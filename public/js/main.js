@@ -560,7 +560,8 @@ function removeRemote(id) {
 }
 
 function updateRemotes(dt, t) {
-  for (const r of remotes.values()) {
+  const smp = sampleSnapshots();
+  for (const [id, r] of remotes) {
     const u = r.model.userData;
     if (!r.alive) {
       // animação de queda
@@ -570,13 +571,38 @@ function updateRemotes(dt, t) {
       if (r.deadT > 1.4) r.model.visible = false;
       continue;
     }
-    const k = 1 - Math.exp(-14 * dt);
-    r.model.position.lerp(r.target, k);
-    // yaw pelo caminho mais curto
-    let dy = r.tYaw - r.yaw;
-    while (dy > Math.PI) dy -= Math.PI * 2;
-    while (dy < -Math.PI) dy += Math.PI * 2;
-    r.yaw += dy * k;
+
+    // posição/rotação interpoladas entre dois snapshots do servidor
+    if (smp) {
+      const a0 = smp.a.p[id];
+      const a1 = smp.b ? smp.b.p[id] : null;
+      let px, py, pz, yw, pt;
+      if (a0 && a1) {
+        // teleporte (respawn): não desliza pelo mapa
+        if (Math.hypot(a1[0] - a0[0], a1[2] - a0[2]) > 12) {
+          px = a1[0]; py = a1[1]; pz = a1[2]; yw = a1[3]; pt = a1[4];
+        } else {
+          const al = smp.alpha;
+          px = a0[0] + (a1[0] - a0[0]) * al;
+          py = a0[1] + (a1[1] - a0[1]) * al;
+          pz = a0[2] + (a1[2] - a0[2]) * al;
+          let dyw = a1[3] - a0[3];
+          while (dyw > Math.PI) dyw -= Math.PI * 2;
+          while (dyw < -Math.PI) dyw += Math.PI * 2;
+          yw = a0[3] + dyw * al;
+          pt = a0[4] + (a1[4] - a0[4]) * al;
+        }
+      } else if (a0 || a1) {
+        const a = a0 || a1;
+        px = a[0]; py = a[1]; pz = a[2]; yw = a[3]; pt = a[4];
+      }
+      if (px !== undefined) {
+        r.model.position.set(px, py, pz);
+        r.target.set(px, py, pz);
+        r.yaw = yw;
+        r.pitch = pt;
+      }
+    }
     r.model.rotation.y = r.yaw;
     u.arms.rotation.x = -r.pitch * 0.7;
     u.head.rotation.x = -r.pitch * 0.4;
@@ -986,6 +1012,7 @@ function showKillPop() {
 function clearRoomState() {
   for (const id of [...remotes.keys()]) removeRemote(id);
   meta.clear();
+  snapBuf.length = 0;
   hud.feed.textContent = '';
   hud.death.classList.remove('show');
   hud.endscreen.classList.remove('show');
@@ -1011,18 +1038,38 @@ net.on('init', msg => {
 });
 net.on('j', msg => addRemote(msg.p));
 net.on('l', msg => removeRemote(msg.id));
+// Buffer de snapshots para interpolação suave (estilo FPS grandes):
+// renderizamos os remotos ~100ms no passado, interpolando entre dois
+// estados conhecidos — movimento liso mesmo com ping alto/oscilante.
+const SNAP_INTERP_MS = 100;
+const snapBuf = []; // { t: performance.now() na chegada, p: estados }
+
 net.on('s', msg => {
+  snapBuf.push({ t: performance.now(), p: msg.p });
+  while (snapBuf.length > 60) snapBuf.shift();
   for (const [id, a] of Object.entries(msg.p)) {
     const r = remotes.get(+id);
     if (!r) continue;
-    r.target.set(a[0], a[1], a[2]);
-    r.tYaw = a[3];
-    r.pitch = a[4];
     r.anim = a[5];
     r.hp = a[6];
   }
   if (typeof msg.tl === 'number') updateMatchBar(msg.tl, msg.ts);
 });
+
+// Acha o par de snapshots que envolve o tempo de render (agora - atraso)
+function sampleSnapshots() {
+  if (!snapBuf.length) return null;
+  const rt = performance.now() - SNAP_INTERP_MS;
+  for (let i = snapBuf.length - 1; i >= 0; i--) {
+    if (snapBuf[i].t <= rt) {
+      const s0 = snapBuf[i], s1 = snapBuf[i + 1];
+      if (!s1) return { a: s0, b: null, alpha: 0 };  // sem snapshot novo: congela no último
+      const alpha = Math.min(1, (rt - s0.t) / ((s1.t - s0.t) || 1));
+      return { a: s0, b: s1, alpha };
+    }
+  }
+  return { a: snapBuf[0], b: null, alpha: 0 };        // tudo mais novo que rt: usa o mais antigo
+}
 
 function computeTeamScores() {
   const s = [0, 0];
