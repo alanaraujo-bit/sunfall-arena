@@ -9,7 +9,7 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
     }
   }
@@ -20,7 +20,8 @@
 
   <!-- HUD -->
   <div id="hud">
-    <div id="perf" class="hidden"><span id="perf-fps">-- FPS</span><span id="perf-ping">-- ms</span></div>
+    <div id="perf" class="hidden"><span id="perf-fps">-- FPS</span><span id="perf-ping">-- ms</span><span id="perf-draw"></span></div>
+    <div id="fps-hint">FPS baixo — abra ⚙ CONFIGURAÇÕES e reduza a qualidade gráfica</div>
     <div id="cross"><span></span><span></span><span></span><span></span><i></i></div>
     <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
     <div id="dmg-flash"></div>
@@ -132,6 +133,12 @@
     </div>
 
     <div id="menu-status"></div>
+
+    <div id="gl-warn" class="hidden">
+      ⚠ A <b>aceleração de hardware</b> do seu navegador está <b>desligada</b> — o jogo vai rodar lento
+      em qualquer configuração. Ative em Configurações do navegador → Sistema →
+      “Usar aceleração de hardware” e reinicie o navegador.
+    </div>
 
     <div id="invite-banner" class="hidden">
       <span id="invite-text"></span>
@@ -295,11 +302,61 @@
           <div id="cfg-pages">
             <div class="cfg-page" data-page="gfx">
               <div class="cfg-row">
-                <label>Qualidade</label>
+                <label>Qualidade (preset)</label>
                 <select id="set-quality">
+                  <option value="potato">Muito baixa (batata)</option>
                   <option value="low">Baixa</option>
-                  <option value="med">Média</option>
-                  <option value="high" selected>Alta</option>
+                  <option value="med" selected>Média</option>
+                  <option value="high">Alta</option>
+                  <option value="custom" disabled hidden>Personalizada</option>
+                </select>
+              </div>
+              <div class="cfg-row">
+                <label>Escala de resolução</label>
+                <input id="set-scale" type="range" min="40" max="100" step="5" value="100">
+                <b id="set-scale-val">100%</b>
+              </div>
+              <div class="cfg-row">
+                <label>Sombras</label>
+                <select id="set-shadows">
+                  <option value="0">Desligadas</option>
+                  <option value="512">Baixas</option>
+                  <option value="1024" selected>Médias</option>
+                  <option value="2048">Altas</option>
+                </select>
+              </div>
+              <div class="cfg-row">
+                <label>Anti-aliasing</label>
+                <select id="set-aa">
+                  <option value="on" selected>Ligado</option>
+                  <option value="off">Desligado</option>
+                </select>
+              </div>
+              <div id="aa-note" class="cfg-note warn hidden">
+                O anti-aliasing muda ao recarregar a página —
+                <button type="button" id="aa-reload">recarregar agora</button>
+              </div>
+              <div class="cfg-row">
+                <label>Partículas</label>
+                <select id="set-particles">
+                  <option value="off">Desligadas</option>
+                  <option value="low">Reduzidas</option>
+                  <option value="full" selected>Normais</option>
+                </select>
+              </div>
+              <div class="cfg-row">
+                <label>Detalhes do cenário</label>
+                <select id="set-decor">
+                  <option value="off">Desligados</option>
+                  <option value="on" selected>Ligados</option>
+                </select>
+              </div>
+              <div class="cfg-row">
+                <label>Texturas</label>
+                <select id="set-tex">
+                  <option value="low">Baixas</option>
+                  <option value="med" selected>Médias</option>
+                  <option value="high">Altas</option>
                 </select>
               </div>
               <div class="cfg-row">
@@ -307,7 +364,8 @@
                 <input id="set-fov" type="range" min="70" max="110" step="1" value="78">
                 <b id="set-fov-val">78</b>
               </div>
-              <div class="cfg-note">A qualidade afeta sombras, detalhe do cenário e texturas. Baixe se o FPS estiver ruim.</div>
+              <div id="gpu-line" class="cfg-note">GPU em uso: detectando…</div>
+              <div class="cfg-note">Escala de resolução é o que mais pesa no FPS. Sombras e anti-aliasing vêm em seguida.</div>
             </div>
             <div class="cfg-page hidden" data-page="ctl">
               <div class="cfg-row sens-row">

@@ -14,15 +14,71 @@ import { SFX } from './audio.js';
 const errlog = document.getElementById('errlog');
 window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; });
 
+// ---------------- Configurações (antes do renderer — AA e escala dependem delas) ----------------
+const DEFAULT_BINDS = {
+  forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
+  jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR',
+  w1: 'Digit1', w2: 'Digit2', board: 'Tab'
+};
+const BIND_LABELS = {
+  forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
+  jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar',
+  w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
+};
+
+// Presets de qualidade — cada um define as opções individuais.
+// scale = % da resolução; shadows = tamanho do shadow map (0 = sem sombra)
+const PRESETS = {
+  potato: { scale: 50,  shadows: 0,    aa: 'off', particles: 'off',  decor: 'off', texq: 'low' },
+  low:    { scale: 75,  shadows: 0,    aa: 'off', particles: 'low',  decor: 'off', texq: 'low' },
+  med:    { scale: 100, shadows: 1024, aa: 'on',  particles: 'full', decor: 'on',  texq: 'med' },
+  high:   { scale: 100, shadows: 2048, aa: 'on',  particles: 'full', decor: 'on',  texq: 'high' }
+};
+
+let settings = {
+  preset: 'med', ...PRESETS.med,
+  fov: 78, vol: 50, perf: 'on', binds: { ...DEFAULT_BINDS }
+};
+try {
+  const saved = JSON.parse(localStorage.getItem('sf_settings') || '{}');
+  // migração do formato antigo ({ quality: 'low'|'med'|'high' })
+  if (saved.quality && !saved.preset) {
+    saved.preset = saved.quality;
+    Object.assign(saved, PRESETS[saved.quality] || PRESETS.med);
+    delete saved.quality;
+  }
+  settings = { ...settings, ...saved, binds: { ...DEFAULT_BINDS, ...(saved.binds || {}) } };
+} catch { /* settings corrompidas: usa padrão */ }
+const binds = settings.binds;
+const saveSettings = () => localStorage.setItem('sf_settings', JSON.stringify(settings));
+
 // ---------------- Setup básico ----------------
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// powerPreference: 'high-performance' faz o navegador escolher a GPU
+// dedicada (RTX/GTX/Radeon) em máquinas híbridas — sem isso o jogo
+// pode rodar inteiro na GPU integrada, mesmo com placa boa parada.
+const AA_ACTIVE = settings.aa !== 'off'; // AA só muda recriando o contexto (recarregar)
+const renderer = new THREE.WebGLRenderer({
+  antialias: AA_ACTIVE,
+  powerPreference: 'high-performance',
+  stencil: false
+});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * (settings.scale / 100));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = settings.shadows > 0;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 document.getElementById('app').appendChild(renderer.domElement);
+
+// Identifica a GPU real em uso. Renderização por software (SwiftShader)
+// = aceleração de hardware desligada no navegador — causa nº 1 de FPS baixo.
+let gpuName = '';
+try {
+  const gl = renderer.getContext();
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  gpuName = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || '');
+} catch { /* alguns navegadores bloqueiam a extensão */ }
+const SOFTWARE_GL = /swiftshader|llvmpipe|software|basic render/i.test(gpuName);
 
 const scene = new THREE.Scene();
 let BASE_FOV = 78;
@@ -36,29 +92,10 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// ---------------- Configurações ----------------
-const DEFAULT_BINDS = {
-  forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
-  jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR',
-  w1: 'Digit1', w2: 'Digit2', board: 'Tab'
-};
-const BIND_LABELS = {
-  forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
-  jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar',
-  w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
-};
-
-let settings = { quality: 'high', fov: 78, vol: 50, perf: 'on', binds: { ...DEFAULT_BINDS } };
-try {
-  const saved = JSON.parse(localStorage.getItem('sf_settings') || '{}');
-  settings = { ...settings, ...saved, binds: { ...DEFAULT_BINDS, ...(saved.binds || {}) } };
-} catch { /* settings corrompidas: usa padrão */ }
-const binds = settings.binds;
-const saveSettings = () => localStorage.setItem('sf_settings', JSON.stringify(settings));
-
-// Aplica qualidade de textura antes de construir o mundo
-setTexQuality(settings.quality);
-const world = buildWorld(scene, settings.quality);
+// Constrói o mundo (texturas na qualidade configurada)
+setTexQuality(settings.texq);
+let world = buildWorld(scene, { decor: settings.decor !== 'off' });
+let worldDecor = settings.decor, worldTexq = settings.texq;
 
 // Personagem em destaque no lobby (showcase giratório na praça central)
 const lobbyChar = makeCharacter('#3fc8b4');
@@ -115,8 +152,12 @@ const hud = {
   stWins: $('st-wins'), stMatches: $('st-matches'), stKills: $('st-kills'),
   stDeaths: $('st-deaths'), stKd: $('st-kd'), stHs: $('st-hs'),
   setQuality: $('set-quality'), setFov: $('set-fov'), setFovVal: $('set-fov-val'),
+  setScale: $('set-scale'), setScaleVal: $('set-scale-val'),
+  setShadows: $('set-shadows'), setAa: $('set-aa'), aaNote: $('aa-note'), aaReload: $('aa-reload'),
+  setParticles: $('set-particles'), setDecor: $('set-decor'), setTex: $('set-tex'),
+  gpuLine: $('gpu-line'), fpsHint: $('fps-hint'),
   setVol: $('set-vol'), setVolVal: $('set-vol-val'), setPerf: $('set-perf'),
-  perf: $('perf'), perfFps: $('perf-fps'), perfPing: $('perf-ping'),
+  perf: $('perf'), perfFps: $('perf-fps'), perfPing: $('perf-ping'), perfDraw: $('perf-draw'),
   bindsList: $('binds-list'), bindsReset: $('binds-reset'),
   navRank: $('nav-rank'),
   rankSearch: $('rank-search'), rankSearchBtn: $('rank-search-btn'),
@@ -138,30 +179,36 @@ hud.sens.oninput = () => {
 };
 
 function applyGraphics() {
-  if (settings.quality === 'low') {
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 0.75));
-    renderer.toneMapping = THREE.NoToneMapping;
-    world.sun.castShadow = false;
-    scene.fog.near = 40;
-    scene.fog.far = 140;
-  } else if (settings.quality === 'med') {
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    world.sun.castShadow = true;
-    world.sun.shadow.mapSize.set(1024, 1024);
-    world.sun.shadow.map = null; // force regen at new size
-    scene.fog.near = 55;
-    scene.fog.far = 200;
-  } else {
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    world.sun.castShadow = true;
-    world.sun.shadow.mapSize.set(2048, 2048);
-    world.sun.shadow.map = null; // force regen at new size
-    scene.fog.near = 70;
-    scene.fog.far = 260;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * (settings.scale / 100));
+  const tone = settings.preset === 'potato' ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+  if (renderer.toneMapping !== tone) {
+    renderer.toneMapping = tone;
+    // tone mapping é compilado no shader — força recompilar os materiais
+    scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
   }
+  const sh = +settings.shadows;
+  renderer.shadowMap.enabled = sh > 0;
+  world.sun.castShadow = sh > 0;
+  if (sh > 0 && world.sun.shadow.mapSize.x !== sh) {
+    world.sun.shadow.mapSize.set(sh, sh);
+    if (world.sun.shadow.map) { world.sun.shadow.map.dispose(); world.sun.shadow.map = null; }
+  }
+  // sem decoração, a névoa aproxima e esconde o mapa vazio ao longe
+  scene.fog.near = settings.decor === 'off' ? 45 : 70;
+  scene.fog.far = settings.decor === 'off' ? 150 : 260;
   BASE_FOV = settings.fov;
+}
+
+// Reconstrói o mundo ao vivo quando decoração/texturas mudam
+function maybeRebuildWorld() {
+  if (worldDecor === settings.decor && worldTexq === settings.texq) return;
+  worldDecor = settings.decor;
+  worldTexq = settings.texq;
+  scene.remove(world.group);
+  world.dispose();
+  setTexQuality(settings.texq);
+  world = buildWorld(scene, { decor: settings.decor !== 'off' });
+  applyGraphics(); // reaplica sombras/névoa no sol novo
 }
 
 function keyLabel(code) {
@@ -221,8 +268,60 @@ hud.bindsReset.onclick = () => {
   buildBindsUI();
 };
 
-hud.setQuality.value = settings.quality;
-hud.setQuality.onchange = () => { settings.quality = hud.setQuality.value; applyGraphics(); saveSettings(); };
+// ---- Controles de gráficos ----
+function syncGfxControls() {
+  hud.setQuality.value = PRESETS[settings.preset] ? settings.preset : 'custom';
+  hud.setScale.value = settings.scale;
+  hud.setScaleVal.textContent = settings.scale + '%';
+  hud.setShadows.value = String(settings.shadows);
+  hud.setAa.value = settings.aa;
+  hud.setParticles.value = settings.particles;
+  hud.setDecor.value = settings.decor;
+  hud.setTex.value = settings.texq;
+  updateAaNote();
+}
+function updateAaNote() {
+  // AA só é aplicado na criação do contexto WebGL — exige recarregar
+  const pending = (settings.aa !== 'off') !== AA_ACTIVE;
+  hud.aaNote.classList.toggle('hidden', !pending);
+}
+function afterGfxChange() {
+  saveSettings();
+  applyGraphics();
+  maybeRebuildWorld();
+  updateAaNote();
+}
+hud.setQuality.onchange = () => {
+  const p = hud.setQuality.value;
+  if (!PRESETS[p]) return;
+  settings.preset = p;
+  Object.assign(settings, PRESETS[p]);
+  syncGfxControls();
+  afterGfxChange();
+};
+function customize(key, val) {
+  settings[key] = val;
+  settings.preset = 'custom';
+  hud.setQuality.value = 'custom';
+  afterGfxChange();
+}
+hud.setScale.oninput = () => {
+  hud.setScaleVal.textContent = hud.setScale.value + '%';
+  customize('scale', +hud.setScale.value);
+};
+hud.setShadows.onchange = () => customize('shadows', +hud.setShadows.value);
+hud.setAa.onchange = () => customize('aa', hud.setAa.value);
+hud.setParticles.onchange = () => customize('particles', hud.setParticles.value);
+hud.setDecor.onchange = () => customize('decor', hud.setDecor.value);
+hud.setTex.onchange = () => customize('texq', hud.setTex.value);
+hud.aaReload.onclick = () => location.reload();
+hud.gpuLine.textContent = 'GPU em uso: ' + (gpuName || 'desconhecida');
+if (SOFTWARE_GL) {
+  hud.gpuLine.classList.add('warn');
+  hud.gpuLine.textContent += ' — SEM aceleração de hardware!';
+  $('gl-warn').classList.remove('hidden');
+}
+syncGfxControls();
 hud.setFov.value = settings.fov;
 hud.setFovVal.textContent = settings.fov;
 hud.setFov.oninput = () => {
@@ -248,17 +347,27 @@ buildBindsUI();
 
 // ---------------- FPS / Ping ----------------
 let fpsAccum = 0, fpsFrames = 0, fpsShown = 0, ping = 0;
-function updatePerf(dt, t) {
-  if (settings.perf !== 'on') return;
+let fpsLowT = 0, fpsHintDone = false;
+function updatePerf(dt) {
   fpsAccum += dt; fpsFrames++;
-  if (fpsAccum >= 0.4) {
-    fpsShown = Math.round(fpsFrames / fpsAccum);
-    fpsAccum = 0; fpsFrames = 0;
-    hud.perfFps.textContent = `${fpsShown} FPS`;
-    hud.perfFps.className = fpsShown >= 50 ? '' : (fpsShown >= 30 ? 'mid' : 'low');
-    hud.perfPing.textContent = ping ? `${ping} ms` : '-- ms';
-    hud.perfPing.className = ping < 80 ? '' : (ping < 150 ? 'mid' : 'high');
+  if (fpsAccum < 0.4) return;
+  fpsShown = Math.round(fpsFrames / fpsAccum);
+  fpsAccum = 0; fpsFrames = 0;
+
+  // FPS baixo sustentado em partida → dica única para baixar a qualidade
+  if (playing && fpsShown < 40) fpsLowT += 0.4; else fpsLowT = 0;
+  if (fpsLowT >= 8 && !fpsHintDone && settings.preset !== 'potato') {
+    fpsHintDone = true;
+    hud.fpsHint.classList.add('show');
+    setTimeout(() => hud.fpsHint.classList.remove('show'), 9000);
   }
+
+  if (settings.perf !== 'on') return;
+  hud.perfFps.textContent = `${fpsShown} FPS`;
+  hud.perfFps.className = fpsShown >= 50 ? '' : (fpsShown >= 30 ? 'mid' : 'low');
+  hud.perfPing.textContent = ping ? `${ping} ms` : '-- ms';
+  hud.perfPing.className = ping < 80 ? '' : (ping < 150 ? 'mid' : 'high');
+  hud.perfDraw.textContent = `${renderer.info.render.calls} dc`;
 }
 
 // (o handler de 'pong' e o envio de ping ficam após `const net` ser criado)
@@ -579,8 +688,8 @@ function spawnTracer(a, b, color = 0xffd9a0) {
 }
 
 function spawnBurst(point, texture, n = 6, speed = 3, size = 0.14, up = 2) {
-  // reduz partículas em qualidade baixa
-  const count = settings.quality === 'low' ? Math.ceil(n * 0.4) : n;
+  if (settings.particles === 'off') return;
+  const count = settings.particles === 'low' ? Math.ceil(n * 0.4) : n;
   const mat = getParticleMat(texture);
   for (let i = 0; i < count; i++) {
     const s = new THREE.Sprite(mat);
@@ -631,7 +740,7 @@ function updateEffects(dt) {
 
 // ---------------- Nametags ----------------
 function makeNametag(name, color) {
-  const sz = settings.quality === 'low' ? 128 : 256;
+  const sz = settings.texq === 'low' ? 128 : 256;
   const c = document.createElement('canvas');
   c.width = sz; c.height = sz >> 2;
   const ctx = c.getContext('2d');
@@ -1213,23 +1322,37 @@ function computeTeamScores() {
   return s;
 }
 
+// cache dos últimos valores — evita reescrever o DOM 30x/segundo
+let _mbTimeLast = '', _mbScoreLast = '';
 function updateMatchBar(secondsLeft, teamScoresArr) {
   const m = Math.floor(secondsLeft / 60), s = secondsLeft % 60;
-  hud.mbTime.textContent = `${m}:${String(s).padStart(2, '0')}`;
-  hud.mbTime.classList.toggle('low', secondsLeft <= 60 && secondsLeft > 0);
+  const timeTxt = `${m}:${String(s).padStart(2, '0')}`;
+  if (timeTxt !== _mbTimeLast) {
+    _mbTimeLast = timeTxt;
+    hud.mbTime.textContent = timeTxt;
+    hud.mbTime.classList.toggle('low', secondsLeft <= 60 && secondsLeft > 0);
+  }
 
   if (roomInfo && roomInfo.gm === 'tdm') {
     const ts = teamScoresArr || computeTeamScores();
     const mine = me.team === 1 ? 1 : 0, foe = 1 - mine;
-    hud.mbScore.innerHTML =
+    const scoreHtml =
       `<span style="color:${TEAM_COLORS[mine]};font-weight:bold">${ts[mine]}</span>` +
       ` <span style="opacity:.5">—</span> ` +
       `<span style="color:${TEAM_COLORS[foe]}">${ts[foe]}</span>` +
       ` <span style="opacity:.5;font-size:12px">/${roomInfo.kl}</span>`;
+    if (scoreHtml !== _mbScoreLast) {
+      _mbScoreLast = scoreHtml;
+      hud.mbScore.innerHTML = scoreHtml;
+    }
   } else {
     let lead = me.k || 0;
     for (const p of meta.values()) if (p.k > lead) lead = p.k;
-    hud.mbScore.textContent = `${lead}/${roomInfo ? roomInfo.kl : '-'}`;
+    const scoreTxt = `${lead}/${roomInfo ? roomInfo.kl : '-'}`;
+    if (scoreTxt !== _mbScoreLast) {
+      _mbScoreLast = scoreTxt;
+      hud.mbScore.textContent = scoreTxt;
+    }
   }
 }
 net.on('fire', msg => {
@@ -1803,7 +1926,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
-  updatePerf(dt, t);
+  updatePerf(dt);
   world.update(t);
   updateEffects(dt);
   updateRemotes(dt, t);

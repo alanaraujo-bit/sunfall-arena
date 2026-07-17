@@ -1,31 +1,46 @@
 // ============================================================
 // Construção visual do mundo: geometria estilizada, iluminação
 // de fim de tarde, decoração e modelos de personagem/armas.
+//
+// Performance: toda a geometria estática é FUNDIDA por material
+// (BufferGeometryUtils.mergeGeometries) — o mapa inteiro vira
+// ~30 draw calls em vez de centenas, e a passada de sombra idem.
 // ============================================================
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { SOLIDS } from '/shared/mapdata.js';
 import { tex, skyTex } from './textures.js';
 
 const TEAL = 0x3fc8b4, CORAL = 0xd95350, CREAM = 0xf2e3c8;
 
-function mat(name, opts = {}) {
-  return new THREE.MeshStandardMaterial({
-    map: tex(name), roughness: 0.95, metalness: 0, ...opts
-  });
+// Materiais compartilhados por chave — 1 material por textura/cor
+// significa 1 draw call por bucket depois do merge. Limpo a cada
+// buildWorld para acompanhar mudanças de qualidade de textura.
+const _mats = new Map();
+function cmat(key, make) {
+  let m = _mats.get(key);
+  if (!m) { m = make(); _mats.set(key, m); }
+  return m;
 }
 
-function texRepeat(name, rx, ry) {
-  const t = tex(name).clone();
-  t.needsUpdate = true;
-  t.repeat.set(rx, ry);
-  return t;
+function mat(name) {
+  return cmat('tex:' + name, () => new THREE.MeshStandardMaterial({
+    map: tex(name), roughness: 0.95, metalness: 0
+  }));
+}
+
+// Multiplica as UVs da geometria — substitui clones de textura com
+// repeat próprio (permite compartilhar material e fundir geometria).
+function scaleUV(geo, rx, ry) {
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rx, uv.getY(i) * ry);
+  return geo;
 }
 
 // Deslocamento pseudo-aleatório determinístico p/ rochas
 function jitterGeo(geo, amp, ampY = amp * 0.6, keepBottom = true) {
   const pos = geo.attributes.position;
-  const minY = geo.boundingBox ? geo.boundingBox.min.y : -Infinity;
   geo.computeBoundingBox();
   const bMin = geo.boundingBox.min.y;
   for (let i = 0; i < pos.count; i++) {
@@ -63,15 +78,17 @@ function makeBarrel(s) {
   );
   body.castShadow = body.receiveShadow = true;
   grp.add(body);
-  const ringMat = new THREE.MeshStandardMaterial({ color: 0x46525c, roughness: 0.6, metalness: 0.4 });
+  const ringMat = cmat('barrel-ring', () =>
+    new THREE.MeshStandardMaterial({ color: 0x46525c, roughness: 0.6, metalness: 0.4 }));
   for (const y of [-s.h * 0.3, s.h * 0.3]) {
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.0, r * 1.0, 0.09, 14), ringMat);
     ring.position.y = y;
     ring.castShadow = true;
     grp.add(ring);
   }
-  const lid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.8, 0.05, 14),
+  const lidMat = cmat('barrel-lid', () =>
     new THREE.MeshStandardMaterial({ color: 0x6e4a2d, roughness: 0.9 }));
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.8, 0.05, 14), lidMat);
   lid.position.y = s.h / 2;
   grp.add(lid);
   return grp;
@@ -93,10 +110,9 @@ function makePalm(s) {
     oy += 0.8;
   }
   // copa
-  const leafT = tex('leaf');
-  const leafM = new THREE.MeshStandardMaterial({
-    map: leafT, side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.9
-  });
+  const leafM = cmat('leaf', () => new THREE.MeshStandardMaterial({
+    map: tex('leaf'), side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.9
+  }));
   const crown = new THREE.Group();
   crown.position.set(ox, oy + 0.2, 0);
   for (let i = 0; i < 7; i++) {
@@ -108,7 +124,8 @@ function makePalm(s) {
     holder.add(leaf);
     crown.add(holder);
   }
-  const cocoM = new THREE.MeshStandardMaterial({ color: 0x7c5433, roughness: 0.85 });
+  const cocoM = cmat('coco', () =>
+    new THREE.MeshStandardMaterial({ color: 0x7c5433, roughness: 0.85 }));
   for (const [cx, cz] of [[0.2, 0.12], [-0.15, -0.18]]) {
     const coco = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), cocoM);
     coco.position.set(cx, -0.15, cz);
@@ -119,16 +136,18 @@ function makePalm(s) {
   return grp;
 }
 
+const rockFlatM = () => cmat('rock-flat', () => new THREE.MeshStandardMaterial({
+  map: tex('rock'), roughness: 1, flatShading: true
+}));
+
 function makeCliff(s) {
   const geo = new THREE.BoxGeometry(
     s.w + 1.5, s.h + 3, s.d + 1.5,
     Math.max(2, Math.ceil(s.w / 4)), 3, Math.max(2, Math.ceil(s.d / 4))
   );
   jitterGeo(geo, 1.1, 0.8);
-  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    map: texRepeat('rock', Math.max(s.w, s.d) / 8, s.h / 8),
-    roughness: 1, flatShading: true
-  }));
+  scaleUV(geo, Math.max(s.w, s.d) / 8, s.h / 8);
+  const m = new THREE.Mesh(geo, rockFlatM());
   m.castShadow = m.receiveShadow = true;
   return m;
 }
@@ -136,14 +155,12 @@ function makeCliff(s) {
 function makeRock(s) {
   const geo = new THREE.BoxGeometry(s.w, s.h + 0.6, s.d, 3, 3, 3);
   jitterGeo(geo, 0.35, 0.3);
-  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    map: tex('rock'), roughness: 1, flatShading: true
-  }));
+  const m = new THREE.Mesh(geo, rockFlatM());
   m.castShadow = m.receiveShadow = true;
   return m;
 }
 
-// Bloco de construção com textura repetida conforme dimensão
+// Bloco de construção com repeat de textura embutido nas UVs
 function makeBlock(s) {
   const geo = s.w < 3 && s.h < 3 && s.d < 3
     ? new RoundedBoxGeometry(s.w, s.h, s.d, 2, 0.05)
@@ -152,16 +169,14 @@ function makeBlock(s) {
   const plaster = s.mat.startsWith('plaster');
   const ry = plaster ? 1 : Math.max(1, s.h / 2.6);
   const rx = plaster ? Math.max(1, Math.round(Math.max(s.w, s.d) / 4)) : Math.max(1, Math.max(s.w, s.d) / 2.6);
-  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    map: texRepeat(s.mat, rx, ry),
-    roughness: 0.95
-  }));
+  scaleUV(geo, rx, ry);
+  const m = new THREE.Mesh(geo, mat(s.mat));
   m.castShadow = m.receiveShadow = true;
   return m;
 }
 
 // Fachada: janelas, porta, cornija e toldo para blocos 'plaster' grandes
-function decorateBuilding(scene, s) {
+function decorateBuilding(staticRoot, s) {
   const grp = new THREE.Group();
   // cornija no topo
   const trim = new THREE.Mesh(
@@ -174,10 +189,11 @@ function decorateBuilding(scene, s) {
   const faceX = Math.abs(s.x) > Math.abs(s.z);
   const sign = faceX ? -Math.sign(s.x) : -Math.sign(s.z);
   const half = (faceX ? s.w : s.d) / 2 + 0.02;
-  const winM = new THREE.MeshStandardMaterial({ map: tex('window'), roughness: 0.8 });
-  const doorM = new THREE.MeshStandardMaterial({
+  const winM = cmat('window', () =>
+    new THREE.MeshStandardMaterial({ map: tex('window'), roughness: 0.8 }));
+  const doorM = cmat('door', () => new THREE.MeshStandardMaterial({
     map: tex('door'), alphaTest: 0.5, roughness: 0.9, side: THREE.DoubleSide
-  });
+  }));
 
   const place = (mesh, along, up) => {
     if (faceX) {
@@ -200,18 +216,21 @@ function decorateBuilding(scene, s) {
 
   // toldo listrado sobre a porta
   const awnGrp = new THREE.Group();
-  const awn = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3),
+  const awnM = cmat('awning', () =>
     new THREE.MeshStandardMaterial({ map: tex('awning'), side: THREE.DoubleSide, roughness: 0.9 }));
+  const awn = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), awnM);
   awn.rotation.x = -Math.PI / 2 + 0.5;
   awn.position.y = -0.28;
   awn.position.z = 0.55;
   awn.castShadow = true;
   awnGrp.add(awn);
-  const edge = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.3),
+  const edgeM = cmat('awning-edge', () =>
     new THREE.MeshStandardMaterial({ map: tex('awningEdge'), alphaTest: 0.4, side: THREE.DoubleSide }));
+  const edge = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.3), edgeM);
   edge.position.set(0, -0.62, 1.12);
   awnGrp.add(edge);
-  const poleM = new THREE.MeshStandardMaterial({ color: 0x6e4a2d, roughness: 0.9 });
+  const poleM = cmat('pole', () =>
+    new THREE.MeshStandardMaterial({ color: 0x6e4a2d, roughness: 0.9 }));
   for (const px of [-1.2, 1.2]) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 3.0, 6), poleM);
     pole.position.set(px, -1.55, 1.1);
@@ -225,60 +244,103 @@ function decorateBuilding(scene, s) {
     awnGrp.rotation.y = sign > 0 ? 0 : Math.PI;
   }
   grp.add(awnGrp);
-  scene.add(grp);
+  staticRoot.add(grp);
+}
+
+// Funde toda a geometria de um grupo em 1 mesh por material.
+function mergeStatics(srcRoot, dstRoot) {
+  srcRoot.updateMatrixWorld(true);
+  const buckets = new Map(); // material -> { geos, cast, recv }
+  srcRoot.traverse(o => {
+    if (!o.isMesh) return;
+    let b = buckets.get(o.material);
+    if (!b) { b = { geos: [], cast: false, recv: false }; buckets.set(o.material, b); }
+    b.geos.push(o.geometry.clone().applyMatrix4(o.matrixWorld));
+    b.cast = b.cast || o.castShadow;
+    b.recv = b.recv || o.receiveShadow;
+    o.geometry.dispose();
+  });
+  for (const [material, b] of buckets) {
+    const merged = b.geos.length === 1
+      ? b.geos[0]
+      : BufferGeometryUtils.mergeGeometries(b.geos, false);
+    if (!merged) continue;
+    if (b.geos.length > 1) for (const g of b.geos) g.dispose();
+    const m = new THREE.Mesh(merged, material);
+    m.castShadow = b.cast;
+    m.receiveShadow = b.recv;
+    m.matrixAutoUpdate = false; // estático: nunca recalcular matriz
+    dstRoot.add(m);
+  }
 }
 
 // ---------------- Mundo ----------------
 
-export function buildWorld(scene, quality = 'high') {
+export function buildWorld(scene, opts = {}) {
+  const decor = opts.decor !== false;
   const animated = [];
-  const low = quality === 'low';
-  const high = quality === 'high';
 
-  // Céu + névoa quente
+  _mats.clear(); // materiais novos por build (texturas podem ter trocado de tamanho)
+
+  const root = new THREE.Group();        // tudo do mundo (removível p/ rebuild)
+  const staticRoot = new THREE.Group();  // temporário: vira meshes fundidos
+  const liveRoot = new THREE.Group();    // luzes, céu e objetos animados
+  root.add(liveRoot);
+
+  // Céu + névoa quente — raio pequeno o bastante p/ caber no far plane
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(300, low ? 16 : 24, low ? 10 : 14),
+    new THREE.SphereGeometry(120, 24, 14),
     new THREE.MeshBasicMaterial({ map: skyTex(), side: THREE.BackSide, fog: false })
   );
-  scene.add(sky);
+  sky.frustumCulled = false;
+  liveRoot.add(sky);
   scene.fog = new THREE.Fog(0xecca9c, 70, 260);
 
   // Iluminação de fim de tarde
-  scene.add(new THREE.HemisphereLight(0xbcd8e8, 0xd8a86a, 0.85));
-  if (!low) scene.add(new THREE.AmbientLight(0xffe8c8, 0.25));
-  const sun = new THREE.DirectionalLight(0xffe3b0, low ? 2.8 : 2.4);
+  liveRoot.add(new THREE.HemisphereLight(0xbcd8e8, 0xd8a86a, 0.85));
+  if (decor) liveRoot.add(new THREE.AmbientLight(0xffe8c8, 0.25));
+  const sun = new THREE.DirectionalLight(0xffe3b0, decor ? 2.4 : 2.8);
   sun.position.set(45, 55, 18);
-  sun.castShadow = !low;
-  sun.shadow.mapSize.set(high ? 2048 : 1024, high ? 2048 : 1024);
+  sun.castShadow = false; // ligado depois via applyGraphics conforme a config
+  sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.left = -52; sun.shadow.camera.right = 52;
   sun.shadow.camera.top = 52; sun.shadow.camera.bottom = -52;
   sun.shadow.camera.near = 5; sun.shadow.camera.far = 160;
   sun.shadow.bias = -0.0008;
-  scene.add(sun);
+  liveRoot.add(sun);
 
   // Chão de areia
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(220, 220),
-    new THREE.MeshStandardMaterial({ map: texRepeat('sand', 18, 18), roughness: 1 })
-  );
+  const groundM = cmat('ground', () => {
+    const t = tex('sand').clone();
+    t.needsUpdate = true;
+    t.repeat.set(18, 18);
+    return new THREE.MeshStandardMaterial({ map: t, roughness: 1 });
+  });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), groundM);
   ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = !low;
-  scene.add(ground);
+  ground.receiveShadow = true;
+  staticRoot.add(ground);
 
   // Praça central em pedra
-  const plaza = new THREE.Mesh(
-    new THREE.CircleGeometry(9, low ? 16 : 28),
-    new THREE.MeshStandardMaterial({ map: texRepeat('plaza', 4, 4), roughness: 1 })
-  );
+  const plazaM = cmat('plaza-m', () => {
+    const t = tex('plaza').clone();
+    t.needsUpdate = true;
+    t.repeat.set(4, 4);
+    return new THREE.MeshStandardMaterial({ map: t, roughness: 1 });
+  });
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(9, 28), plazaM);
   plaza.rotation.x = -Math.PI / 2;
   plaza.position.y = 0.02;
-  plaza.receiveShadow = !low;
-  scene.add(plaza);
+  plaza.receiveShadow = true;
+  staticRoot.add(plaza);
 
   // Trilhas de areia escura ligando os pontos de interesse
-  if (!low) {
-    const pathM = new THREE.MeshStandardMaterial({
-      map: texRepeat('sand', 3, 10), color: 0xbfa070, roughness: 1
+  if (decor) {
+    const pathM = cmat('path', () => {
+      const t = tex('sand').clone();
+      t.needsUpdate = true;
+      t.repeat.set(3, 10);
+      return new THREE.MeshStandardMaterial({ map: t, color: 0xbfa070, roughness: 1 });
     });
     const paths = [
       [0, 0, -22, -18, 3.2], [0, 0, 20, -20, 3.2],
@@ -292,7 +354,7 @@ export function buildWorld(scene, quality = 'high') {
       p.rotation.z = -Math.atan2(dx, dz);
       p.position.set((ax + bx) / 2, 0.012, (az + bz) / 2);
       p.receiveShadow = true;
-      scene.add(p);
+      staticRoot.add(p);
     }
   }
 
@@ -309,37 +371,38 @@ export function buildWorld(scene, quality = 'high') {
     }
     if (s.mat === 'palm') m.position.set(s.x, s.y - s.h / 2, s.z);
     else m.position.set(s.x, s.y, s.z);
-    scene.add(m);
-    // fachada nas casas grandes (pula no low — são só visuais)
-    if (!low && s.mat === 'plaster' && s.h >= 4) decorateBuilding(scene, s);
+    staticRoot.add(m);
+    // fachada nas casas grandes (só com decoração ligada — visual puro)
+    if (decor && s.mat === 'plaster' && s.h >= 4) decorateBuilding(staticRoot, s);
   }
 
   // ---- Decoração ----
 
-  // Cristal do obelisco central
+  // Cristal do obelisco central (animado — fica fora do merge)
   const crystal = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.55),
-    new THREE.MeshStandardMaterial({
+    cmat('crystal', () => new THREE.MeshStandardMaterial({
       color: TEAL, emissive: 0x35e0c8, emissiveIntensity: 1.3, roughness: 0.3
-    })
+    }))
   );
   crystal.position.set(0, 4.15, 0);
-  scene.add(crystal);
-  if (!low) {
+  liveRoot.add(crystal);
+  if (decor) {
     const crystalLight = new THREE.PointLight(0x35e0c8, 26, 14, 2);
     crystalLight.position.set(0, 4.2, 0);
-    scene.add(crystalLight);
+    liveRoot.add(crystalLight);
   }
   animated.push(t => {
     crystal.rotation.y = t * 0.8;
     crystal.position.y = 4.15 + Math.sin(t * 1.6) * 0.12;
   });
 
-  // Estandartes (torre + obelisco) — pula no low
-  if (!low) {
-    const banM = new THREE.MeshStandardMaterial({
+  // Estandartes (torre + obelisco) — animados, fora do merge
+  if (decor) {
+    const banM = cmat('banner', () => new THREE.MeshStandardMaterial({
       map: tex('banner'), side: THREE.DoubleSide, roughness: 0.95
-    });
+    }));
+    const rodM = cmat('rod', () => new THREE.MeshStandardMaterial({ color: 0x6e4a2d }));
     const banners = [[16.4, 9.4, -20, Math.PI / 2], [0, 3.4, 1.36, 0], [0, 3.4, -1.36, Math.PI], [23.6, 8.9, -20, -Math.PI / 2]];
     for (const [bx, by, bz, ry] of banners) {
       const pivot = new THREE.Group();
@@ -347,30 +410,28 @@ export function buildWorld(scene, quality = 'high') {
       pivot.rotation.y = ry;
       const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 2.1), banM);
       cloth.position.y = -1.05;
-      cloth.castShadow = high;
+      cloth.castShadow = true;
       pivot.add(cloth);
-      const rod = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.03, 0.03, 1.15, 6),
-        new THREE.MeshStandardMaterial({ color: 0x6e4a2d }));
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.15, 6), rodM);
       rod.rotation.z = Math.PI / 2;
       pivot.add(rod);
-      scene.add(pivot);
+      liveRoot.add(pivot);
       const phase = bx + bz;
       animated.push(t => { pivot.rotation.x = Math.sin(t * 1.3 + phase) * 0.06; });
     }
   }
 
-  // ---- Decoração visual pura (pula inteira no low — ~70 draw calls) ----
-  if (!low) {
+  // ---- Decoração visual pura (pula inteira com decoração desligada) ----
+  if (decor) {
     // Tapetes na praça
-    const rugM = new THREE.MeshStandardMaterial({ map: tex('rug'), roughness: 1 });
+    const rugM = cmat('rug', () => new THREE.MeshStandardMaterial({ map: tex('rug'), roughness: 1 }));
     for (const [rx, rz, rot, sc] of [[2.8, 3.4, 0.4, 1], [-3.4, -2.6, -0.9, 0.85], [4.2, 21.4, 0.15, 0.9]]) {
       const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.6 * sc, 1.7 * sc), rugM);
       rug.rotation.x = -Math.PI / 2;
       rug.rotation.z = rot;
       rug.position.set(rx, 0.035, rz);
-      rug.receiveShadow = high;
-      scene.add(rug);
+      rug.receiveShadow = true;
+      staticRoot.add(rug);
     }
 
     // Bandeirolas no mercado
@@ -384,17 +445,17 @@ export function buildWorld(scene, quality = 'high') {
       p.y -= Math.sin(t * Math.PI) * 0.75;
       linePts.push(p.clone());
       if (i > 0 && i < 14) {
-        const pen = new THREE.Mesh(buntG, new THREE.MeshStandardMaterial({
-          color: buntColors[i % 4], side: THREE.DoubleSide, roughness: 0.9
-        }));
+        const col = buntColors[i % 4];
+        const pen = new THREE.Mesh(buntG.clone(), cmat('bunt' + col, () =>
+          new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.9 })));
         pen.position.copy(p);
         pen.position.y -= 0.2;
-        scene.add(pen);
+        staticRoot.add(pen);
       }
     }
-    scene.add(new THREE.Line(
+    liveRoot.add(new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(linePts),
-      new THREE.LineBasicMaterial({ color: 0x4a3018 })
+      cmat('bunt-line', () => new THREE.LineBasicMaterial({ color: 0x4a3018 }))
     ));
 
     // Frutas nas bancadas do mercado
@@ -402,19 +463,20 @@ export function buildWorld(scene, quality = 'high') {
     let fi = 0;
     for (const [tx, tz] of [[-3.5, 22], [3.5, 22]]) {
       for (const [ox, oz] of [[-0.6, -0.25], [0.1, 0.3], [0.65, -0.15]]) {
+        const col = fruitCols[fi++ % 4];
         const fruit = new THREE.Mesh(
           new RoundedBoxGeometry(0.34, 0.3, 0.34, 2, 0.1),
-          new THREE.MeshStandardMaterial({ color: fruitCols[fi++ % 4], roughness: 0.7 }));
+          cmat('fruit' + col, () => new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 })));
         fruit.position.set(tx + ox, 1.22, tz + oz);
-        fruit.castShadow = high;
-        scene.add(fruit);
+        fruit.castShadow = true;
+        staticRoot.add(fruit);
       }
     }
 
     // Tufos de grama
-    const grassM = new THREE.MeshStandardMaterial({
+    const grassM = cmat('grass', () => new THREE.MeshStandardMaterial({
       map: tex('grass'), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1
-    });
+    }));
     const grassSpots = [
       [-8, 20], [11, 10], [-20, -4], [17, -12], [-28, -14], [6, -20],
       [-14, 24], [26, 20], [30, -14], [-32, 10], [3, -7], [-25, -24]
@@ -424,23 +486,23 @@ export function buildWorld(scene, quality = 'high') {
         const blade = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.55), grassM);
         blade.position.set(gx + (i - 1) * 0.1, 0.27, gz);
         blade.rotation.y = i * 1.05;
-        scene.add(blade);
+        staticRoot.add(blade);
       }
     }
 
     // Vasos de terracota com plantas
-    const potM = new THREE.MeshStandardMaterial({ color: 0xc9714c, roughness: 0.95 });
-    const bushM = new THREE.MeshStandardMaterial({ color: 0x5aa84e, roughness: 1, flatShading: true });
+    const potM = cmat('pot', () => new THREE.MeshStandardMaterial({ color: 0xc9714c, roughness: 0.95 }));
+    const bushM = cmat('bush', () => new THREE.MeshStandardMaterial({ color: 0x5aa84e, roughness: 1, flatShading: true }));
     for (const [px, pz] of [[-17.5, -13.4], [21.2, 4.2], [-1.8, 24.8], [-23.8, 9.8]]) {
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.5, low ? 6 : 10), potM);
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.5, 10), potM);
       pot.position.set(px, 0.25, pz);
-      pot.castShadow = high;
-      scene.add(pot);
+      pot.castShadow = true;
+      staticRoot.add(pot);
       const bushGeo = jitterGeo(new THREE.SphereGeometry(0.34, 7, 6), 0.09, 0.09, false);
       const bush = new THREE.Mesh(bushGeo, bushM);
       bush.position.set(px, 0.68, pz);
-      bush.castShadow = high;
-      scene.add(bush);
+      bush.castShadow = true;
+      staticRoot.add(bush);
     }
 
     // Pedrinhas espalhadas
@@ -448,17 +510,31 @@ export function buildWorld(scene, quality = 'high') {
       const a = i * 2.7, r = 12 + (i * 7) % 22;
       const st = new THREE.Mesh(
         jitterGeo(new THREE.BoxGeometry(0.5, 0.3, 0.4, 2, 2, 2), 0.1, 0.08, false),
-        new THREE.MeshStandardMaterial({ map: tex('rock'), flatShading: true, roughness: 1 }));
+        rockFlatM());
       st.position.set(Math.cos(a) * r, 0.1, Math.sin(a) * r);
       st.rotation.y = a * 2;
-      st.castShadow = high;
-      scene.add(st);
+      st.castShadow = true;
+      staticRoot.add(st);
     }
   }
 
+  // Funde tudo que é estático em ~1 draw call por material
+  mergeStatics(staticRoot, root);
+
+  scene.add(root);
+
   return {
+    group: root,
     sun,
-    update(t) { for (const fn of animated) fn(t); }
+    update(t) { for (const fn of animated) fn(t); },
+    dispose() {
+      const seenM = new Set();
+      root.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        const m = o.material;
+        if (m && !seenM.has(m)) { seenM.add(m); m.dispose(); } // texturas ficam no cache
+      });
+    }
   };
 }
 
