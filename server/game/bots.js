@@ -1,26 +1,26 @@
 // ============================================================
-// SUNFALL ARENA — bots: patrulha, mira e tiro
+// SUNFALL ARENA — bots: patrulha, mira e tiro (por sala)
 // ============================================================
 import { PATROL, raycastSolids, pushOut } from '../../shared/mapdata.js';
-import { players, spawnPos, nextPlayerId, nextColor, broadcast } from './state.js';
+import { nextPlayerId, nextColor, spawnPos, broadcastRoom } from './rooms.js';
 
-export const BOT_COUNT = 3;
-const BOT_NAMES = ['Tuca', 'Zumbi-77', 'Nina.exe'];
+const BOT_NAMES = [
+  'Tuca', 'Zumbi-77', 'Nina.exe', 'Kadu', 'Foguete', 'Piolho',
+  'Dona-Morte', 'Sabre', 'Trovao', 'Careca', 'Mel', 'Vulto'
+];
+let botNameIdx = 0;
 
-export function spawnBots() {
-  for (let i = 0; i < BOT_COUNT; i++) {
-    const bot = {
-      id: nextPlayerId(),
-      accountId: null,
-      name: BOT_NAMES[i],
-      color: nextColor(),
-      pos: spawnPos(), yaw: 0, pitch: 0, anim: 1,
-      hp: 100, kills: 0, deaths: 0, alive: true, bot: true, ws: null,
-      wp: (Math.random() * PATROL.length) | 0,
-      fireT: 1 + Math.random() * 2, burst: 0, strafe: 0
-    };
-    players.set(bot.id, bot);
-  }
+export function makeBot(room) {
+  return {
+    id: nextPlayerId(),
+    accountId: null,
+    name: BOT_NAMES[botNameIdx++ % BOT_NAMES.length],
+    color: nextColor(room),
+    pos: spawnPos(room), yaw: 0, pitch: 0, anim: 1,
+    hp: 100, kills: 0, deaths: 0, alive: true, bot: true, ws: null,
+    wp: (Math.random() * PATROL.length) | 0,
+    fireT: 1 + Math.random() * 2, burst: 0, strafe: 0
+  };
 }
 
 function hasLOS(a, b) {
@@ -33,13 +33,13 @@ function hasLOS(a, b) {
   return raycastSolids(ax, ay, az, dx, dy, dz) > dist - 0.6;
 }
 
-export function updateBot(bot, dt, damage) {
+export function updateBot(room, bot, dt, damage) {
   if (!bot.alive) return;
 
   // alvo: humano mais próximo com LOS; senão outro bot
   let target = null, tDist = 40;
   for (const pass of [false, true]) {
-    for (const p of players.values()) {
+    for (const p of room.players.values()) {
       if (p === bot || !p.alive || p.bot !== pass) continue;
       const d = Math.hypot(p.pos.x - bot.pos.x, p.pos.z - bot.pos.z);
       if (d < tDist && hasLOS(bot, p)) { target = p; tDist = d; }
@@ -69,9 +69,9 @@ export function updateBot(bot, dt, damage) {
       dx = dx / d + (Math.random() - 0.5) * 0.06;
       dy = dy / d + (Math.random() - 0.5) * 0.06;
       dz = dz / d + (Math.random() - 0.5) * 0.06;
-      broadcast({ t: 'fire', id: bot.id, o: [ex, ey, ez], d: [dx, dy, dz], w: 0 });
+      broadcastRoom(room, { t: 'fire', id: bot.id, o: [ex, ey, ez], d: [dx, dy, dz], w: 0 });
       const chance = Math.max(0.08, Math.min(0.45, 0.5 - tDist * 0.009));
-      if (Math.random() < chance) damage(bot, target, 8 + (Math.random() * 5 | 0));
+      if (Math.random() < chance) damage(room, bot, target, 8 + (Math.random() * 5 | 0));
     }
   } else {
     // patrulha

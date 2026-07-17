@@ -20,7 +20,7 @@ router.get('/profile/me', requireAuth, async (req, res) => {
 
 router.get('/stats/me', requireAuth, async (req, res) => {
   const { rows } = await query(
-    `SELECT kills, deaths, headshots, matches_played AS "matchesPlayed"
+    `SELECT kills, deaths, headshots, wins, matches_played AS "matchesPlayed"
      FROM player_stats WHERE user_id = $1`,
     [req.user.sub]
   );

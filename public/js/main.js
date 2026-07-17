@@ -40,7 +40,18 @@ const world = buildWorld(scene);
 // ---------------- HUD ----------------
 const $ = id => document.getElementById(id);
 const hud = {
-  menu: $('menu'), playBtn: $('play-btn'), nameInput: $('name-input'),
+  menu: $('menu'), nameInput: $('name-input'),
+  mpBtn: $('mp-btn'), customBtn: $('custom-btn'), customPanel: $('custom-panel'),
+  cfgBots: $('cfg-bots'), cfgKl: $('cfg-kl'), cfgTl: $('cfg-tl'),
+  createBtn: $('create-btn'), codeInput: $('code-input'), joinBtn: $('join-btn'),
+  modeBtns: $('mode-btns'), pauseBtns: $('pause-btns'),
+  roomLine: $('room-line'), roomCode: $('room-code'),
+  resumeBtn: $('resume-btn'), leaveBtn: $('leave-btn'),
+  inviteBanner: $('invite-banner'), inviteText: $('invite-text'),
+  inviteAccept: $('invite-accept'), inviteDismiss: $('invite-dismiss'),
+  matchBar: $('match-bar'), mbTime: $('mb-time'), mbScore: $('mb-score'),
+  endscreen: $('endscreen'), endWinnerName: $('end-winner-name'),
+  endRows: $('end-rows'), endCount: $('end-count'),
   sens: $('sens'), sensVal: $('sens-val'), menuTitle: $('menu-title'),
   menuStatus: $('menu-status'), hpFill: $('hp-fill'), hpNum: $('hp-num'),
   ammo: $('ammo'), wname: $('weapon-name'), feed: $('feed'), board: $('board'),
@@ -73,6 +84,10 @@ const me = {
   eyeH: PLAYER.EYE, stepT: 0
 };
 let playing = false, connected = false;
+let inRoom = false, matchEnded = false;
+let roomInfo = null;         // {code, mode, kl, end}
+let lastInvite = null;       // {from, code}
+let endCountTimer = null;
 const remotes = new Map();   // id -> {model, meta, target, dead...}
 const meta = new Map();      // id -> {name,color,k,d,bot}
 const net = new Net();
@@ -294,7 +309,7 @@ document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas && playing) {
     hud.menu.classList.remove('hidden');
     hud.menuTitle.textContent = 'PAUSADO';
-    hud.playBtn.textContent = 'VOLTAR';
+    setMenuMode(true);
     mouseDown = false;
   } else if (playing) {
     hud.menu.classList.add('hidden');
@@ -476,7 +491,7 @@ const _dir = new THREE.Vector3(), _origin = new THREE.Vector3(), _muzzleV = new 
 function tryFire() {
   const w = WEAPONS[curW];
   const now = performance.now() / 1000;
-  if (!playing || me.dead || reloading > 0 || swapT > 0) return;
+  if (!playing || matchEnded || me.dead || reloading > 0 || swapT > 0) return;
   if (now - lastShot < w.int) return;
   if (ammo[curW] <= 0) { SFX.empty(); startReload(); return; }
   lastShot = now;
@@ -633,9 +648,21 @@ function showKillPop() {
 }
 
 // ---------------- Rede ----------------
+function clearRoomState() {
+  for (const id of [...remotes.keys()]) removeRemote(id);
+  meta.clear();
+  hud.feed.textContent = '';
+  hud.death.classList.remove('show');
+  hud.endscreen.classList.remove('show');
+  if (endCountTimer) { clearInterval(endCountTimer); endCountTimer = null; }
+  matchEnded = false;
+}
+
 net.on('init', msg => {
+  clearRoomState();
   me.id = msg.id;
-  connected = true;
+  inRoom = true;
+  roomInfo = { code: msg.code, mode: msg.mode, kl: msg.kl, end: msg.end };
   for (const p of msg.players) {
     if (p.id === msg.id) {
       me.pos.set(p.pos[0], p.pos[1], p.pos[2]);
@@ -658,7 +685,17 @@ net.on('s', msg => {
     r.anim = a[5];
     r.hp = a[6];
   }
+  if (typeof msg.tl === 'number') updateMatchBar(msg.tl);
 });
+
+function updateMatchBar(secondsLeft) {
+  const m = Math.floor(secondsLeft / 60), s = secondsLeft % 60;
+  hud.mbTime.textContent = `${m}:${String(s).padStart(2, '0')}`;
+  hud.mbTime.classList.toggle('low', secondsLeft <= 60 && secondsLeft > 0);
+  let lead = me.k || 0;
+  for (const p of meta.values()) if (p.k > lead) lead = p.k;
+  hud.mbScore.textContent = `${lead}/${roomInfo ? roomInfo.kl : '-'}`;
+}
 net.on('fire', msg => {
   if (msg.id === me.id) return;
   const o = new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]);
@@ -729,14 +766,122 @@ net.on('spawn', msg => {
     }
   }
 });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+net.on('end', msg => {
+  matchEnded = true;
+  mouseDown = false;
+  setZoom(false);
+  hud.death.classList.remove('show');
+  const win = msg.winId === me.id
+    ? { name: me.name + ' (você)', color: me.color }
+    : meta.get(msg.winId);
+  hud.endWinnerName.textContent = win ? win.name : '—';
+  hud.endWinnerName.style.color = win ? win.color : '';
+  hud.endRows.innerHTML = msg.board.map(r => {
+    const nm = r.id === me.id ? `${esc(r.name)} (você)` : esc(r.name);
+    return `<tr><td><span class="dot" style="background:${esc(r.color)}"></span>${nm}${r.bot ? ' <span class="bot">BOT</span>' : ''}</td><td>${r.k}</td><td>${r.d}</td></tr>`;
+  }).join('');
+  hud.endscreen.classList.add('show');
+  let count = msg.next || 10;
+  hud.endCount.textContent = count;
+  if (endCountTimer) clearInterval(endCountTimer);
+  endCountTimer = setInterval(() => {
+    count--;
+    hud.endCount.textContent = Math.max(0, count);
+    if (count <= 0) { clearInterval(endCountTimer); endCountTimer = null; }
+  }, 1000);
+  if (msg.winId === me.id) SFX.kill();
+});
+
+net.on('restart', msg => {
+  matchEnded = false;
+  hud.endscreen.classList.remove('show');
+  if (endCountTimer) { clearInterval(endCountTimer); endCountTimer = null; }
+  if (roomInfo) roomInfo.end = msg.end;
+  me.k = 0; me.d = 0;
+  for (const m of meta.values()) { m.k = 0; m.d = 0; }
+  for (const p of msg.players) {
+    if (p.id === me.id) {
+      me.pos.set(p.pos[0], p.pos[1], p.pos[2]);
+      me.vel.set(0, 0, 0);
+      me.hp = 100; me.dead = false;
+      faceCenter();
+      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
+      reloading = 0;
+      updateHpHUD(); updateAmmoHUD();
+    } else {
+      const r = remotes.get(p.id);
+      if (r) {
+        r.alive = true;
+        r.model.visible = true;
+        r.model.rotation.x = 0;
+        r.target.set(p.pos[0], p.pos[1], p.pos[2]);
+        r.model.position.copy(r.target);
+      } else addRemote(p);
+    }
+  }
+  hud.death.classList.remove('show');
+  SFX.spawn();
+});
+
+net.on('invited', msg => {
+  lastInvite = { from: String(msg.from || '?'), code: String(msg.code || '') };
+  hud.inviteText.textContent = '';
+  const b = document.createElement('b');
+  b.textContent = lastInvite.from;
+  hud.inviteText.append(b, ` te convidou (sala ${lastInvite.code})`);
+  hud.inviteBanner.classList.remove('hidden');
+  SFX.hit();
+});
+
+const WS_ERRORS = {
+  room_not_found: 'Sala não encontrada.',
+  room_full: 'Sala cheia.',
+  not_friends: 'Vocês não são amigos.',
+  friend_offline: 'Esse amigo está offline.',
+  not_in_custom_room: 'Crie uma sala personalizada para convidar.'
+};
+net.on('err', msg => {
+  const txt = WS_ERRORS[msg.code] || 'Erro.';
+  hud.menuStatus.textContent = txt;
+  if (msg.code === 'not_friends' || msg.code === 'friend_offline' || msg.code === 'not_in_custom_room') {
+    hud.friendStatus.style.color = '';
+    hud.friendStatus.textContent = txt;
+  }
+});
+net.on('invite_sent', () => {
+  hud.friendStatus.style.color = '#6ee0c8';
+  hud.friendStatus.textContent = 'Convite enviado!';
+});
+
+net.on('hello', () => {
+  if (!playing) hud.menuStatus.textContent = '';
+});
+
+net.on('_open', () => {
+  connected = true;
+  net.send({ t: 'hello', token: auth ? auth.token : undefined });
+  if (pendingPlay) { net.send(pendingPlay); pendingPlay = null; }
+});
+
 net.on('_close', () => {
+  connected = false;
+  const wasPlaying = playing;
   if (playing) {
+    playing = false;
+    inRoom = false;
+    roomInfo = null;
+    vmRoot.visible = false;
+    hud.game.classList.remove('show');
+    clearRoomState();
     hud.menu.classList.remove('hidden');
     hud.menuTitle.textContent = 'CONEXÃO PERDIDA';
-    hud.menuStatus.textContent = 'Recarregue a página para voltar à partida.';
-    hud.playBtn.style.display = 'none';
-    playing = false;
+    hud.menuStatus.textContent = 'Reconectando…';
+    setMenuMode(false);
+    if (document.exitPointerLock) document.exitPointerLock();
   }
+  setTimeout(connectPresence, wasPlaying ? 1500 : 3000);
 });
 
 // envio de estado a 20Hz
@@ -777,6 +922,7 @@ function renderAccountPanel() {
       localStorage.removeItem('sf_token'); localStorage.removeItem('sf_username');
       hud.accountStatus.textContent = '';
       renderAccountPanel();
+      if (net.open) net.send({ t: 'hello' });
     };
     hud.accountInfo.appendChild(logout);
   } else {
@@ -816,6 +962,7 @@ async function doAuth(path) {
     localStorage.setItem('sf_username', auth.username);
     hud.accPass.value = '';
     renderAccountPanel();
+    if (net.open) net.send({ t: 'hello', token: auth.token });
   } catch (err) {
     hud.accountStatus.textContent = AUTH_ERRORS[err.code] || 'Falha na conexão. Tente novamente.';
   }
@@ -849,6 +996,7 @@ async function refreshFriends() {
 
 function friendAction(fn) {
   return async () => {
+    hud.friendStatus.style.color = '';
     hud.friendStatus.textContent = '';
     try { await fn(); await refreshFriends(); }
     catch (err) { hud.friendStatus.textContent = FRIEND_ERRORS[err.code] || 'Falha na conexão.'; }
@@ -873,6 +1021,14 @@ function friendRow(u, kind) {
     lvl.className = 'flvl';
     lvl.textContent = `nv ${u.level}`;
     row.appendChild(lvl);
+    if (u.online && inRoom && roomInfo && roomInfo.mode === 'custom') {
+      const inv = document.createElement('button');
+      inv.className = 'f-accept';
+      inv.textContent = '✉';
+      inv.title = 'Convidar para a sala';
+      inv.onclick = () => net.send({ t: 'invite', userId: u.id });
+      row.appendChild(inv);
+    }
   } else {
     const tag = document.createElement('span');
     tag.className = 'ftag';
@@ -918,28 +1074,97 @@ hud.friendName.addEventListener('keydown', e => {
   if (e.key === 'Enter') hud.friendAddBtn.click();
 });
 
-// atualiza status online enquanto o menu está aberto
+// atualiza status online enquanto o menu (ou pausa) está aberto
 setInterval(() => {
-  if (auth && !playing && !hud.accountPanel.classList.contains('hidden')) refreshFriends();
+  if (auth && !hud.menu.classList.contains('hidden') && !hud.accountPanel.classList.contains('hidden')) refreshFriends();
 }, 20000);
 
 // ---------------- Menu / fluxo ----------------
-hud.playBtn.addEventListener('click', () => {
-  SFX.unlock();
-  if (playing) { canvas.requestPointerLock(); return; }
+let pendingPlay = null;
 
+function connectPresence() {
+  if (net.ws && (net.ws.readyState === 0 || net.ws.readyState === 1)) return;
+  net.connect();
+}
+
+function playName() {
+  const usingAccount = hud.tabAccount.classList.contains('active');
+  if (usingAccount && auth) return auth.username;
+  const name = (hud.nameInput.value.trim() || 'Recruta').slice(0, 14);
+  localStorage.setItem('sf_name', name);
+  return name;
+}
+
+function sendPlay(msg) {
+  SFX.unlock();
   const usingAccount = hud.tabAccount.classList.contains('active');
   if (usingAccount && !auth) {
     hud.accountStatus.textContent = 'Faça login ou crie uma conta primeiro.';
     return;
   }
-
-  const name = usingAccount ? auth.username : (hud.nameInput.value.trim() || 'Recruta').slice(0, 14);
-  me.name = name;
-  if (!usingAccount) localStorage.setItem('sf_name', name);
+  msg.name = playName();
+  me.name = msg.name;
   hud.menuStatus.textContent = 'Conectando…';
-  net.connect({ name, token: usingAccount ? auth.token : undefined });
+  if (net.open) net.send(msg);
+  else { pendingPlay = msg; connectPresence(); }
+}
+
+hud.mpBtn.addEventListener('click', () => sendPlay({ t: 'play', mode: 'public' }));
+hud.customBtn.addEventListener('click', () => hud.customPanel.classList.toggle('hidden'));
+hud.createBtn.addEventListener('click', () => sendPlay({
+  t: 'play', mode: 'create',
+  bots: +hud.cfgBots.value, kl: +hud.cfgKl.value, tl: +hud.cfgTl.value
+}));
+hud.joinBtn.addEventListener('click', () => {
+  const code = hud.codeInput.value.trim().toUpperCase();
+  if (code.length !== 4) { hud.menuStatus.textContent = 'O código tem 4 caracteres.'; return; }
+  sendPlay({ t: 'play', mode: 'join', code });
 });
+hud.codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') hud.joinBtn.click(); });
+
+hud.resumeBtn.addEventListener('click', () => { if (playing) canvas.requestPointerLock(); });
+hud.leaveBtn.addEventListener('click', () => {
+  net.send({ t: 'leave' });
+  exitToMenu();
+});
+
+hud.inviteAccept.addEventListener('click', () => {
+  if (!lastInvite) return;
+  hud.inviteBanner.classList.add('hidden');
+  sendPlay({ t: 'play', mode: 'join', code: lastInvite.code });
+  lastInvite = null;
+});
+hud.inviteDismiss.addEventListener('click', () => {
+  hud.inviteBanner.classList.add('hidden');
+  lastInvite = null;
+});
+
+function setMenuMode(paused) {
+  hud.modeBtns.classList.toggle('hidden', paused);
+  hud.customPanel.classList.add('hidden');
+  hud.pauseBtns.classList.toggle('hidden', !paused);
+  if (paused && roomInfo && roomInfo.mode === 'custom') {
+    hud.roomLine.classList.remove('hidden');
+    hud.roomCode.textContent = roomInfo.code;
+  } else {
+    hud.roomLine.classList.add('hidden');
+  }
+}
+
+function exitToMenu() {
+  playing = false;
+  inRoom = false;
+  roomInfo = null;
+  vmRoot.visible = false;
+  hud.game.classList.remove('show');
+  clearRoomState();
+  hud.menuTitle.innerHTML = 'SUNFALL<span>ARENA</span>';
+  hud.menuStatus.textContent = '';
+  setMenuMode(false);
+  hud.menu.classList.remove('hidden');
+  if (document.exitPointerLock) document.exitPointerLock();
+  renderAccountPanel();
+}
 
 function startPlaying() {
   playing = true;
@@ -947,17 +1172,22 @@ function startPlaying() {
   hud.menu.classList.add('hidden');
   hud.game.classList.add('show');
   hud.menuTitle.textContent = 'PAUSADO';
-  hud.playBtn.textContent = 'VOLTAR';
   document.getElementById('menu-form').classList.add('compact');
+  hud.menuStatus.textContent = '';
   updateHpHUD(); updateAmmoHUD();
+  if (roomInfo) updateMatchBar(Math.max(0, Math.ceil((roomInfo.end - Date.now()) / 1000)));
+  setMenuMode(true);
   canvas.requestPointerLock();
 }
 
-// modo de teste automatizado (?test=1): entra direto na partida
+// presença: conecta ao abrir o site (amigos online + convites)
+connectPresence();
+
+// modo de teste automatizado (?test=1): entra direto no multiplayer
 if (TESTMODE) {
   addEventListener('load', () => {
     hud.nameInput.value = 'Tester';
-    hud.playBtn.click();
+    hud.mpBtn.click();
   });
 }
 

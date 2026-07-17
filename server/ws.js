@@ -1,25 +1,33 @@
 // ============================================================
-// SUNFALL ARENA — WebSocket: join (conta/convidado), sync, combate
+// SUNFALL ARENA — WebSocket: presença (hello), salas (play/leave),
+// convites e combate autoritativo com partidas que terminam.
 // ============================================================
 import { WebSocketServer } from 'ws';
-import { players, spawnPos, nextPlayerId, nextColor, snapshot, broadcast } from './game/state.js';
-import { spawnBots, updateBot, BOT_COUNT } from './game/bots.js';
-import { awardXpAndPersist, persistDeath, loadProfileForJoin, markMatchStart } from './game/stats.js';
+import {
+  rooms, findOrCreatePublic, createCustom, getByCode, realCount, MAX_REAL,
+  nextPlayerId, nextColor, spawnPos, snapshot, broadcastRoom,
+  adjustBots, removePlayer, endMatch
+} from './game/rooms.js';
+import { updateBot } from './game/bots.js';
+import { awardXpAndPersist, persistDeath, loadProfileForJoin } from './game/stats.js';
 import { verifyToken } from './auth.js';
+import { setPresence, clearPresence, getPresence } from './presence.js';
+import { query } from './db.js';
 
-function damage(attacker, victim, dmg, head = false) {
+function damage(room, attacker, victim, dmg, head = false) {
+  if (room.state !== 'playing') return;
   if (!victim || !victim.alive || !attacker || !attacker.alive) return;
   victim.hp -= dmg;
   if (victim.hp > 0) {
-    broadcast({ t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id });
+    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id });
     return;
   }
   victim.hp = 0;
   victim.alive = false;
   victim.deaths++;
   if (attacker !== victim) attacker.kills++;
-  broadcast({ t: 'dmg', id: victim.id, hp: 0, by: attacker.id });
-  broadcast({ t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head });
+  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id });
+  broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head });
 
   if (attacker !== victim && attacker.accountId) {
     awardXpAndPersist(attacker.accountId, { headshot: head })
@@ -30,13 +38,29 @@ function damage(attacker, victim, dmg, head = false) {
       .catch(err => console.error('[stats] death persist failed for', victim.accountId, err));
   }
 
+  if (attacker !== victim && attacker.kills >= room.settings.kl) {
+    endMatch(room, attacker);
+    return;
+  }
+
   setTimeout(() => {
-    if (!players.has(victim.id)) return;
-    victim.pos = spawnPos();
+    if (!rooms.has(room.code) || room.state !== 'playing') return;
+    if (!room.players.has(victim.id)) return;
+    victim.pos = spawnPos(room);
     victim.hp = 100;
     victim.alive = true;
-    broadcast({ t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z] });
+    broadcastRoom(room, { t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z] });
   }, 2600);
+}
+
+async function isFriendAccepted(a, b) {
+  const { rows } = await query(
+    `SELECT 1 FROM friendships
+     WHERE status = 'accepted'
+       AND ((requester_id = $1 AND addressee_id = $2) OR (requester_id = $2 AND addressee_id = $1))`,
+    [a, b]
+  );
+  return rows.length > 0;
 }
 
 export function attachWs(server) {
@@ -49,50 +73,108 @@ export function attachWs(server) {
       if (allowed.length && !allowed.includes(origin)) { ws.close(1008, 'origin not allowed'); return; }
     }
 
-    let self = null;
+    let auth = null;   // { accountId, username, color } quando logado
+    let self = null;   // jogador dentro de uma sala
+    let room = null;
+
+    const send = obj => { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); };
+
+    function leaveRoom() {
+      if (!room || !self) return;
+      removePlayer(room, self);
+      console.log(`- ${self.name} saiu da sala ${room.code}`);
+      self = null;
+      room = null;
+    }
+
+    function joinRoom(target, displayName) {
+      self = {
+        id: nextPlayerId(),
+        accountId: auth ? auth.accountId : null,
+        name: displayName,
+        color: (auth && auth.color) || nextColor(target),
+        pos: spawnPos(target), yaw: 0, pitch: 0, anim: 0,
+        hp: 100, kills: 0, deaths: 0, alive: true, bot: false, ws
+      };
+      room = target;
+      room.players.set(self.id, self);
+      send({
+        t: 'init',
+        id: self.id,
+        code: room.code,
+        mode: room.mode,
+        kl: room.settings.kl,
+        end: room.endsAt,
+        players: [...room.players.values()].map(snapshot)
+      });
+      broadcastRoom(room, { t: 'j', p: snapshot(self) }, self.id);
+      adjustBots(room);
+      console.log(`+ ${self.name} (${self.accountId ? 'conta' : 'convidado'}) entrou na sala ${room.code} [${room.mode}] — ${realCount(room)} reais`);
+    }
 
     ws.on('message', async raw => {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
 
-      if (msg.t === 'join' && !self) {
-        let accountId = null, displayName, persistedColor = null;
-
-        if (msg.token) {
-          const claims = verifyToken(msg.token);
+      switch (msg.t) {
+        case 'hello': {
+          const claims = msg.token ? verifyToken(msg.token) : null;
           if (claims) {
             const profile = await loadProfileForJoin(claims.sub).catch(() => null);
             if (profile) {
-              accountId = claims.sub;
-              displayName = profile.username;
-              persistedColor = profile.color;
+              auth = { accountId: claims.sub, username: profile.username, color: profile.color };
+              setPresence(auth.accountId, ws, auth.username);
             }
+          } else if (auth) {
+            clearPresence(auth.accountId, ws);
+            auth = null;
           }
-        }
-        if (!accountId) {
-          displayName = String(msg.name || 'Recruta').slice(0, 14);
+          send({ t: 'hello', ok: true, user: auth ? auth.username : null });
+          return;
         }
 
-        self = {
-          id: nextPlayerId(),
-          accountId,
-          name: displayName,
-          color: persistedColor || nextColor(),
-          pos: spawnPos(), yaw: 0, pitch: 0, anim: 0,
-          hp: 100, kills: 0, deaths: 0, alive: true, bot: false, ws
-        };
-        players.set(self.id, self);
-        ws.send(JSON.stringify({
-          t: 'init', id: self.id,
-          players: [...players.values()].map(snapshot)
-        }));
-        broadcast({ t: 'j', p: snapshot(self) }, self.id);
-        console.log(`+ ${self.name} (#${self.id}${accountId ? ', conta' : ', convidado'}) entrou — ${players.size} na arena`);
+        case 'play': {
+          if (room) leaveRoom();
+          const displayName = auth
+            ? auth.username
+            : String(msg.name || 'Recruta').slice(0, 14);
 
-        if (accountId) markMatchStart(accountId).catch(() => {});
-        return;
+          if (msg.mode === 'public') {
+            joinRoom(findOrCreatePublic(), displayName);
+          } else if (msg.mode === 'create') {
+            const bots = Math.min(6, Math.max(0, msg.bots | 0));
+            const kl = [10, 20, 30].includes(+msg.kl) ? +msg.kl : 20;
+            const tlMin = [5, 10, 15].includes(+msg.tl) ? +msg.tl : 10;
+            joinRoom(createCustom({ bots, kl, tl: tlMin * 60 * 1000 }, auth ? auth.accountId : null), displayName);
+          } else if (msg.mode === 'join') {
+            const target = getByCode(msg.code);
+            if (!target) { send({ t: 'err', code: 'room_not_found' }); return; }
+            if (realCount(target) >= MAX_REAL) { send({ t: 'err', code: 'room_full' }); return; }
+            joinRoom(target, displayName);
+          }
+          return;
+        }
+
+        case 'leave':
+          leaveRoom();
+          return;
+
+        case 'invite': {
+          if (!auth) { send({ t: 'err', code: 'unauthorized' }); return; }
+          if (!room || room.mode !== 'custom') { send({ t: 'err', code: 'not_in_custom_room' }); return; }
+          const targetId = String(msg.userId || '');
+          if (!/^\d+$/.test(targetId)) return;
+          const ok = await isFriendAccepted(auth.accountId, targetId).catch(() => false);
+          if (!ok) { send({ t: 'err', code: 'not_friends' }); return; }
+          const target = getPresence(targetId);
+          if (!target || target.ws.readyState !== 1) { send({ t: 'err', code: 'friend_offline' }); return; }
+          target.ws.send(JSON.stringify({ t: 'invited', from: auth.username, code: room.code }));
+          send({ t: 'invite_sent', to: targetId });
+          return;
+        }
       }
-      if (!self) return;
+
+      if (!self || !room) return;
 
       switch (msg.t) {
         case 's':
@@ -105,22 +187,20 @@ export function attachWs(server) {
           self.anim = msg.a | 0;
           break;
         case 'fire':
-          broadcast({ t: 'fire', id: self.id, o: msg.o, d: msg.d, w: msg.w }, self.id);
+          broadcastRoom(room, { t: 'fire', id: self.id, o: msg.o, d: msg.d, w: msg.w }, self.id);
           break;
         case 'hit': {
-          const victim = players.get(msg.id);
+          const victim = room.players.get(msg.id);
           const dmg = Math.min(200, Math.max(1, +msg.dmg || 0));
-          damage(self, victim, dmg, !!msg.h);
+          damage(room, self, victim, dmg, !!msg.h);
           break;
         }
       }
     });
 
     ws.on('close', () => {
-      if (!self) return;
-      players.delete(self.id);
-      broadcast({ t: 'l', id: self.id });
-      console.log(`- ${self.name} saiu — ${players.size - BOT_COUNT} jogador(es)`);
+      leaveRoom();
+      if (auth) clearPresence(auth.accountId, ws);
     });
     ws.on('error', () => {});
   });
@@ -129,19 +209,27 @@ export function attachWs(server) {
 }
 
 export function startGameLoop() {
-  spawnBots();
-
   setInterval(() => {
     const dt = 1 / 15;
-    for (const p of players.values()) if (p.bot) updateBot(p, dt, damage);
+    const now = Date.now();
 
-    const state = {};
-    for (const p of players.values()) {
-      state[p.id] = [
-        +p.pos.x.toFixed(2), +p.pos.y.toFixed(2), +p.pos.z.toFixed(2),
-        +p.yaw.toFixed(3), +p.pitch.toFixed(3), p.anim, p.hp
-      ];
+    for (const room of rooms.values()) {
+      if (room.state === 'playing') {
+        for (const p of room.players.values()) if (p.bot) updateBot(room, p, dt, damage);
+        if (now >= room.endsAt) endMatch(room);
+      }
+
+      const state = {};
+      for (const p of room.players.values()) {
+        state[p.id] = [
+          +p.pos.x.toFixed(2), +p.pos.y.toFixed(2), +p.pos.z.toFixed(2),
+          +p.yaw.toFixed(3), +p.pitch.toFixed(3), p.anim, p.hp
+        ];
+      }
+      broadcastRoom(room, {
+        t: 's', p: state,
+        tl: room.state === 'playing' ? Math.max(0, Math.ceil((room.endsAt - now) / 1000)) : 0
+      });
     }
-    broadcast({ t: 's', p: state });
   }, 66);
 }

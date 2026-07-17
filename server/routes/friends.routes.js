@@ -5,16 +5,10 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireAuth } from '../auth.js';
-import { players } from '../game/state.js';
+import { onlineAccountIds } from '../presence.js';
 
 const router = Router();
 router.use(requireAuth);
-
-function onlineAccountIds() {
-  const online = new Set();
-  for (const p of players.values()) if (p.accountId) online.add(String(p.accountId));
-  return online;
-}
 
 // Lista completa: amigos aceitos + pedidos recebidos + pedidos enviados
 router.get('/', async (req, res) => {

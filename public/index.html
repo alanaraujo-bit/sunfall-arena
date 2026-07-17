@@ -38,6 +38,12 @@
     <div id="feed"></div>
     <div id="kill-pop">ELIMINAÇÃO&nbsp;+1</div>
 
+    <div id="match-bar">
+      <span id="mb-time">--:--</span>
+      <span class="mb-sep">•</span>
+      <span id="mb-score">0/30</span>
+    </div>
+
     <div id="board">
       <div class="board-card">
         <h3>PLACAR</h3>
@@ -53,6 +59,18 @@
         <div class="skull">☠</div>
         <div>Eliminado por <b id="death-by">?</b></div>
         <div class="sub">renascendo…</div>
+      </div>
+    </div>
+
+    <div id="endscreen">
+      <div class="end-card">
+        <div class="end-trophy">🏆</div>
+        <div class="end-winner">VENCEDOR: <b id="end-winner-name">?</b></div>
+        <table>
+          <thead><tr><th>JOGADOR</th><th>E</th><th>M</th></tr></thead>
+          <tbody id="end-rows"></tbody>
+        </table>
+        <div class="end-next">próxima partida em <b id="end-count">10</b>s</div>
       </div>
     </div>
   </div>
@@ -100,7 +118,50 @@
           <input id="sens" type="range" min="0.2" max="2.5" step="0.1" value="1">
           <b id="sens-val">1.0</b>
         </div>
-        <button id="play-btn">JOGAR</button>
+
+        <div id="mode-btns">
+          <button type="button" id="mp-btn">MULTIPLAYER</button>
+          <button type="button" id="custom-btn">PERSONALIZADO</button>
+        </div>
+
+        <div id="custom-panel" class="hidden">
+          <div class="cfg-row">
+            <label>Bots</label>
+            <select id="cfg-bots">
+              <option>0</option><option>1</option><option selected>2</option>
+              <option>3</option><option>4</option><option>5</option><option>6</option>
+            </select>
+          </div>
+          <div class="cfg-row">
+            <label>Eliminações</label>
+            <select id="cfg-kl"><option>10</option><option selected>20</option><option>30</option></select>
+          </div>
+          <div class="cfg-row">
+            <label>Tempo</label>
+            <select id="cfg-tl"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="15">15 min</option></select>
+          </div>
+          <button type="button" id="create-btn">CRIAR SALA</button>
+          <div class="custom-sep">ou entre com um código</div>
+          <div id="join-row">
+            <input id="code-input" type="text" maxlength="4" placeholder="CÓDIGO" autocomplete="off">
+            <button type="button" id="join-btn">ENTRAR</button>
+          </div>
+        </div>
+
+        <div id="pause-btns" class="hidden">
+          <div id="room-line" class="hidden">SALA <b id="room-code">----</b> — compartilhe o código com amigos</div>
+          <button type="button" id="resume-btn">VOLTAR</button>
+          <button type="button" id="leave-btn">SAIR DA PARTIDA</button>
+        </div>
+
+        <div id="invite-banner" class="hidden">
+          <span id="invite-text"></span>
+          <span id="invite-actions">
+            <button type="button" id="invite-accept">ENTRAR</button>
+            <button type="button" id="invite-dismiss">✕</button>
+          </span>
+        </div>
+
         <div id="menu-status"></div>
       </div>
       <div class="controls">

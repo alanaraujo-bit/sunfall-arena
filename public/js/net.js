@@ -42,12 +42,13 @@ export class Net {
 
   on(type, fn) { this.handlers.set(type, fn); }
 
-  connect({ name, token } = {}) {
+  connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${API_HOST}`);
     this.ws.onopen = () => {
       this.open = true;
-      this.send({ t: 'join', name, token: token || undefined });
+      const h = this.handlers.get('_open');
+      if (h) h();
     };
     this.ws.onmessage = ev => {
       let msg;
