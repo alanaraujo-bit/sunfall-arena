@@ -1,1 +1,5 @@
 node_modules/
+public/shared/
+.env
+
+.vercel

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
 import { buildWorld, makeCharacter, makeViewmodel } from './world.js';
 import { tex, spriteTex } from './textures.js';
-import { Net } from './net.js';
+import { Net, api } from './net.js';
 import { SFX } from './audio.js';
 
 // Log de erros visível no DOM (debug em headless)
@@ -46,7 +46,12 @@ const hud = {
   ammo: $('ammo'), wname: $('weapon-name'), feed: $('feed'), board: $('board'),
   boardRows: $('board-rows'), hitmarker: $('hitmarker'), dmgFlash: $('dmg-flash'),
   death: $('death'), deathBy: $('death-by'), scope: $('scope'), game: $('hud'),
-  killPop: $('kill-pop')
+  killPop: $('kill-pop'),
+  tabGuest: $('tab-guest'), tabAccount: $('tab-account'),
+  guestPanel: $('guest-panel'), accountPanel: $('account-panel'),
+  accUser: $('acc-user'), accPass: $('acc-pass'), accountStatus: $('account-status'),
+  accountInfo: $('account-info'), accountBtns: $('account-btns'),
+  loginBtn: $('login-btn'), registerBtn: $('register-btn')
 };
 hud.nameInput.value = localStorage.getItem('sf_name') || '';
 hud.sens.value = localStorage.getItem('sf_sens') || '1';
@@ -743,15 +748,90 @@ setInterval(() => {
   });
 }, 50);
 
+// ---------------- Conta (login/registro) ----------------
+let auth = null; // {token, username}
+{
+  const savedToken = localStorage.getItem('sf_token');
+  const savedUser = localStorage.getItem('sf_username');
+  if (savedToken && savedUser) auth = { token: savedToken, username: savedUser };
+}
+
+function renderAccountPanel() {
+  hud.accountInfo.textContent = '';
+  if (auth) {
+    hud.accountBtns.classList.add('hidden');
+    hud.accUser.classList.add('hidden');
+    hud.accPass.classList.add('hidden');
+    hud.accountInfo.classList.remove('hidden');
+    hud.accountInfo.append(`Logado como ${auth.username} · `);
+    const logout = document.createElement('a');
+    logout.href = '#'; logout.textContent = 'Sair'; logout.style.color = '#f0806a';
+    logout.onclick = e => {
+      e.preventDefault();
+      auth = null;
+      localStorage.removeItem('sf_token'); localStorage.removeItem('sf_username');
+      hud.accountStatus.textContent = '';
+      renderAccountPanel();
+    };
+    hud.accountInfo.appendChild(logout);
+  } else {
+    hud.accountBtns.classList.remove('hidden');
+    hud.accUser.classList.remove('hidden');
+    hud.accPass.classList.remove('hidden');
+    hud.accountInfo.classList.add('hidden');
+  }
+}
+renderAccountPanel();
+
+hud.tabGuest.addEventListener('click', () => {
+  hud.tabGuest.classList.add('active'); hud.tabAccount.classList.remove('active');
+  hud.guestPanel.classList.remove('hidden'); hud.accountPanel.classList.add('hidden');
+});
+hud.tabAccount.addEventListener('click', () => {
+  hud.tabAccount.classList.add('active'); hud.tabGuest.classList.remove('active');
+  hud.accountPanel.classList.remove('hidden'); hud.guestPanel.classList.add('hidden');
+});
+
+const AUTH_ERRORS = {
+  invalid_input: 'Usuário (3-20) e senha (mín. 8) são obrigatórios.',
+  username_taken: 'Esse usuário já existe.',
+  invalid_credentials: 'Usuário ou senha incorretos.'
+};
+
+async function doAuth(path) {
+  const username = hud.accUser.value.trim();
+  const password = hud.accPass.value;
+  hud.accountStatus.textContent = '';
+  try {
+    const data = await api(path, { username, password });
+    auth = { token: data.token, username: data.user.username };
+    localStorage.setItem('sf_token', auth.token);
+    localStorage.setItem('sf_username', auth.username);
+    hud.accPass.value = '';
+    renderAccountPanel();
+  } catch (err) {
+    hud.accountStatus.textContent = AUTH_ERRORS[err.code] || 'Falha na conexão. Tente novamente.';
+  }
+}
+hud.loginBtn.addEventListener('click', () => doAuth('/auth/login'));
+hud.registerBtn.addEventListener('click', () => doAuth('/auth/register'));
+
 // ---------------- Menu / fluxo ----------------
 hud.playBtn.addEventListener('click', () => {
   SFX.unlock();
   if (playing) { canvas.requestPointerLock(); return; }
-  const name = (hud.nameInput.value.trim() || 'Recruta').slice(0, 14);
+
+  const usingAccount = hud.tabAccount.classList.contains('active');
+  if (usingAccount && !auth) {
+    hud.accountStatus.textContent = 'Faça login ou crie uma conta primeiro.';
+    return;
+  }
+
+  const name = usingAccount ? auth.username : (hud.nameInput.value.trim() || 'Recruta').slice(0, 14);
   me.name = name;
-  localStorage.setItem('sf_name', name);
+  if (!usingAccount) localStorage.setItem('sf_name', name);
   hud.menuStatus.textContent = 'Conectando…';
-  net.connect(name);
+  net.connect({ name, token: usingAccount ? auth.token : undefined });
 });
 
 function startPlaying() {

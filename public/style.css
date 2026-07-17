@@ -174,13 +174,38 @@ body {
 }
 .logo h1 span { display: block; font-size: 26px; letter-spacing: 16px; color: #6ee0c8; -webkit-text-fill-color: #6ee0c8; }
 .tagline { font-size: 12px; letter-spacing: 4px; opacity: .65; margin: 10px 0 26px; }
-#name-input {
+#name-input, #acc-user, #acc-pass {
   width: 100%; padding: 13px 18px; font-size: 17px; text-align: center;
   background: rgba(14,10,6,.7); color: #f2e3c8;
   border: 2px solid rgba(242,227,200,.2); border-radius: 12px; outline: none;
   font-family: inherit; letter-spacing: 1px;
 }
-#name-input:focus { border-color: #3fc8b4; }
+#name-input:focus, #acc-user:focus, #acc-pass:focus { border-color: #3fc8b4; }
+#acc-user, #acc-pass { margin-top: 10px; }
+#acc-user:first-child { margin-top: 0; }
+
+.hidden { display: none !important; }
+
+#account-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+#account-tabs .tab {
+  flex: 1; padding: 9px; font-family: inherit; font-size: 12px; font-weight: bold;
+  letter-spacing: 2px; color: #f2e3c8; opacity: .55; cursor: pointer;
+  background: rgba(14,10,6,.5); border: 2px solid rgba(242,227,200,.16);
+  border-radius: 10px; transition: opacity .15s, border-color .15s;
+}
+#account-tabs .tab.active { opacity: 1; border-color: #3fc8b4; color: #6ee0c8; }
+
+#account-btns { display: flex; gap: 8px; margin-top: 12px; }
+#account-btns button {
+  flex: 1; padding: 11px; font-family: inherit; font-size: 13px; font-weight: bold;
+  letter-spacing: 2px; cursor: pointer; border-radius: 10px; border: none;
+  transition: filter .1s;
+}
+#account-btns button:hover { filter: brightness(1.1); }
+#login-btn { background: linear-gradient(180deg, #6ee0c8, #3fc8b4); color: #241408; }
+#register-btn { background: rgba(242,227,200,.12); color: #f2e3c8; border: 2px solid rgba(242,227,200,.2); }
+#account-status { margin-top: 10px; font-size: 12px; min-height: 16px; color: #f0806a; letter-spacing: .5px; }
+#account-info { margin-top: 10px; font-size: 13px; color: #6ee0c8; letter-spacing: .5px; }
 .sens-row { display: flex; align-items: center; gap: 10px; margin: 14px 2px; font-size: 13px; opacity: .9; }
 .sens-row label { letter-spacing: 1px; white-space: nowrap; }
 .sens-row input { flex: 1; accent-color: #3fc8b4; }

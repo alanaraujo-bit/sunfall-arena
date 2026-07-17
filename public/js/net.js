@@ -1,6 +1,27 @@
 // ============================================================
-// Camada de rede do cliente (WebSocket + JSON)
+// Camada de rede do cliente (WebSocket + JSON + API REST)
 // ============================================================
+const API_HOST = window.SF_API_HOST || location.host;
+const API_BASE = `${location.protocol === 'https:' ? 'https' : 'http'}://${API_HOST}/api`;
+
+export async function api(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, status: res.status });
+  return data;
+}
+
+export async function apiGet(path, token) {
+  const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, status: res.status });
+  return data;
+}
+
 export class Net {
   constructor() {
     this.ws = null;
@@ -10,12 +31,12 @@ export class Net {
 
   on(type, fn) { this.handlers.set(type, fn); }
 
-  connect(name) {
+  connect({ name, token } = {}) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    this.ws = new WebSocket(`${proto}://${location.host}`);
+    this.ws = new WebSocket(`${proto}://${API_HOST}`);
     this.ws.onopen = () => {
       this.open = true;
-      this.send({ t: 'join', name });
+      this.send({ t: 'join', name, token: token || undefined });
     };
     this.ws.onmessage = ev => {
       let msg;
