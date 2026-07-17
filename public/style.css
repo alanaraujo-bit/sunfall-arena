@@ -19,6 +19,21 @@ body {
 #hud { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s; }
 #hud.show { opacity: 1; }
 
+/* contador de FPS / ping */
+#perf {
+  position: absolute; top: 12px; left: 14px;
+  display: flex; flex-direction: column; gap: 1px;
+  font-family: "Consolas", "Courier New", monospace; font-size: 13px; font-weight: bold;
+  line-height: 1.25; text-shadow: 0 1px 3px rgba(0,0,0,.9); letter-spacing: .5px;
+}
+#perf.hidden { display: none; }
+#perf-fps { color: #8ac850; }
+#perf-fps.mid { color: #f0c04c; }
+#perf-fps.low { color: #e0554e; }
+#perf-ping { color: #6ee0c8; }
+#perf-ping.mid { color: #f0c04c; }
+#perf-ping.high { color: #e0554e; }
+
 /* mira */
 #cross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 #cross span {

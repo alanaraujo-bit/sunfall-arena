@@ -129,6 +129,8 @@ export function attachWs(server) {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
 
+      if (msg.t === 'ping') { send({ t: 'pong', ts: msg.ts }); return; }
+
       switch (msg.t) {
         case 'hello': {
           const claims = msg.token ? verifyToken(msg.token) : null;

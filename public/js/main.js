@@ -75,7 +75,8 @@ const hud = {
   stWins: $('st-wins'), stMatches: $('st-matches'), stKills: $('st-kills'),
   stDeaths: $('st-deaths'), stKd: $('st-kd'), stHs: $('st-hs'),
   setQuality: $('set-quality'), setFov: $('set-fov'), setFovVal: $('set-fov-val'),
-  setVol: $('set-vol'), setVolVal: $('set-vol-val'),
+  setVol: $('set-vol'), setVolVal: $('set-vol-val'), setPerf: $('set-perf'),
+  perf: $('perf'), perfFps: $('perf-fps'), perfPing: $('perf-ping'),
   bindsList: $('binds-list'), bindsReset: $('binds-reset'),
   navRank: $('nav-rank'), panelRank: $('panel-rank'),
   rankSearch: $('rank-search'), rankSearchBtn: $('rank-search-btn'),
@@ -108,7 +109,7 @@ const BIND_LABELS = {
   w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
 };
 
-let settings = { quality: 'high', fov: 78, vol: 50, binds: { ...DEFAULT_BINDS } };
+let settings = { quality: 'high', fov: 78, vol: 50, perf: 'on', binds: { ...DEFAULT_BINDS } };
 try {
   const saved = JSON.parse(localStorage.getItem('sf_settings') || '{}');
   settings = { ...settings, ...saved, binds: { ...DEFAULT_BINDS, ...(saved.binds || {}) } };
@@ -204,9 +205,34 @@ hud.setVol.oninput = () => {
   SFX.setVolume(settings.vol / 100);
   saveSettings();
 };
+function applyPerf() { hud.perf.classList.toggle('hidden', settings.perf !== 'on'); }
+hud.setPerf.value = settings.perf;
+hud.setPerf.onchange = () => { settings.perf = hud.setPerf.value; applyPerf(); saveSettings(); };
 SFX.setVolume(settings.vol / 100);
 applyGraphics();
+applyPerf();
 buildBindsUI();
+
+// ---------------- FPS / Ping ----------------
+let fpsAccum = 0, fpsFrames = 0, fpsShown = 0, ping = 0;
+function updatePerf(dt, t) {
+  if (settings.perf !== 'on') return;
+  fpsAccum += dt; fpsFrames++;
+  if (fpsAccum >= 0.4) {
+    fpsShown = Math.round(fpsFrames / fpsAccum);
+    fpsAccum = 0; fpsFrames = 0;
+    hud.perfFps.textContent = `${fpsShown} FPS`;
+    hud.perfFps.className = fpsShown >= 50 ? '' : (fpsShown >= 30 ? 'mid' : 'low');
+    hud.perfPing.textContent = ping ? `${ping} ms` : '-- ms';
+    hud.perfPing.className = ping < 80 ? '' : (ping < 150 ? 'mid' : 'high');
+  }
+}
+
+net.on('pong', msg => {
+  const rtt = performance.now() - msg.ts;
+  ping = ping ? Math.round(ping * 0.6 + rtt * 0.4) : Math.round(rtt);
+});
+setInterval(() => { if (net.open) net.send({ t: 'ping', ts: performance.now() }); }, 2000);
 
 // ---------------- Navegação do menu ----------------
 function showPanel(name) {
@@ -1574,6 +1600,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
+  updatePerf(dt, t);
   world.update(t);
   updateEffects(dt);
   updateRemotes(dt, t);

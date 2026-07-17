@@ -20,6 +20,7 @@
 
   <!-- HUD -->
   <div id="hud">
+    <div id="perf" class="hidden"><span id="perf-fps">-- FPS</span><span id="perf-ping">-- ms</span></div>
     <div id="cross"><span></span><span></span><span></span><span></span><i></i></div>
     <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
     <div id="dmg-flash"></div>
@@ -230,6 +231,13 @@
             <label>Campo de visão</label>
             <input id="set-fov" type="range" min="70" max="110" step="1" value="78">
             <b id="set-fov-val">78</b>
+          </div>
+          <div class="cfg-row">
+            <label>Mostrar FPS e Ping</label>
+            <select id="set-perf">
+              <option value="on">Ligado</option>
+              <option value="off" selected>Desligado</option>
+            </select>
           </div>
         </div>
 
