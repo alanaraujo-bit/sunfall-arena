@@ -60,6 +60,20 @@ const saveSettings = () => localStorage.setItem('sf_settings', JSON.stringify(se
 setTexQuality(settings.quality);
 const world = buildWorld(scene, settings.quality);
 
+// Personagem em destaque no lobby (showcase giratório na praça central)
+const lobbyChar = makeCharacter('#3fc8b4');
+lobbyChar.position.set(0, 0, 6.5);
+scene.add(lobbyChar);
+function setLobbyCharColor(hex) {
+  const nc = makeCharacter(hex);
+  nc.position.copy(lobbyChar.position);
+  nc.rotation.copy(lobbyChar.rotation);
+  scene.remove(lobbyChar);
+  scene.add(nc);
+  lobbyCharRef.g = nc;
+}
+const lobbyCharRef = { g: lobbyChar };
+
 // ---------------- HUD ----------------
 const $ = id => document.getElementById(id);
 const hud = {
@@ -67,7 +81,12 @@ const hud = {
   mpBtn: $('mp-btn'), customBtn: $('custom-btn'), customPanel: $('custom-panel'),
   cfgGm: $('cfg-gm'), cfgBots: $('cfg-bots'), cfgKl: $('cfg-kl'), cfgTl: $('cfg-tl'),
   createBtn: $('create-btn'), codeInput: $('code-input'), joinBtn: $('join-btn'),
-  modeBtns: $('mode-btns'), pauseBtns: $('pause-btns'),
+  idChip: $('id-chip'), idAvatar: $('id-avatar'), idName: $('id-name'),
+  idLevel: $('id-level'), idXpFill: $('id-xpfill'), idXpText: $('id-xptext'),
+  btnFullscreen: $('btn-fullscreen'),
+  navFriends: $('nav-friends'), friendsHint: $('friends-hint'),
+  modeChip: $('mode-chip'), modeChipTitle: $('mode-chip-title'), modeChipSub: $('mode-chip-sub'),
+  startBtn: $('start-btn'), playDock: $('play-dock'), pauseCard: $('pause-card'),
   teamSwitch: $('team-switch'), team0: $('team-0'), team1: $('team-1'),
   roomLine: $('room-line'), roomCode: $('room-code'),
   resumeBtn: $('resume-btn'), leaveBtn: $('leave-btn'),
@@ -90,8 +109,7 @@ const hud = {
   friendsBox: $('friends-box'), friendName: $('friend-name'),
   friendAddBtn: $('friend-add-btn'), friendStatus: $('friend-status'),
   friendsList: $('friends-list'),
-  navPlay: $('nav-play'), navProfile: $('nav-profile'), navConfig: $('nav-config'),
-  panelPlay: $('panel-play'), panelProfile: $('panel-profile'), panelConfig: $('panel-config'),
+  navProfile: $('nav-profile'), navConfig: $('nav-config'),
   profileHint: $('profile-hint'), profileContent: $('profile-content'),
   pfName: $('pf-name'), pfLevel: $('pf-level'), pfXpFill: $('pf-xpfill'), pfXpText: $('pf-xptext'),
   stWins: $('st-wins'), stMatches: $('st-matches'), stKills: $('st-kills'),
@@ -100,7 +118,7 @@ const hud = {
   setVol: $('set-vol'), setVolVal: $('set-vol-val'), setPerf: $('set-perf'),
   perf: $('perf'), perfFps: $('perf-fps'), perfPing: $('perf-ping'),
   bindsList: $('binds-list'), bindsReset: $('binds-reset'),
-  navRank: $('nav-rank'), panelRank: $('panel-rank'),
+  navRank: $('nav-rank'),
   rankSearch: $('rank-search'), rankSearchBtn: $('rank-search-btn'),
   rankStatus: $('rank-status'), rankList: $('rank-list'),
   playerModal: $('player-modal'), pmClose: $('pm-close'), pmDot: $('pm-dot'),
@@ -246,22 +264,79 @@ function updatePerf(dt, t) {
 // (o handler de 'pong' e o envio de ping ficam após `const net` ser criado)
 
 // ---------------- Navegação do menu ----------------
-function showPanel(name) {
-  hud.navPlay.classList.toggle('active', name === 'play');
-  hud.navProfile.classList.toggle('active', name === 'profile');
-  hud.navRank.classList.toggle('active', name === 'rank');
-  hud.navConfig.classList.toggle('active', name === 'config');
-  hud.panelPlay.classList.toggle('hidden', name !== 'play');
-  hud.panelProfile.classList.toggle('hidden', name !== 'profile');
-  hud.panelRank.classList.toggle('hidden', name !== 'rank');
-  hud.panelConfig.classList.toggle('hidden', name !== 'config');
+// ---------------- Telas do lobby (overlays) ----------------
+const screens = {
+  account: $('screen-account'), profile: $('screen-profile'), friends: $('screen-friends'),
+  rank: $('screen-rank'), config: $('screen-config'), modes: $('screen-modes')
+};
+let currentScreen = null;
+
+function showScreen(name) {
+  for (const [k, el] of Object.entries(screens)) el.classList.toggle('show', k === name);
+  currentScreen = name;
   if (name === 'profile') loadProfile();
   if (name === 'rank') loadLeaderboard();
+  if (name === 'friends') { renderFriendsScreen(); refreshFriends(); }
 }
-hud.navPlay.onclick = () => showPanel('play');
-hud.navProfile.onclick = () => showPanel('profile');
-hud.navRank.onclick = () => showPanel('rank');
-hud.navConfig.onclick = () => showPanel('config');
+function closeScreen() {
+  for (const el of Object.values(screens)) el.classList.remove('show');
+  currentScreen = null;
+}
+
+// botões que abrem telas
+hud.idChip.onclick = () => showScreen('account');
+hud.navProfile.onclick = () => showScreen('profile');
+hud.navFriends.onclick = () => showScreen('friends');
+hud.navRank.onclick = () => showScreen('rank');
+hud.navConfig.onclick = () => showScreen('config');
+hud.modeChip.onclick = () => showScreen('modes');
+
+// fechar telas: botão ✕, clicar fora do painel, ou Esc
+for (const el of Object.values(screens)) {
+  el.querySelector('.screen-close')?.addEventListener('click', closeScreen);
+  el.addEventListener('click', e => { if (e.target === el) closeScreen(); });
+}
+addEventListener('keydown', e => {
+  if (e.code === 'Escape' && currentScreen && !playing) closeScreen();
+}, true);
+
+// sub-navegação das configurações
+document.querySelectorAll('#cfg-side .cfg-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('#cfg-side .cfg-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('#cfg-pages .cfg-page').forEach(p =>
+      p.classList.toggle('hidden', p.dataset.page !== tab.dataset.page));
+  };
+});
+
+// tela cheia
+hud.btnFullscreen.onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+};
+
+// atualiza o chip de identidade no topo do lobby
+function updateIdChip() {
+  if (auth) {
+    hud.idName.textContent = auth.username;
+    hud.idAvatar.textContent = auth.username[0].toUpperCase();
+    hud.idLevel.classList.remove('hidden');
+    apiAuth('GET', '/profile/me', auth.token).then(p => {
+      hud.idLevel.querySelector('b').textContent = p.level;
+      const inLevel = p.xp - (p.level - 1) * 500;
+      hud.idXpFill.style.width = `${Math.min(100, (inLevel / 500) * 100)}%`;
+      hud.idXpText.textContent = `${inLevel}/500 XP`;
+      if (p.color) setLobbyCharColor(p.color);
+    }).catch(() => {});
+  } else {
+    const nick = (hud.nameInput.value.trim() || 'Recruta').slice(0, 14);
+    hud.idName.textContent = nick;
+    hud.idAvatar.textContent = nick[0].toUpperCase();
+    hud.idLevel.classList.add('hidden');
+    hud.idXpFill.style.width = '0';
+    hud.idXpText.textContent = 'convidado';
+  }
+}
 
 async function loadProfile() {
   const logged = !!auth;
@@ -718,8 +793,7 @@ document.addEventListener('pointerlockchange', () => {
   if (TESTMODE) return;
   if (document.pointerLockElement !== canvas && playing) {
     hud.menu.classList.remove('hidden');
-    hud.menuTitle.textContent = 'PAUSADO';
-    showPanel('play');
+    closeScreen();
     setMenuMode(true);
     mouseDown = false;
   } else if (playing) {
@@ -1375,8 +1449,8 @@ net.on('_close', () => {
     hud.game.classList.remove('show');
     clearRoomState();
     hud.menu.classList.remove('hidden');
-    hud.menuTitle.textContent = 'CONEXÃO PERDIDA';
-    hud.menuStatus.textContent = 'Reconectando…';
+    closeScreen();
+    hud.menuStatus.textContent = 'Conexão perdida — reconectando…';
     setMenuMode(false);
     if (document.exitPointerLock) document.exitPointerLock();
   } else {
@@ -1412,6 +1486,12 @@ let auth = null; // {token, username}
   if (savedToken && savedUser) auth = { token: savedToken, username: savedUser };
 }
 
+function renderFriendsScreen() {
+  hud.friendsHint.classList.toggle('hidden', !!auth);
+  hud.friendsBox.classList.toggle('hidden', !auth);
+  if (!auth) hud.friendsList.textContent = '';
+}
+
 function renderAccountPanel() {
   hud.accountInfo.textContent = '';
   if (auth) {
@@ -1419,8 +1499,6 @@ function renderAccountPanel() {
     hud.accUser.classList.add('hidden');
     hud.accPass.classList.add('hidden');
     hud.accountInfo.classList.remove('hidden');
-    hud.friendsBox.classList.remove('hidden');
-    refreshFriends();
     hud.accountInfo.append(`Logado como ${auth.username} · `);
     const logout = document.createElement('a');
     logout.href = '#'; logout.textContent = 'Sair'; logout.style.color = '#f0806a';
@@ -1438,12 +1516,14 @@ function renderAccountPanel() {
     hud.accUser.classList.remove('hidden');
     hud.accPass.classList.remove('hidden');
     hud.accountInfo.classList.add('hidden');
-    hud.friendsBox.classList.add('hidden');
-    hud.friendsList.textContent = '';
   }
-  if (!hud.panelProfile.classList.contains('hidden')) loadProfile();
+  updateIdChip();
+  renderFriendsScreen();
+  if (currentScreen === 'profile') loadProfile();
+  if (currentScreen === 'friends') refreshFriends();
 }
 renderAccountPanel();
+hud.nameInput.addEventListener('input', () => { if (!auth) updateIdChip(); });
 
 hud.tabGuest.addEventListener('click', () => {
   hud.tabGuest.classList.add('active'); hud.tabAccount.classList.remove('active');
@@ -1586,9 +1666,9 @@ hud.friendName.addEventListener('keydown', e => {
   if (e.key === 'Enter') hud.friendAddBtn.click();
 });
 
-// atualiza status online enquanto o menu (ou pausa) está aberto
+// atualiza status online enquanto a tela de amigos está aberta
 setInterval(() => {
-  if (auth && !hud.menu.classList.contains('hidden') && !hud.accountPanel.classList.contains('hidden')) refreshFriends();
+  if (auth && currentScreen === 'friends') refreshFriends();
 }, 20000);
 
 // ---------------- Menu / fluxo ----------------
@@ -1621,15 +1701,16 @@ function sendPlay(msg) {
   else { pendingPlay = msg; connectPresence(); }
 }
 
-hud.mpBtn.addEventListener('click', () => sendPlay({ t: 'play', mode: 'public' }));
-hud.customBtn.addEventListener('click', () => hud.customPanel.classList.toggle('hidden'));
-hud.createBtn.addEventListener('click', () => sendPlay({
+hud.startBtn.addEventListener('click', () => { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); });
+hud.mpBtn.addEventListener('click', () => { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); });
+hud.createBtn.addEventListener('click', () => { closeScreen(); sendPlay({
   t: 'play', mode: 'create', gm: hud.cfgGm.value,
   bots: +hud.cfgBots.value, kl: +hud.cfgKl.value, tl: +hud.cfgTl.value
-}));
+}); });
 hud.joinBtn.addEventListener('click', () => {
   const code = hud.codeInput.value.trim().toUpperCase();
   if (code.length !== 4) { hud.menuStatus.textContent = 'O código tem 4 caracteres.'; return; }
+  closeScreen();
   sendPlay({ t: 'play', mode: 'join', code });
 });
 hud.codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') hud.joinBtn.click(); });
@@ -1659,10 +1740,10 @@ function updateTeamButtons() {
   hud.team1.classList.toggle('mine', me.team === 1);
 }
 
+// alterna o lobby entre "menu inicial" e "pausa em partida"
 function setMenuMode(paused) {
-  hud.modeBtns.classList.toggle('hidden', paused);
-  hud.customPanel.classList.add('hidden');
-  hud.pauseBtns.classList.toggle('hidden', !paused);
+  hud.menu.classList.toggle('paused', paused);
+  hud.pauseCard.classList.toggle('hidden', !paused);
   const isTdm = paused && roomInfo && roomInfo.gm === 'tdm';
   hud.teamSwitch.classList.toggle('hidden', !isTdm);
   if (isTdm) updateTeamButtons();
@@ -1681,9 +1762,8 @@ function exitToMenu() {
   vmRoot.visible = false;
   hud.game.classList.remove('show');
   clearRoomState();
-  hud.menuTitle.innerHTML = 'SUNFALL<span>ARENA</span>';
   hud.menuStatus.textContent = '';
-  showPanel('play');
+  closeScreen();
   setMenuMode(false);
   hud.menu.classList.remove('hidden');
   if (document.exitPointerLock) document.exitPointerLock();
@@ -1695,8 +1775,7 @@ function startPlaying() {
   vmRoot.visible = true;
   hud.menu.classList.add('hidden');
   hud.game.classList.add('show');
-  hud.menuTitle.textContent = 'PAUSADO';
-  document.getElementById('menu-form').classList.add('compact');
+  closeScreen();
   hud.menuStatus.textContent = '';
   updateHpHUD(); updateAmmoHUD();
   if (roomInfo) updateMatchBar(Math.max(0, Math.ceil((roomInfo.end - Date.now()) / 1000)));
@@ -1711,7 +1790,7 @@ connectPresence();
 if (TESTMODE) {
   addEventListener('load', () => {
     hud.nameInput.value = 'Tester';
-    hud.mpBtn.click();
+    hud.startBtn.click();
   });
 }
 
@@ -1775,12 +1854,15 @@ function frame() {
     camera.rotation.x = -0.3;
     camera.rotation.z = 0.3;
   } else {
-    // câmera orbital do menu
-    const a = t * 0.06;
-    camera.position.set(Math.cos(a) * 33, 17, Math.sin(a) * 33);
-    camera.lookAt(0, 2.5, 0);
+    // lobby: personagem em destaque girando devagar + câmera com leve deriva
+    lobbyCharRef.g.visible = true;
+    lobbyCharRef.g.rotation.y += dt * 0.4;
+    const drift = Math.sin(t * 0.13) * 2.4;
+    camera.position.set(drift, 3.0, 15.8);
+    camera.lookAt(0, 1.45, 6.5);
     if (Math.abs(camera.fov - BASE_FOV) > 0.01) { camera.fov = BASE_FOV; camera.updateProjectionMatrix(); }
   }
+  lobbyCharRef.g.visible = !playing;
 
   renderer.render(scene, camera);
 }

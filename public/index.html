@@ -76,125 +76,185 @@
     </div>
   </div>
 
-  <!-- MENU -->
+  <!-- LOBBY -->
   <div id="menu">
-    <div class="menu-card">
-      <div class="logo">
+    <div id="lobby-scrim"></div>
+
+    <!-- TOPO -->
+    <header id="lobby-top">
+      <button type="button" id="id-chip" class="lobby-only">
+        <div id="id-avatar">R</div>
+        <div id="id-meta">
+          <div id="id-name">Recruta</div>
+          <div id="id-xpwrap"><div id="id-xpbar"><div id="id-xpfill"></div></div><span id="id-xptext">convidado</span></div>
+        </div>
+        <div id="id-level" class="hidden"><b>1</b><span>NV</span></div>
+      </button>
+
+      <div id="lobby-brand">
         <h1 id="menu-title">SUNFALL<span>ARENA</span></h1>
-        <div class="tagline">FPS competitivo de navegador</div>
       </div>
 
-      <div id="nav-tabs">
-        <button type="button" id="nav-play" class="nav-tab active">JOGAR</button>
-        <button type="button" id="nav-profile" class="nav-tab">PERFIL</button>
-        <button type="button" id="nav-rank" class="nav-tab">RANKING</button>
-        <button type="button" id="nav-config" class="nav-tab">CONFIG</button>
+      <div id="lobby-top-actions">
+        <button type="button" class="icon-btn" id="btn-fullscreen" title="Tela cheia">⛶</button>
+        <button type="button" class="icon-btn" id="nav-config" title="Configurações">⚙</button>
       </div>
+    </header>
 
-      <div id="panel-play">
-      <div id="menu-form">
-        <div id="account-tabs">
-          <button type="button" id="tab-guest" class="tab active">CONVIDADO</button>
-          <button type="button" id="tab-account" class="tab">CONTA</button>
-        </div>
+    <!-- NAV LATERAL -->
+    <nav id="lobby-nav">
+      <button type="button" class="nav-item" id="nav-profile"><span class="ni-ico">◈</span><span class="ni-txt">PERFIL</span></button>
+      <button type="button" class="nav-item" id="nav-friends"><span class="ni-ico">☍</span><span class="ni-txt">AMIGOS</span></button>
+      <button type="button" class="nav-item" id="nav-rank"><span class="ni-ico">♛</span><span class="ni-txt">RANKING</span></button>
+    </nav>
 
-        <div id="guest-panel">
-          <input id="name-input" type="text" maxlength="14" placeholder="Seu apelido" autocomplete="off">
-        </div>
+    <!-- DOCK DE JOGAR -->
+    <div id="play-dock" class="lobby-only">
+      <button type="button" id="mode-chip">
+        <span id="mode-chip-title">MULTIPLAYER</span>
+        <span id="mode-chip-sub">Todos contra Todos · público</span>
+        <span id="mode-chip-edit">⟳</span>
+      </button>
+      <button type="button" id="start-btn">INICIAR</button>
+    </div>
 
-        <div id="account-panel" class="hidden">
-          <input id="acc-user" type="text" maxlength="20" placeholder="Usuário" autocomplete="username">
-          <input id="acc-pass" type="password" maxlength="72" placeholder="Senha" autocomplete="current-password">
-          <div id="account-status"></div>
-          <div id="account-btns">
-            <button type="button" id="login-btn">ENTRAR</button>
-            <button type="button" id="register-btn">CRIAR CONTA</button>
-          </div>
-          <div id="account-info" class="hidden"></div>
-        </div>
-
-        <div id="mode-btns">
-          <button type="button" id="mp-btn">MULTIPLAYER</button>
-          <button type="button" id="custom-btn">PERSONALIZADO</button>
-        </div>
-
-        <div id="custom-panel" class="hidden">
-          <div class="cfg-row">
-            <label>Modo</label>
-            <select id="cfg-gm">
-              <option value="ffa" selected>Todos contra Todos</option>
-              <option value="tdm">Mata-mata em Equipe</option>
-            </select>
-          </div>
-          <div class="cfg-row">
-            <label>Bots</label>
-            <select id="cfg-bots">
-              <option>0</option><option>1</option><option selected>2</option>
-              <option>3</option><option>4</option><option>5</option><option>6</option>
-            </select>
-          </div>
-          <div class="cfg-row">
-            <label>Eliminações</label>
-            <select id="cfg-kl"><option>10</option><option selected>20</option><option>30</option></select>
-          </div>
-          <div class="cfg-row">
-            <label>Tempo</label>
-            <select id="cfg-tl"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="15">15 min</option></select>
-          </div>
-          <button type="button" id="create-btn">CRIAR SALA</button>
-          <div class="custom-sep">ou entre com um código</div>
-          <div id="join-row">
-            <input id="code-input" type="text" maxlength="4" placeholder="CÓDIGO" autocomplete="off">
-            <button type="button" id="join-btn">ENTRAR</button>
-          </div>
-        </div>
-
-        <div id="pause-btns" class="hidden">
-          <div id="room-line" class="hidden">SALA <b id="room-code">----</b> — compartilhe o código com amigos</div>
-          <div id="team-switch" class="hidden">
-            <span class="team-label">TIME:</span>
-            <button type="button" id="team-0" class="team-btn">LARANJA</button>
-            <button type="button" id="team-1" class="team-btn">AZUL</button>
-          </div>
-          <button type="button" id="resume-btn">VOLTAR</button>
-          <button type="button" id="leave-btn">SAIR DA PARTIDA</button>
-        </div>
-
-        <div id="invite-banner" class="hidden">
-          <span id="invite-text"></span>
-          <span id="invite-actions">
-            <button type="button" id="invite-accept">ENTRAR</button>
-            <button type="button" id="invite-dismiss">✕</button>
-          </span>
-        </div>
-
-        <div id="menu-status"></div>
+    <!-- CARTÃO DE PAUSA -->
+    <div id="pause-card" class="hidden">
+      <div class="pause-title">PAUSADO</div>
+      <div id="room-line" class="hidden">SALA <b id="room-code">----</b> — compartilhe com amigos</div>
+      <div id="team-switch" class="hidden">
+        <span class="team-label">TIME</span>
+        <button type="button" id="team-0" class="team-btn">LARANJA</button>
+        <button type="button" id="team-1" class="team-btn">AZUL</button>
       </div>
-      </div>
+      <button type="button" id="resume-btn">VOLTAR</button>
+      <button type="button" id="leave-btn">SAIR DA PARTIDA</button>
+    </div>
 
-      <!-- PERFIL -->
-      <div id="panel-profile" class="hidden">
-        <div id="profile-hint" class="hidden">
-          Crie uma conta na aba <b>JOGAR</b> para ter perfil,<br>nível, estatísticas e amigos.
+    <div id="menu-status"></div>
+
+    <div id="invite-banner" class="hidden">
+      <span id="invite-text"></span>
+      <span id="invite-actions">
+        <button type="button" id="invite-accept">ENTRAR</button>
+        <button type="button" id="invite-dismiss">✕</button>
+      </span>
+    </div>
+
+    <!-- ============ TELAS (overlays) ============ -->
+
+    <!-- MODOS -->
+    <section class="screen" id="screen-modes">
+      <div class="screen-panel">
+        <div class="screen-head"><h2>MODO DE JOGO</h2><button type="button" class="screen-close">✕</button></div>
+        <div class="screen-body">
+          <button type="button" class="mode-card" id="mp-btn">
+            <div class="mc-top"><b>MULTIPLAYER</b><span class="mc-tag">PÚBLICO</span></div>
+            <span class="mc-desc">Todos contra Todos · entra na fila e joga na hora com bots e outros jogadores.</span>
+          </button>
+
+          <div class="mode-card static">
+            <div class="mc-top"><b id="custom-btn">PERSONALIZADO</b><span class="mc-tag gold">PRIVADO</span></div>
+            <span class="mc-desc">Crie uma sala e chame os amigos pelo código.</span>
+            <div id="custom-panel">
+              <div class="cfg-row">
+                <label>Modo</label>
+                <select id="cfg-gm">
+                  <option value="ffa" selected>Todos contra Todos</option>
+                  <option value="tdm">Mata-mata em Equipe</option>
+                </select>
+              </div>
+              <div class="cfg-row">
+                <label>Bots</label>
+                <select id="cfg-bots">
+                  <option>0</option><option>1</option><option selected>2</option>
+                  <option>3</option><option>4</option><option>5</option><option>6</option>
+                </select>
+              </div>
+              <div class="cfg-row">
+                <label>Eliminações</label>
+                <select id="cfg-kl"><option>10</option><option selected>20</option><option>30</option></select>
+              </div>
+              <div class="cfg-row">
+                <label>Tempo</label>
+                <select id="cfg-tl"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="15">15 min</option></select>
+              </div>
+              <button type="button" id="create-btn">CRIAR SALA</button>
+              <div class="custom-sep">ou entre com um código</div>
+              <div id="join-row">
+                <input id="code-input" type="text" maxlength="4" placeholder="CÓDIGO" autocomplete="off">
+                <button type="button" id="join-btn">ENTRAR</button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div id="profile-content" class="hidden">
-          <div id="pf-head">
-            <div id="pf-name">—</div>
-            <div id="pf-level-badge">NÍVEL <b id="pf-level">1</b></div>
-          </div>
-          <div id="pf-xpbar"><div id="pf-xpfill"></div></div>
-          <div id="pf-xptext">0 / 500 XP</div>
-          <div id="pf-stats">
-            <div class="pf-tile"><b id="st-wins">0</b><span>Vitórias</span></div>
-            <div class="pf-tile"><b id="st-matches">0</b><span>Partidas</span></div>
-            <div class="pf-tile"><b id="st-kills">0</b><span>Eliminações</span></div>
-            <div class="pf-tile"><b id="st-deaths">0</b><span>Mortes</span></div>
-            <div class="pf-tile"><b id="st-kd">0.00</b><span>K/D</span></div>
-            <div class="pf-tile"><b id="st-hs">0</b><span>Headshots</span></div>
-          </div>
+      </div>
+    </section>
 
+    <!-- CONTA -->
+    <section class="screen" id="screen-account">
+      <div class="screen-panel narrow">
+        <div class="screen-head"><h2>SUA CONTA</h2><button type="button" class="screen-close">✕</button></div>
+        <div class="screen-body">
+          <div id="account-tabs">
+            <button type="button" id="tab-guest" class="tab active">CONVIDADO</button>
+            <button type="button" id="tab-account" class="tab">CONTA</button>
+          </div>
+          <div id="guest-panel">
+            <input id="name-input" type="text" maxlength="14" placeholder="Seu apelido" autocomplete="off">
+            <div class="field-hint">Jogue rápido, sem cadastro — progresso não é salvo.</div>
+          </div>
+          <div id="account-panel" class="hidden">
+            <input id="acc-user" type="text" maxlength="20" placeholder="Usuário" autocomplete="username">
+            <input id="acc-pass" type="password" maxlength="72" placeholder="Senha" autocomplete="current-password">
+            <div id="account-status"></div>
+            <div id="account-btns">
+              <button type="button" id="login-btn">ENTRAR</button>
+              <button type="button" id="register-btn">CRIAR CONTA</button>
+            </div>
+            <div id="account-info" class="hidden"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PERFIL -->
+    <section class="screen" id="screen-profile">
+      <div class="screen-panel narrow">
+        <div class="screen-head"><h2>PERFIL</h2><button type="button" class="screen-close">✕</button></div>
+        <div class="screen-body">
+          <div id="profile-hint" class="hidden">
+            Crie uma conta para ter perfil,<br>nível, estatísticas e amigos.
+          </div>
+          <div id="profile-content" class="hidden">
+            <div id="pf-head">
+              <div id="pf-name">—</div>
+              <div id="pf-level-badge">NÍVEL <b id="pf-level">1</b></div>
+            </div>
+            <div id="pf-xpbar"><div id="pf-xpfill"></div></div>
+            <div id="pf-xptext">0 / 500 XP</div>
+            <div id="pf-stats">
+              <div class="pf-tile"><b id="st-wins">0</b><span>Vitórias</span></div>
+              <div class="pf-tile"><b id="st-matches">0</b><span>Partidas</span></div>
+              <div class="pf-tile"><b id="st-kills">0</b><span>Eliminações</span></div>
+              <div class="pf-tile"><b id="st-deaths">0</b><span>Mortes</span></div>
+              <div class="pf-tile"><b id="st-kd">0.00</b><span>K/D</span></div>
+              <div class="pf-tile"><b id="st-hs">0</b><span>Headshots</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AMIGOS -->
+    <section class="screen" id="screen-friends">
+      <div class="screen-panel narrow">
+        <div class="screen-head"><h2>AMIGOS</h2><button type="button" class="screen-close">✕</button></div>
+        <div class="screen-body">
+          <div id="friends-hint" class="hidden">
+            Crie uma conta para adicionar amigos,<br>ver quem está online e convidar para salas.
+          </div>
           <div id="friends-box" class="hidden">
-            <div id="friends-title">AMIGOS</div>
             <div id="friend-add-row">
               <input id="friend-name" type="text" maxlength="20" placeholder="Adicionar por usuário" autocomplete="off">
               <button type="button" id="friend-add-btn">＋</button>
@@ -204,64 +264,80 @@
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- RANKING -->
-      <div id="panel-rank" class="hidden">
-        <div id="rank-search-row">
-          <input id="rank-search" type="text" maxlength="20" placeholder="Buscar jogador…" autocomplete="off">
-          <button type="button" id="rank-search-btn">BUSCAR</button>
-        </div>
-        <div id="rank-status"></div>
-        <div id="rank-list"></div>
-      </div>
-
-      <!-- CONFIG -->
-      <div id="panel-config" class="hidden">
-        <div class="cfg-section">
-          <h4>GRÁFICOS</h4>
-          <div class="cfg-row">
-            <label>Qualidade</label>
-            <select id="set-quality">
-              <option value="low">Baixa</option>
-              <option value="med">Média</option>
-              <option value="high" selected>Alta</option>
-            </select>
+    <!-- RANKING -->
+    <section class="screen" id="screen-rank">
+      <div class="screen-panel narrow">
+        <div class="screen-head"><h2>RANKING GLOBAL</h2><button type="button" class="screen-close">✕</button></div>
+        <div class="screen-body">
+          <div id="rank-search-row">
+            <input id="rank-search" type="text" maxlength="20" placeholder="Buscar jogador…" autocomplete="off">
+            <button type="button" id="rank-search-btn">BUSCAR</button>
           </div>
-          <div class="cfg-row">
-            <label>Campo de visão</label>
-            <input id="set-fov" type="range" min="70" max="110" step="1" value="78">
-            <b id="set-fov-val">78</b>
-          </div>
-          <div class="cfg-row">
-            <label>Mostrar FPS e Ping</label>
-            <select id="set-perf">
-              <option value="on">Ligado</option>
-              <option value="off" selected>Desligado</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="cfg-section">
-          <h4>CONTROLES</h4>
-          <div class="cfg-row sens-row">
-            <label>Sensibilidade</label>
-            <input id="sens" type="range" min="0.2" max="2.5" step="0.1" value="1">
-            <b id="sens-val">1.0</b>
-          </div>
-          <div id="binds-list"></div>
-          <button type="button" id="binds-reset">RESTAURAR PADRÃO</button>
-        </div>
-
-        <div class="cfg-section">
-          <h4>ÁUDIO</h4>
-          <div class="cfg-row">
-            <label>Volume</label>
-            <input id="set-vol" type="range" min="0" max="100" step="5" value="50">
-            <b id="set-vol-val">50</b>
-          </div>
+          <div id="rank-status"></div>
+          <div id="rank-list"></div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <!-- CONFIGURAÇÕES -->
+    <section class="screen" id="screen-config">
+      <div class="screen-panel wide">
+        <div class="screen-head"><h2>CONFIGURAÇÕES</h2><button type="button" class="screen-close">✕</button></div>
+        <div class="screen-body cfg-layout">
+          <div id="cfg-side">
+            <button type="button" class="cfg-tab active" data-page="gfx">GRÁFICOS</button>
+            <button type="button" class="cfg-tab" data-page="ctl">CONTROLES</button>
+            <button type="button" class="cfg-tab" data-page="aud">ÁUDIO</button>
+            <button type="button" class="cfg-tab" data-page="ui">INTERFACE</button>
+          </div>
+          <div id="cfg-pages">
+            <div class="cfg-page" data-page="gfx">
+              <div class="cfg-row">
+                <label>Qualidade</label>
+                <select id="set-quality">
+                  <option value="low">Baixa</option>
+                  <option value="med">Média</option>
+                  <option value="high" selected>Alta</option>
+                </select>
+              </div>
+              <div class="cfg-row">
+                <label>Campo de visão</label>
+                <input id="set-fov" type="range" min="70" max="110" step="1" value="78">
+                <b id="set-fov-val">78</b>
+              </div>
+              <div class="cfg-note">A qualidade afeta sombras, detalhe do cenário e texturas. Baixe se o FPS estiver ruim.</div>
+            </div>
+            <div class="cfg-page hidden" data-page="ctl">
+              <div class="cfg-row sens-row">
+                <label>Sensibilidade</label>
+                <input id="sens" type="range" min="0.2" max="2.5" step="0.1" value="1">
+                <b id="sens-val">1.0</b>
+              </div>
+              <div id="binds-list"></div>
+              <button type="button" id="binds-reset">RESTAURAR PADRÃO</button>
+            </div>
+            <div class="cfg-page hidden" data-page="aud">
+              <div class="cfg-row">
+                <label>Volume geral</label>
+                <input id="set-vol" type="range" min="0" max="100" step="5" value="50">
+                <b id="set-vol-val">50</b>
+              </div>
+            </div>
+            <div class="cfg-page hidden" data-page="ui">
+              <div class="cfg-row">
+                <label>Mostrar FPS e Ping</label>
+                <select id="set-perf">
+                  <option value="on">Ligado</option>
+                  <option value="off" selected>Desligado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- PERFIL PÚBLICO (modal) -->
     <div id="player-modal" class="hidden">
