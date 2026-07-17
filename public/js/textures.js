@@ -499,15 +499,26 @@ const PAINTERS = {
 // ---------------- API ----------------
 const cache = new Map();
 
-export function tex(name, size = 512) {
-  const key = name + size;
+// Quality settings (set by main.js via setTexQuality)
+let _texSize = 512;
+let _aniso = 8;
+
+export function setTexQuality(quality) {
+  if (quality === 'low') { _texSize = 256; _aniso = 1; }
+  else if (quality === 'med') { _texSize = 384; _aniso = 4; }
+  else { _texSize = 512; _aniso = 8; }
+}
+
+export function tex(name, size) {
+  const s = size || _texSize;
+  const key = name + s;
   if (cache.has(key)) return cache.get(key);
-  const [c, ctx] = canvas(size);
-  PAINTERS[name](ctx, size);
+  const [c, ctx] = canvas(s);
+  PAINTERS[name](ctx, s);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 8;
+  t.anisotropy = _aniso;
   cache.set(key, t);
   return t;
 }
@@ -531,8 +542,8 @@ export function spriteTex(inner = '#fff8e0', outer = '#ffb040') {
 // Céu de fim de tarde pintado (gradiente + sol + nuvens)
 export function skyTex() {
   if (cache.has('sky')) return cache.get('sky');
-  const [c, ctx] = canvas(1024);
-  const s = 1024;
+  const [c, ctx] = canvas(512);
+  const s = 512;
   const g = ctx.createLinearGradient(0, 0, 0, s);
   g.addColorStop(0, '#3e78ac');
   g.addColorStop(0.42, '#7fb2cf');

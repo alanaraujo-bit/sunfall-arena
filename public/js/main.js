@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
 import { buildWorld, makeCharacter, makeViewmodel } from './world.js';
-import { tex, spriteTex } from './textures.js';
+import { tex, spriteTex, setTexQuality } from './textures.js';
 import { Net, api, apiAuth, apiPublicGet } from './net.js';
 import { SFX } from './audio.js';
 
@@ -36,7 +36,29 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-const world = buildWorld(scene);
+// ---------------- Configurações ----------------
+const DEFAULT_BINDS = {
+  forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
+  jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR',
+  w1: 'Digit1', w2: 'Digit2', board: 'Tab'
+};
+const BIND_LABELS = {
+  forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
+  jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar',
+  w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
+};
+
+let settings = { quality: 'high', fov: 78, vol: 50, perf: 'on', binds: { ...DEFAULT_BINDS } };
+try {
+  const saved = JSON.parse(localStorage.getItem('sf_settings') || '{}');
+  settings = { ...settings, ...saved, binds: { ...DEFAULT_BINDS, ...(saved.binds || {}) } };
+} catch { /* settings corrompidas: usa padrão */ }
+const binds = settings.binds;
+const saveSettings = () => localStorage.setItem('sf_settings', JSON.stringify(settings));
+
+// Aplica qualidade de textura antes de construir o mundo
+setTexQuality(settings.quality);
+const world = buildWorld(scene, settings.quality);
 
 // ---------------- HUD ----------------
 const $ = id => document.getElementById(id);
@@ -97,36 +119,29 @@ hud.sens.oninput = () => {
   localStorage.setItem('sf_sens', hud.sens.value);
 };
 
-// ---------------- Configurações ----------------
-const DEFAULT_BINDS = {
-  forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
-  jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR',
-  w1: 'Digit1', w2: 'Digit2', board: 'Tab'
-};
-const BIND_LABELS = {
-  forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
-  jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar',
-  w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
-};
-
-let settings = { quality: 'high', fov: 78, vol: 50, perf: 'on', binds: { ...DEFAULT_BINDS } };
-try {
-  const saved = JSON.parse(localStorage.getItem('sf_settings') || '{}');
-  settings = { ...settings, ...saved, binds: { ...DEFAULT_BINDS, ...(saved.binds || {}) } };
-} catch { /* settings corrompidas: usa padrão */ }
-const binds = settings.binds;
-const saveSettings = () => localStorage.setItem('sf_settings', JSON.stringify(settings));
-
 function applyGraphics() {
   if (settings.quality === 'low') {
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 0.85));
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 0.75));
+    renderer.toneMapping = THREE.NoToneMapping;
     world.sun.castShadow = false;
+    scene.fog.near = 40;
+    scene.fog.far = 140;
   } else if (settings.quality === 'med') {
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.3));
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     world.sun.castShadow = true;
+    world.sun.shadow.mapSize.set(1024, 1024);
+    world.sun.shadow.map = null; // force regen at new size
+    scene.fog.near = 55;
+    scene.fog.far = 200;
   } else {
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     world.sun.castShadow = true;
+    world.sun.shadow.mapSize.set(2048, 2048);
+    world.sun.shadow.map = null; // force regen at new size
+    scene.fog.near = 70;
+    scene.fog.far = 260;
   }
   BASE_FOV = settings.fov;
 }
@@ -441,24 +456,59 @@ const dustTex = spriteTex('#e8cfa8', '#b08a5c');
 const bloodTex = spriteTex('#ff7060', '#a02020');
 const poofTex = spriteTex('#d0f0e8', '#3fc8b4');
 
+// Material pools — evita criar+destruir material a cada tiro (reduz GC pressure)
+const _tracerPool = [];
+const _spritePool = [];
+const _tracerMat = new THREE.MeshBasicMaterial({
+  color: 0xffd9a0, transparent: true, opacity: 0.85,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+const _tracerMatAlt = new THREE.MeshBasicMaterial({
+  color: 0xffc080, transparent: true, opacity: 0.85,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+const _flashMat = new THREE.SpriteMaterial({
+  map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+});
+
+function getTracerMesh(color) {
+  if (_tracerPool.length > 0) {
+    const m = _tracerPool.pop();
+    m.material = color === 0xffc080 ? _tracerMatAlt : _tracerMat;
+    m.visible = true;
+    return m;
+  }
+  return new THREE.Mesh(tracerGeo, color === 0xffc080 ? _tracerMatAlt : _tracerMat);
+}
+
+// Cache shared SpriteMaterials per texture to avoid per-particle allocation
+const _particleMatCache = new Map();
+function getParticleMat(texture) {
+  if (!_particleMatCache.has(texture)) {
+    _particleMatCache.set(texture, new THREE.SpriteMaterial({
+      map: texture, transparent: true, depthWrite: false
+    }));
+  }
+  return _particleMatCache.get(texture);
+}
+
 function spawnTracer(a, b, color = 0xffd9a0) {
   const len = a.distanceTo(b);
   if (len < 0.5) return;
-  const m = new THREE.Mesh(tracerGeo, new THREE.MeshBasicMaterial({
-    color, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false
-  }));
+  const m = getTracerMesh(color);
   m.scale.set(0.03, 0.03, len);
   m.position.copy(a).lerp(b, 0.5);
   m.lookAt(b);
   scene.add(m);
-  effects.push({ obj: m, ttl: 0.07, life: 0.07, kind: 'fade' });
+  effects.push({ obj: m, ttl: 0.07, life: 0.07, kind: 'tracer' });
 }
 
 function spawnBurst(point, texture, n = 6, speed = 3, size = 0.14, up = 2) {
-  for (let i = 0; i < n; i++) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture, transparent: true, depthWrite: false
-    }));
+  // reduz partículas em qualidade baixa
+  const count = settings.quality === 'low' ? Math.ceil(n * 0.4) : n;
+  const mat = getParticleMat(texture);
+  for (let i = 0; i < count; i++) {
+    const s = new THREE.Sprite(mat);
     s.position.copy(point);
     s.scale.setScalar(size * (0.7 + Math.random() * 0.6));
     scene.add(s);
@@ -473,10 +523,7 @@ function spawnBurst(point, texture, n = 6, speed = 3, size = 0.14, up = 2) {
 }
 
 function spawnFlash(pos) {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    rotation: Math.random() * Math.PI
-  }));
+  const s = new THREE.Sprite(_flashMat);
   s.position.copy(pos);
   s.scale.setScalar(0.28 + Math.random() * 0.15);
   scene.add(s);
@@ -489,31 +536,38 @@ function updateEffects(dt) {
     e.ttl -= dt;
     if (e.ttl <= 0) {
       scene.remove(e.obj);
-      e.obj.material.dispose();
+      if (e.kind === 'tracer') {
+        e.obj.visible = false;
+        _tracerPool.push(e.obj); // recycle tracer mesh
+      }
+      // shared materials are NOT disposed — they're reused
       effects.splice(i, 1);
       continue;
     }
-    const k = e.ttl / e.life;
-    e.obj.material.opacity = k;
-    if (e.kind === 'particle') {
+    if (e.kind === 'tracer' || e.kind === 'fade') {
+      e.obj.material.opacity = e.ttl / e.life;
+    } else if (e.kind === 'particle') {
       e.vel.y -= 9 * dt;
       e.obj.position.addScaledVector(e.vel, dt);
+      e.obj.scale.setScalar(e.obj.scale.x * (0.92 + 0.08 * (e.ttl / e.life)));
     }
   }
 }
 
 // ---------------- Nametags ----------------
 function makeNametag(name, color) {
+  const sz = settings.quality === 'low' ? 128 : 256;
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 64;
+  c.width = sz; c.height = sz >> 2;
   const ctx = c.getContext('2d');
-  ctx.font = 'bold 34px "Trebuchet MS", sans-serif';
+  const fs = sz === 128 ? 17 : 34;
+  ctx.font = `bold ${fs}px "Trebuchet MS", sans-serif`;
   ctx.textAlign = 'center';
-  ctx.lineWidth = 6;
+  ctx.lineWidth = sz === 128 ? 3 : 6;
   ctx.strokeStyle = 'rgba(20,14,8,0.85)';
-  ctx.strokeText(name, 128, 42);
+  ctx.strokeText(name, sz >> 1, c.height - (sz === 128 ? 6 : 22));
   ctx.fillStyle = color;
-  ctx.fillText(name, 128, 42);
+  ctx.fillText(name, sz >> 1, c.height - (sz === 128 ? 6 : 22));
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false }));
@@ -1313,7 +1367,6 @@ net.on('_open', () => {
 
 net.on('_close', () => {
   connected = false;
-  const wasPlaying = playing;
   if (playing) {
     playing = false;
     inRoom = false;
@@ -1326,8 +1379,17 @@ net.on('_close', () => {
     hud.menuStatus.textContent = 'Reconectando…';
     setMenuMode(false);
     if (document.exitPointerLock) document.exitPointerLock();
+  } else {
+    hud.menuStatus.textContent = 'Reconectando…';
   }
-  setTimeout(connectPresence, wasPlaying ? 1500 : 3000);
+});
+
+net.on('_reconnect_status', ({ attempt, max }) => {
+  hud.menuStatus.textContent = `Reconectando… (tentativa ${attempt}/${max})`;
+});
+
+net.on('_reconnect_failed', () => {
+  hud.menuStatus.textContent = 'Não foi possível reconectar. Recarregue a página.';
 });
 
 // envio de estado a ~30Hz (menos delay percebido pelos outros jogadores)
@@ -1693,8 +1755,10 @@ function frame() {
     // FOV dinâmico
     const hv = Math.hypot(me.vel.x, me.vel.z);
     const targetFov = zoomed ? ZOOM_FOV : BASE_FOV + (me.sliding ? 6 : 0) + Math.max(0, (hv - 8.2)) * 0.5;
+    const prevFov = camera.fov;
     camera.fov += (targetFov - camera.fov) * Math.min(1, 12 * dt);
-    camera.updateProjectionMatrix();
+    // só recalcula a projeção se o FOV de fato mudou (economiza CPU)
+    if (Math.abs(camera.fov - prevFov) > 0.01) camera.updateProjectionMatrix();
 
     // viewmodel: bob + recuo + troca
     if (me.grounded && hv > 1 && !me.sliding) bobT += dt * hv * 1.4;
@@ -1715,7 +1779,7 @@ function frame() {
     const a = t * 0.06;
     camera.position.set(Math.cos(a) * 33, 17, Math.sin(a) * 33);
     camera.lookAt(0, 2.5, 0);
-    if (camera.fov !== BASE_FOV) { camera.fov = BASE_FOV; camera.updateProjectionMatrix(); }
+    if (Math.abs(camera.fov - BASE_FOV) > 0.01) { camera.fov = BASE_FOV; camera.updateProjectionMatrix(); }
   }
 
   renderer.render(scene, camera);

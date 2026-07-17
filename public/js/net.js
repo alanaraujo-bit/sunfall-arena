@@ -45,15 +45,22 @@ export class Net {
     this.ws = null;
     this.handlers = new Map();
     this.open = false;
+    this._retries = 0;
+    this._maxRetries = 20;
+    this._reconnecting = false;
+    this._reconnectTimer = null;
   }
 
   on(type, fn) { this.handlers.set(type, fn); }
 
   connect() {
+    if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${API_HOST}`);
     this.ws.onopen = () => {
       this.open = true;
+      this._retries = 0;
+      this._reconnecting = false;
       const h = this.handlers.get('_open');
       if (h) h();
     };
@@ -67,7 +74,29 @@ export class Net {
       this.open = false;
       const h = this.handlers.get('_close');
       if (h) h();
+      this._autoReconnect();
     };
+    this.ws.onerror = () => {}; // onclose will fire after onerror
+  }
+
+  _autoReconnect() {
+    if (this._reconnecting) return;
+    if (this._retries >= this._maxRetries) {
+      const h = this.handlers.get('_reconnect_failed');
+      if (h) h();
+      return;
+    }
+    this._reconnecting = true;
+    this._retries++;
+    // exponential backoff: 1s, 2s, 4s, 8s, max 15s + small jitter
+    const delay = Math.min(15000, 1000 * Math.pow(2, this._retries - 1)) + Math.random() * 500;
+    const h = this.handlers.get('_reconnect_status');
+    if (h) h({ attempt: this._retries, max: this._maxRetries, delay });
+    clearTimeout(this._reconnectTimer);
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnecting = false;
+      this.connect();
+    }, delay);
   }
 
   send(obj) {

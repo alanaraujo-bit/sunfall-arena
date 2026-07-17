@@ -99,7 +99,20 @@ async function isFriendAccepted(a, b) {
 export function attachWs(server) {
   const wss = new WebSocketServer({ server });
 
+  // Server-side ping to keep connections alive through Fly.io proxy
+  const PING_INTERVAL = 25_000;
+  const pingTimer = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (ws.isAlive === false) { ws.terminate(); continue; }
+      ws.isAlive = false;
+      ws.ping();
+    }
+  }, PING_INTERVAL);
+  wss.on('close', () => clearInterval(pingTimer));
+
   wss.on('connection', (ws, req) => {
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
     if (process.env.NODE_ENV === 'production') {
       const allowed = (process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
       const origin = req.headers.origin;

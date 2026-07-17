@@ -24,6 +24,7 @@ const CORS_ORIGIN = (process.env.CORS_ORIGIN || 'http://localhost:3000').split('
 const app = express();
 app.use(cors({ origin: CORS_ORIGIN, credentials: false }));
 app.use(express.json());
+app.get('/healthz', (req, res) => res.send('ok'));
 app.use('/api/auth', authRoutes);
 app.use('/api', profileRoutes);
 app.use('/api/friends', friendsRoutes);
