@@ -17,12 +17,12 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 // ---------------- Configurações (antes do renderer — AA e escala dependem delas) ----------------
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
-  jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR',
+  jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
   w1: 'Digit1', w2: 'Digit2', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
-  jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar',
+  jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
   w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
 };
 
@@ -137,7 +137,9 @@ const hud = {
   ammo: $('ammo'), wname: $('weapon-name'), feed: $('feed'), board: $('board'),
   boardRows: $('board-rows'), hitmarker: $('hitmarker'), dmgFlash: $('dmg-flash'),
   death: $('death'), deathBy: $('death-by'), scope: $('scope'), game: $('hud'),
-  killPop: $('kill-pop'),
+  killPop: $('kill-pop'), multiKill: $('multi-kill'),
+  stamBox: $('stam-box'), stamFill: $('stam-fill'),
+  kitBox: $('kit-box'), kitCount: $('kit-count'), kitBar: $('kit-bar'),
   tabGuest: $('tab-guest'), tabAccount: $('tab-account'),
   guestPanel: $('guest-panel'), accountPanel: $('account-panel'),
   accUser: $('acc-user'), accPass: $('acc-pass'), accountStatus: $('account-status'),
@@ -581,8 +583,14 @@ const me = {
   pos: new THREE.Vector3(0, 0, 20), vel: new THREE.Vector3(),
   yaw: 0, pitch: 0, grounded: false, coyote: 0,
   sliding: false, slideT: 0, slideDir: new THREE.Vector2(),
-  eyeH: PLAYER.EYE, stepT: 0
+  slideEnergy: 100, slideCooldownT: 0,
+  eyeH: PLAYER.EYE, stepT: 0,
+  kits: 0, usingKit: 0
 };
+const SLIDE_MAX_ENERGY = 100, SLIDE_COST = 40, SLIDE_REGEN_DELAY = 1, SLIDE_REGEN_RATE = 30;
+const KIT_USE_TIME = 1, KIT_HEAL = 50;
+let lastKillTime = 0, multiKillCount = 0;
+const MULTI_KILL_WINDOW = 4;
 
 // times (TDM) — cores absolutas, iguais para todos
 const TEAM_COLORS = ['#f0844c', '#5c9ce8'];
@@ -618,6 +626,7 @@ const WEAPONS = [
   { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false },
   { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true }
 ];
+const WEAPON_ICONS = ['⚡', '◎'];
 const ammo = [WEAPONS[0].mag, WEAPONS[1].mag];
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0;
 
@@ -873,6 +882,7 @@ addEventListener('keydown', e => {
   if (!playing || me.dead) return;
   if (e.code === binds.jump) wantJump = true;
   if (e.code === binds.reload) startReload();
+  if (e.code === binds.kit) tryUseKit();
   if (e.code === binds.w1) switchWeapon(0);
   if (e.code === binds.w2) switchWeapon(1);
 });
@@ -917,7 +927,7 @@ function setZoom(z) {
 }
 
 function switchWeapon(i) {
-  if (i === curW || reloading || me.dead) return;
+  if (i === curW || reloading || me.dead || me.usingKit > 0) return;
   curW = i;
   swapT = 0.25;
   setZoom(false);
@@ -985,11 +995,14 @@ function updateMovement(dt) {
   const wx = (-sy) * fz + cy * fx;
   const wz = (-cy) * fz + (-sy) * fx;
 
-  // slide
+  // slide (com limite de energia — tipo sprint: gasta ao usar, recarrega parado)
   if (keys[binds.slide] && me.grounded && !me.sliding && (fx || fz) &&
-      Math.hypot(me.vel.x, me.vel.z) > 4) {
+      Math.hypot(me.vel.x, me.vel.z) > 4 && me.slideEnergy >= SLIDE_COST) {
     me.sliding = true;
     me.slideT = 0.85;
+    me.slideEnergy -= SLIDE_COST;
+    me.slideCooldownT = SLIDE_REGEN_DELAY;
+    updateSlideHUD();
     const h = Math.hypot(me.vel.x, me.vel.z);
     const boost = Math.max(h, 12.6);
     const nx2 = me.vel.x / (h || 1), nz2 = me.vel.z / (h || 1);
@@ -999,6 +1012,13 @@ function updateMovement(dt) {
   if (me.sliding) {
     me.slideT -= dt;
     if (me.slideT <= 0 || !keys[binds.slide] || !me.grounded) me.sliding = false;
+  }
+  if (!me.sliding) {
+    if (me.slideCooldownT > 0) me.slideCooldownT -= dt;
+    else if (me.slideEnergy < SLIDE_MAX_ENERGY) {
+      me.slideEnergy = Math.min(SLIDE_MAX_ENERGY, me.slideEnergy + SLIDE_REGEN_RATE * dt);
+      updateSlideHUD();
+    }
   }
 
   // fricção + aceleração
@@ -1085,7 +1105,7 @@ const _dir = new THREE.Vector3(), _origin = new THREE.Vector3(), _muzzleV = new 
 function tryFire() {
   const w = WEAPONS[curW];
   const now = performance.now() / 1000;
-  if (!playing || matchEnded || me.dead || reloading > 0 || swapT > 0) return;
+  if (!playing || matchEnded || me.dead || reloading > 0 || swapT > 0 || me.usingKit > 0) return;
   if (now - lastShot < w.int) return;
   if (ammo[curW] <= 0) { SFX.empty(); startReload(); return; }
   lastShot = now;
@@ -1180,7 +1200,7 @@ function rayBoxLocal(o, d, b) {
 
 function startReload() {
   const w = WEAPONS[curW];
-  if (reloading > 0 || ammo[curW] === w.mag || me.dead) return;
+  if (reloading > 0 || ammo[curW] === w.mag || me.dead || me.usingKit > 0) return;
   reloading = w.reload;
   setZoom(false);
   SFX.reload();
@@ -1199,6 +1219,36 @@ function updateHpHUD() {
   hud.hpFill.classList.toggle('low', me.hp <= 30);
 }
 
+function updateSlideHUD() {
+  hud.stamFill.style.width = (me.slideEnergy / SLIDE_MAX_ENERGY * 100) + '%';
+  hud.stamBox.classList.toggle('show', me.slideEnergy < SLIDE_MAX_ENERGY);
+  hud.stamFill.classList.toggle('ready', me.slideEnergy >= SLIDE_COST);
+}
+
+function updateKitHUD() {
+  hud.kitCount.textContent = me.kits;
+  hud.kitBox.classList.toggle('show', me.kits > 0);
+  hud.kitBar.style.width = me.usingKit > 0 ? (100 - me.usingKit / KIT_USE_TIME * 100) + '%' : '0%';
+  hud.kitBox.classList.toggle('using', me.usingKit > 0);
+}
+
+let multiKillT = null;
+const MULTI_KILL_LABEL = { 2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'QUAD KILL' };
+function showMultiKill(n) {
+  hud.multiKill.textContent = MULTI_KILL_LABEL[n] || 'MULTI KILL';
+  hud.multiKill.className = n >= 5 ? 'show t5' : n === 4 ? 'show t4' : n === 3 ? 'show t3' : 'show';
+  clearTimeout(multiKillT);
+  multiKillT = setTimeout(() => { hud.multiKill.className = ''; }, 1400);
+  SFX.multiKill(n);
+}
+
+function tryUseKit() {
+  if (!playing || matchEnded || me.dead || me.kits <= 0 || me.usingKit > 0 || me.hp >= 100) return;
+  net.send({ t: 'usekit' });
+  me.usingKit = KIT_USE_TIME;
+  updateKitHUD();
+}
+
 let hitmarkerT = null;
 function showHitmarker(head) {
   hud.hitmarker.classList.remove('show', 'head');
@@ -1209,16 +1259,17 @@ function showHitmarker(head) {
   hitmarkerT = setTimeout(() => hud.hitmarker.classList.remove('show', 'head'), 120);
 }
 
-function addFeed(killer, victim, head, isMe) {
+function addFeed(killer, victim, head, isMe, weaponIndex) {
   const div = document.createElement('div');
-  div.className = 'feed-item' + (isMe ? ' me' : '');
+  div.className = 'feed-item' + (isMe ? ' me' : '') + (head ? ' head' : '');
   const km = meta.get(killer) || (killer === me.id ? me : null);
   const vm2 = meta.get(victim) || (victim === me.id ? me : null);
   const kn = killer === me.id ? me.name : (km ? km.name : '?');
   const vn = victim === me.id ? me.name : (vm2 ? vm2.name : '?');
   const kc = killer === me.id ? me.color : (km ? km.color : '#fff');
   const vc = victim === me.id ? me.color : (vm2 ? vm2.color : '#fff');
-  div.innerHTML = `<b style="color:${kc}">${kn}</b> <span class="fx">${head ? '⌖' : '⚔'}</span> <b style="color:${vc}">${vn}</b>`;
+  const wi = weaponIndex !== undefined ? weaponIndex : 0;
+  div.innerHTML = `<b style="color:${kc}">${kn}</b> <span class="fx w">${WEAPON_ICONS[wi] || '?'}</span> <span class="fx">${head ? '⌖' : '⚔'}</span> <b style="color:${vc}">${vn}</b>`;
   hud.feed.prepend(div);
   setTimeout(() => div.classList.add('out'), 4200);
   setTimeout(() => div.remove(), 4700);
@@ -1260,6 +1311,10 @@ function clearRoomState() {
   hud.endscreen.classList.remove('show');
   if (endCountTimer) { clearInterval(endCountTimer); endCountTimer = null; }
   matchEnded = false;
+  me.slideEnergy = SLIDE_MAX_ENERGY; me.slideCooldownT = 0;
+  me.kits = 0; me.usingKit = 0;
+  multiKillCount = 0; lastKillTime = 0;
+  updateSlideHUD(); updateKitHUD();
 }
 
 net.on('init', msg => {
@@ -1381,6 +1436,17 @@ net.on('dmg', msg => {
     if (msg.h) SFX.headshot(); else SFX.hit();
   }
 });
+net.on('kit', msg => {
+  me.kits = msg.n;
+  updateKitHUD();
+  SFX.kitReady();
+});
+net.on('heal', msg => {
+  if (msg.id !== me.id) { const r = remotes.get(msg.id); if (r) r.hp = msg.hp; return; }
+  me.hp = msg.hp;
+  updateHpHUD();
+  SFX.heal();
+});
 net.on('die', msg => {
   // atualizar placar
   if (msg.id === me.id) { me.d = msg.vd; }
@@ -1388,11 +1454,14 @@ net.on('die', msg => {
   if (msg.by === me.id) { me.k = msg.kk; }
   else if (meta.has(msg.by)) meta.get(msg.by).k = msg.kk;
 
-  addFeed(msg.by, msg.id, msg.h, msg.by === me.id || msg.id === me.id);
+  addFeed(msg.by, msg.id, msg.h, msg.by === me.id || msg.id === me.id, msg.w);
 
   if (msg.id === me.id) {
     me.dead = true;
     me.sliding = false;
+    me.usingKit = 0;
+    updateKitHUD();
+    multiKillCount = 0;
     setZoom(false);
     mouseDown = false;
     const killer = meta.get(msg.by);
@@ -1402,7 +1471,13 @@ net.on('die', msg => {
   } else {
     const r = remotes.get(msg.id);
     if (r) { r.alive = false; r.deadT = 0; }
-    if (msg.by === me.id) { SFX.kill(); showKillPop(); }
+    if (msg.by === me.id) {
+      SFX.kill(); showKillPop();
+      const now = performance.now();
+      multiKillCount = (now - lastKillTime <= MULTI_KILL_WINDOW * 1000) ? multiKillCount + 1 : 1;
+      lastKillTime = now;
+      if (multiKillCount >= 2) showMultiKill(multiKillCount);
+    }
   }
   if (hud.board.classList.contains('show')) rebuildBoard();
 });
@@ -1945,6 +2020,10 @@ function frame() {
       }
     }
     if (swapT > 0) swapT -= dt;
+    if (me.usingKit > 0) {
+      me.usingKit = Math.max(0, me.usingKit - dt);
+      updateKitHUD();
+    }
     if (mouseDown && WEAPONS[curW].auto) tryFire();
 
     // câmera

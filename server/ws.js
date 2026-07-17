@@ -21,6 +21,10 @@ const WEAPONS = [
   { dmg: 92, head: 2, int: 1.05 }        // FERRÃO-SR
 ];
 const REWIND_MAX_MS = 1000;
+const KIT_STREAK = 3;     // kills seguidas (sem morrer) para ganhar 1 kit
+const KIT_MAX = 2;        // cargas de kit acumuláveis
+const KIT_HEAL = 50;      // vida restaurada por uso
+const KIT_USE_MS = 1000;  // tempo de canalização
 
 // posição do jogador rebobinada para o instante `sv` (lag compensation)
 function rewindPos(p, sv) {
@@ -37,7 +41,7 @@ function rewindPos(p, sv) {
   return h[0];
 }
 
-function damage(room, attacker, victim, dmg, head = false) {
+function damage(room, attacker, victim, dmg, head = false, wi = 0) {
   if (room.state !== 'playing') return;
   if (!victim || !victim.alive || !attacker || !attacker.alive) return;
   // TDM: sem fogo amigo (aliados não se ferem)
@@ -52,7 +56,7 @@ function damage(room, attacker, victim, dmg, head = false) {
   victim.deaths++;
   if (attacker !== victim) attacker.kills++;
   broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head });
-  broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head });
+  broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi });
 
   if (attacker !== victim && attacker.accountId) {
     awardXpAndPersist(attacker.accountId, { headshot: head })
@@ -312,7 +316,7 @@ export function attachWs(server) {
             if (tb < hitT) { hitT = tb; victim = p; head = false; }
           }
           if (victim) {
-            damage(room, self, victim, Math.round(w.dmg * (head ? w.head : 1)), head);
+            damage(room, self, victim, Math.round(w.dmg * (head ? w.head : 1)), head, wi);
           }
           break;
         }

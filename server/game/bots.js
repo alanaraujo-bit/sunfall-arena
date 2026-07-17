@@ -74,7 +74,7 @@ export function updateBot(room, bot, dt, damage) {
       dz = dz / d + (Math.random() - 0.5) * 0.06;
       broadcastRoom(room, { t: 'fire', id: bot.id, o: [ex, ey, ez], d: [dx, dy, dz], w: 0 });
       const chance = Math.max(0.08, Math.min(0.45, 0.5 - tDist * 0.009));
-      if (Math.random() < chance) damage(room, bot, target, 8 + (Math.random() * 5 | 0));
+      if (Math.random() < chance) damage(room, bot, target, 8 + (Math.random() * 5 | 0), false, 0);
     }
   } else {
     // patrulha

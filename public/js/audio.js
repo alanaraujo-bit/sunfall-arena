@@ -78,5 +78,14 @@ export const SFX = {
   step() { ensure(); noise(0.05, 0.07, 500, 250); },
   swap() { ensure(); noise(0.06, 0.15, 1400, 900, 'highpass'); tone(240, 0.05, 0.1, 'square'); },
   empty() { ensure(); tone(220, 0.05, 0.15, 'square', 180); },
-  spawn() { ensure(); tone(420, 0.1, 0.2, 'triangle', 640); tone(840, 0.15, 0.15, 'triangle', null, 0.1); }
+  spawn() { ensure(); tone(420, 0.1, 0.2, 'triangle', 640); tone(840, 0.15, 0.15, 'triangle', null, 0.1); },
+  kitReady() { ensure(); tone(660, 0.08, 0.22, 'triangle', 990); tone(990, 0.1, 0.18, 'triangle', null, 0.07); },
+  heal() { ensure(); tone(500, 0.12, 0.25, 'sine', 760); tone(760, 0.16, 0.2, 'sine', null, 0.08); },
+  multiKill(n) {
+    ensure();
+    const base = 480 + Math.min(n, 5) * 60;
+    tone(base, 0.1, 0.32, 'triangle', base * 1.5);
+    tone(base * 1.5, 0.14, 0.3, 'triangle', base * 2, 0.09);
+    if (n >= 4) tone(base * 2, 0.18, 0.28, 'triangle', base * 2.6, 0.18);
+  }
 };

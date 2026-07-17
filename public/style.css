@@ -104,6 +104,47 @@ body {
   text-shadow: 0 2px 6px rgba(0,0,0,.7);
 }
 
+/* stamina do slide */
+#stam-box {
+  position: absolute; left: 26px; bottom: 64px; width: 140px;
+  opacity: 0; transition: opacity .3s;
+}
+#stam-box.show { opacity: 1; }
+#stam-bar {
+  height: 7px; border-radius: 4px; overflow: hidden;
+  background: rgba(20,14,8,.65); border: 1px solid rgba(242,227,200,.2);
+}
+#stam-fill {
+  height: 100%; width: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #8a8478, #b8b0a0);
+  transition: width .1s linear;
+}
+#stam-fill.ready { background: linear-gradient(90deg, #3fc8b4, #6ee0c8); }
+
+/* kit (cura) */
+#kit-box {
+  position: absolute; left: 176px; bottom: 24px;
+  display: flex; align-items: center; gap: 6px;
+  opacity: 0; transform: scale(.85); transition: opacity .25s, transform .25s;
+}
+#kit-box.show { opacity: 1; transform: scale(1); }
+#kit-icon {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(20,40,20,.7); border: 2px solid #7fe08a;
+  color: #7fe08a; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: bold; text-shadow: 0 0 6px rgba(127,224,138,.8);
+}
+#kit-box.using #kit-icon { animation: kitPulse .5s infinite; }
+@keyframes kitPulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+#kit-bar-track {
+  width: 46px; height: 5px; border-radius: 3px; overflow: hidden;
+  background: rgba(20,14,8,.6); display: none;
+}
+#kit-box.using #kit-bar-track { display: block; }
+#kit-bar { height: 100%; width: 0%; background: #7fe08a; transition: width .1s linear; }
+#kit-count { font-size: 15px; font-weight: bold; color: #7fe08a; min-width: 12px; }
+#kit-box.using #kit-count { display: none; }
+
 /* munição */
 #ammo-box { position: absolute; right: 30px; bottom: 22px; text-align: right; }
 #weapon-name {
@@ -115,16 +156,28 @@ body {
   text-shadow: 0 3px 8px rgba(0,0,0,.75);
 }
 
-/* killfeed */
+/* killfeed — plaquinhas estilo Warzone */
 #feed { position: absolute; right: 22px; top: 20px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .feed-item {
-  background: rgba(20,14,8,.6); border-radius: 8px; padding: 5px 12px;
-  font-size: 14px; transition: opacity .5s, transform .5s;
-  border: 1px solid rgba(242,227,200,.12);
+  display: flex; align-items: center; gap: 8px;
+  background: linear-gradient(90deg, rgba(20,14,8,.75), rgba(20,14,8,.55));
+  border-radius: 4px; padding: 6px 14px 6px 10px;
+  font-size: 14px; letter-spacing: .3px;
+  border-left: 3px solid rgba(242,227,200,.4);
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  transition: opacity .5s, transform .5s;
+  animation: feedIn .28s ease-out;
 }
-.feed-item.me { border-color: rgba(63,200,180,.55); background: rgba(20,40,36,.65); }
-.feed-item.out { opacity: 0; transform: translateX(20px); }
-.feed-item .fx { opacity: .8; margin: 0 4px; }
+.feed-item.me { border-left-color: #6ee0c8; background: linear-gradient(90deg, rgba(20,40,36,.85), rgba(20,40,36,.6)); }
+.feed-item.head { border-left-color: #f0b34c; }
+.feed-item.out { opacity: 0; transform: translateX(24px); }
+.feed-item .fx { opacity: .9; margin: 0 2px; font-size: 13px; }
+.feed-item .fx.w { opacity: .7; font-size: 12px; filter: saturate(.75); }
+.feed-item.head .fx { color: #f0b34c; text-shadow: 0 0 6px rgba(240,179,76,.7); }
+@keyframes feedIn {
+  0% { opacity: 0; transform: translateX(30px) scale(.92); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
 
 /* +1 */
 #kill-pop {
@@ -138,6 +191,24 @@ body {
   15% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
   70% { opacity: 1; }
   100% { opacity: 0; transform: translateX(-50%) translateY(-14px); }
+}
+
+/* multi-kill (double/triple/quad) */
+#multi-kill {
+  position: absolute; left: 50%; top: 26%; transform: translateX(-50%) scale(.7);
+  font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #f2e3c8;
+  text-shadow: 0 3px 12px rgba(0,0,0,.85); opacity: 0;
+}
+#multi-kill.show { animation: multiPop 1.4s ease-out; }
+#multi-kill.t3 { color: #f0b34c; }
+#multi-kill.t4 { color: #f0844c; }
+#multi-kill.t5 { color: #e0554e; font-size: 42px; }
+@keyframes multiPop {
+  0% { opacity: 0; transform: translateX(-50%) scale(.6); }
+  12% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+  22% { transform: translateX(-50%) scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) scale(1) translateY(-10px); }
 }
 
 /* placar */
