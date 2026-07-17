@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
 import { buildWorld, makeCharacter, makeViewmodel } from './world.js';
 import { tex, spriteTex } from './textures.js';
-import { Net, api, apiAuth } from './net.js';
+import { Net, api, apiAuth, apiPublicGet } from './net.js';
 import { SFX } from './audio.js';
 
 // Log de erros visível no DOM (debug em headless)
@@ -75,7 +75,17 @@ const hud = {
   stDeaths: $('st-deaths'), stKd: $('st-kd'), stHs: $('st-hs'),
   setQuality: $('set-quality'), setFov: $('set-fov'), setFovVal: $('set-fov-val'),
   setVol: $('set-vol'), setVolVal: $('set-vol-val'),
-  bindsList: $('binds-list'), bindsReset: $('binds-reset')
+  bindsList: $('binds-list'), bindsReset: $('binds-reset'),
+  navRank: $('nav-rank'), panelRank: $('panel-rank'),
+  rankSearch: $('rank-search'), rankSearchBtn: $('rank-search-btn'),
+  rankStatus: $('rank-status'), rankList: $('rank-list'),
+  playerModal: $('player-modal'), pmClose: $('pm-close'), pmDot: $('pm-dot'),
+  pmName: $('pm-name'), pmLevel: $('pm-level'), pmSince: $('pm-since'),
+  pmXpFill: $('pm-xpfill'), pmXpText: $('pm-xptext'),
+  pmWins: $('pm-wins'), pmMatches: $('pm-matches'), pmWinrate: $('pm-winrate'),
+  pmKills: $('pm-kills'), pmDeaths: $('pm-deaths'), pmKd: $('pm-kd'),
+  pmHs: $('pm-hs'), pmHsrate: $('pm-hsrate'),
+  pmAddFriend: $('pm-addfriend'), pmStatus: $('pm-status')
 };
 hud.nameInput.value = localStorage.getItem('sf_name') || '';
 hud.sens.value = localStorage.getItem('sf_sens') || '1';
@@ -201,14 +211,18 @@ buildBindsUI();
 function showPanel(name) {
   hud.navPlay.classList.toggle('active', name === 'play');
   hud.navProfile.classList.toggle('active', name === 'profile');
+  hud.navRank.classList.toggle('active', name === 'rank');
   hud.navConfig.classList.toggle('active', name === 'config');
   hud.panelPlay.classList.toggle('hidden', name !== 'play');
   hud.panelProfile.classList.toggle('hidden', name !== 'profile');
+  hud.panelRank.classList.toggle('hidden', name !== 'rank');
   hud.panelConfig.classList.toggle('hidden', name !== 'config');
   if (name === 'profile') loadProfile();
+  if (name === 'rank') loadLeaderboard();
 }
 hud.navPlay.onclick = () => showPanel('play');
 hud.navProfile.onclick = () => showPanel('profile');
+hud.navRank.onclick = () => showPanel('rank');
 hud.navConfig.onclick = () => showPanel('config');
 
 async function loadProfile() {
@@ -234,6 +248,110 @@ async function loadProfile() {
     hud.stHs.textContent = stats.headshots;
   } catch { /* mantém últimos valores */ }
 }
+
+// ---------------- Ranking + perfil público ----------------
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+async function loadLeaderboard() {
+  hud.rankStatus.textContent = '';
+  try {
+    const { players: top } = await apiPublicGet('/leaderboard');
+    hud.rankList.textContent = '';
+    if (!top.length) {
+      hud.rankStatus.textContent = 'Ainda não há jogadores ranqueados.';
+      return;
+    }
+    top.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'rank-row';
+
+      const pos = document.createElement('span');
+      pos.className = 'rk-pos';
+      pos.textContent = MEDALS[i] || `#${i + 1}`;
+
+      const dot = document.createElement('span');
+      dot.className = 'rk-dot' + (p.online ? ' on' : '');
+
+      const name = document.createElement('span');
+      name.className = 'rk-name';
+      name.textContent = p.username;
+
+      const lvl = document.createElement('span');
+      lvl.className = 'rk-lvl';
+      lvl.textContent = `NV ${p.level}`;
+
+      const wins = document.createElement('span');
+      wins.className = 'rk-stat';
+      wins.textContent = `${p.wins} vit.`;
+
+      const kd = document.createElement('span');
+      kd.className = 'rk-stat';
+      kd.textContent = `${(p.kills / Math.max(1, p.deaths)).toFixed(2)} K/D`;
+
+      row.append(pos, dot, name, lvl, wins, kd);
+      row.onclick = () => openPlayerProfile(p.username);
+      hud.rankList.appendChild(row);
+    });
+  } catch {
+    hud.rankStatus.textContent = 'Falha ao carregar o ranking.';
+  }
+}
+
+async function openPlayerProfile(username) {
+  hud.pmStatus.textContent = '';
+  try {
+    const p = await apiPublicGet(`/players/${encodeURIComponent(username)}`);
+    hud.pmDot.className = p.online ? 'on' : '';
+    hud.pmName.textContent = p.username;
+    hud.pmLevel.textContent = p.level;
+    const since = new Date(p.createdAt);
+    hud.pmSince.textContent = `${p.online ? 'online agora' : 'offline'} · jogando desde ${since.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`;
+    const inLevel = p.xp - (p.level - 1) * 500;
+    hud.pmXpFill.style.width = `${Math.min(100, (inLevel / 500) * 100)}%`;
+    hud.pmXpText.textContent = `${inLevel} / 500 XP · total ${p.xp}`;
+    const s = p.stats;
+    hud.pmWins.textContent = s.wins;
+    hud.pmMatches.textContent = s.matchesPlayed;
+    hud.pmWinrate.textContent = `${Math.round((s.wins / Math.max(1, s.matchesPlayed)) * 100)}%`;
+    hud.pmKills.textContent = s.kills;
+    hud.pmDeaths.textContent = s.deaths;
+    hud.pmKd.textContent = (s.kills / Math.max(1, s.deaths)).toFixed(2);
+    hud.pmHs.textContent = s.headshots;
+    hud.pmHsrate.textContent = `${Math.round((s.headshots / Math.max(1, s.kills)) * 100)}%`;
+
+    const isSelf = auth && auth.username.toLowerCase() === p.username.toLowerCase();
+    hud.pmAddFriend.classList.toggle('hidden', !auth || isSelf);
+    hud.pmAddFriend.onclick = async () => {
+      hud.pmStatus.style.color = '';
+      try {
+        await apiAuth('POST', '/friends/request', auth.token, { username: p.username });
+        hud.pmStatus.style.color = '#6ee0c8';
+        hud.pmStatus.textContent = 'Pedido de amizade enviado!';
+        refreshFriends();
+      } catch (err) {
+        hud.pmStatus.style.color = '#f0806a';
+        hud.pmStatus.textContent = FRIEND_ERRORS[err.code] || 'Falha ao enviar pedido.';
+      }
+    };
+
+    hud.playerModal.classList.remove('hidden');
+  } catch (err) {
+    if (err.code === 'user_not_found') hud.rankStatus.textContent = 'Jogador não encontrado.';
+    else hud.rankStatus.textContent = 'Falha ao carregar perfil.';
+  }
+}
+
+hud.pmClose.onclick = () => hud.playerModal.classList.add('hidden');
+hud.playerModal.addEventListener('click', e => {
+  if (e.target === hud.playerModal) hud.playerModal.classList.add('hidden');
+});
+
+hud.rankSearchBtn.onclick = () => {
+  const q = hud.rankSearch.value.trim();
+  if (q.length >= 3) openPlayerProfile(q);
+  else hud.rankStatus.textContent = 'Digite pelo menos 3 caracteres.';
+};
+hud.rankSearch.addEventListener('keydown', e => { if (e.key === 'Enter') hud.rankSearchBtn.onclick(); });
 
 // ---------------- Estado ----------------
 const me = {
@@ -1176,6 +1294,9 @@ function friendRow(u, kind) {
   const name = document.createElement('span');
   name.className = 'fname';
   name.textContent = u.username;
+  name.style.cursor = 'pointer';
+  name.title = 'Ver perfil';
+  name.onclick = () => openPlayerProfile(u.username);
   row.appendChild(name);
 
   if (kind === 'friend') {

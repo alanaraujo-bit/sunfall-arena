@@ -19,6 +19,13 @@ export async function apiGet(path, token) {
   return apiAuth('GET', path, token);
 }
 
+export async function apiPublicGet(path) {
+  const res = await fetch(`${API_BASE}${path}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, status: res.status });
+  return data;
+}
+
 export async function apiAuth(method, path, token, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method,

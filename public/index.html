@@ -86,6 +86,7 @@
       <div id="nav-tabs">
         <button type="button" id="nav-play" class="nav-tab active">JOGAR</button>
         <button type="button" id="nav-profile" class="nav-tab">PERFIL</button>
+        <button type="button" id="nav-rank" class="nav-tab">RANKING</button>
         <button type="button" id="nav-config" class="nav-tab">CONFIG</button>
       </div>
 
@@ -191,6 +192,16 @@
         </div>
       </div>
 
+      <!-- RANKING -->
+      <div id="panel-rank" class="hidden">
+        <div id="rank-search-row">
+          <input id="rank-search" type="text" maxlength="20" placeholder="Buscar jogador…" autocomplete="off">
+          <button type="button" id="rank-search-btn">BUSCAR</button>
+        </div>
+        <div id="rank-status"></div>
+        <div id="rank-list"></div>
+      </div>
+
       <!-- CONFIG -->
       <div id="panel-config" class="hidden">
         <div class="cfg-section">
@@ -229,6 +240,33 @@
             <b id="set-vol-val">50</b>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- PERFIL PÚBLICO (modal) -->
+    <div id="player-modal" class="hidden">
+      <div id="pm-card">
+        <button type="button" id="pm-close">✕</button>
+        <div id="pm-head">
+          <span id="pm-dot"></span>
+          <span id="pm-name">—</span>
+          <span id="pm-level-badge">NÍVEL <b id="pm-level">1</b></span>
+        </div>
+        <div id="pm-since">—</div>
+        <div id="pm-xpbar"><div id="pm-xpfill"></div></div>
+        <div id="pm-xptext">—</div>
+        <div id="pm-stats">
+          <div class="pf-tile"><b id="pm-wins">0</b><span>Vitórias</span></div>
+          <div class="pf-tile"><b id="pm-matches">0</b><span>Partidas</span></div>
+          <div class="pf-tile"><b id="pm-winrate">0%</b><span>Vitórias %</span></div>
+          <div class="pf-tile"><b id="pm-kills">0</b><span>Eliminações</span></div>
+          <div class="pf-tile"><b id="pm-deaths">0</b><span>Mortes</span></div>
+          <div class="pf-tile"><b id="pm-kd">0.00</b><span>K/D</span></div>
+          <div class="pf-tile"><b id="pm-hs">0</b><span>Headshots</span></div>
+          <div class="pf-tile"><b id="pm-hsrate">0%</b><span>HS %</span></div>
+        </div>
+        <button type="button" id="pm-addfriend" class="hidden">ADICIONAR AMIGO</button>
+        <div id="pm-status"></div>
       </div>
     </div>
   </div>
