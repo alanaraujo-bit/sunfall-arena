@@ -43,9 +43,10 @@ const $ = id => document.getElementById(id);
 const hud = {
   menu: $('menu'), nameInput: $('name-input'),
   mpBtn: $('mp-btn'), customBtn: $('custom-btn'), customPanel: $('custom-panel'),
-  cfgBots: $('cfg-bots'), cfgKl: $('cfg-kl'), cfgTl: $('cfg-tl'),
+  cfgGm: $('cfg-gm'), cfgBots: $('cfg-bots'), cfgKl: $('cfg-kl'), cfgTl: $('cfg-tl'),
   createBtn: $('create-btn'), codeInput: $('code-input'), joinBtn: $('join-btn'),
   modeBtns: $('mode-btns'), pauseBtns: $('pause-btns'),
+  teamSwitch: $('team-switch'), team0: $('team-0'), team1: $('team-1'),
   roomLine: $('room-line'), roomCode: $('room-code'),
   resumeBtn: $('resume-btn'), leaveBtn: $('leave-btn'),
   inviteBanner: $('invite-banner'), inviteText: $('invite-text'),
@@ -355,12 +356,19 @@ hud.rankSearch.addEventListener('keydown', e => { if (e.key === 'Enter') hud.ran
 
 // ---------------- Estado ----------------
 const me = {
-  id: null, name: '', color: '#3fc8b4', hp: 100, dead: false,
+  id: null, name: '', color: '#3fc8b4', hp: 100, dead: false, team: null,
   pos: new THREE.Vector3(0, 0, 20), vel: new THREE.Vector3(),
   yaw: 0, pitch: 0, grounded: false, coyote: 0,
   sliding: false, slideT: 0, slideDir: new THREE.Vector2(),
   eyeH: PLAYER.EYE, stepT: 0
 };
+
+// times (TDM) — cores absolutas, iguais para todos
+const TEAM_COLORS = ['#f0844c', '#5c9ce8'];
+const TEAM_NAMES = ['LARANJA', 'AZUL'];
+function teamOf(team, fallback) {
+  return (roomInfo && roomInfo.gm === 'tdm' && (team === 0 || team === 1)) ? TEAM_COLORS[team] : fallback;
+}
 let playing = false, connected = false;
 let inRoom = false, matchEnded = false;
 let roomInfo = null;         // {code, mode, kl, end}
@@ -488,16 +496,31 @@ function makeNametag(name, color) {
 // ---------------- Jogadores remotos ----------------
 function addRemote(p) {
   if (p.id === me.id || remotes.has(p.id)) return;
-  meta.set(p.id, { name: p.name, color: p.color, k: p.k || 0, d: p.d || 0, bot: p.bot });
-  const model = makeCharacter(p.color);
+  meta.set(p.id, { name: p.name, color: p.color, team: p.team, k: p.k || 0, d: p.d || 0, bot: p.bot });
+  const col = teamOf(p.team, p.color);
+  const model = makeCharacter(col);
   model.position.set(p.pos[0], p.pos[1], p.pos[2]);
-  model.add(makeNametag(p.name, p.color));
+  model.add(makeNametag(p.name, col));
   scene.add(model);
   remotes.set(p.id, {
     model, hp: p.hp, alive: p.hp > 0,
     target: new THREE.Vector3(p.pos[0], p.pos[1], p.pos[2]),
     yaw: 0, tYaw: 0, pitch: 0, anim: 0, walkT: 0, deadT: 0
   });
+}
+
+// reconstrói o modelo de um remoto (usado quando ele troca de time)
+function rebuildRemoteModel(id) {
+  const r = remotes.get(id), m = meta.get(id);
+  if (!r || !m) return;
+  const col = teamOf(m.team, m.color);
+  scene.remove(r.model);
+  const model = makeCharacter(col);
+  model.position.copy(r.model.position);
+  model.rotation.copy(r.model.rotation);
+  model.add(makeNametag(m.name, col));
+  scene.add(model);
+  r.model = model;
 }
 
 function removeRemote(id) {
@@ -790,8 +813,10 @@ function tryFire() {
   const tMap = raycastSolids(_origin.x, _origin.y, _origin.z, _dir.x, _dir.y, _dir.z);
   // raycast: jogadores
   let hitId = null, hitT = tMap, headshot = false;
+  const tdm = roomInfo && roomInfo.gm === 'tdm';
   for (const [id, r] of remotes) {
     if (!r.alive) continue;
+    if (tdm) { const m = meta.get(id); if (m && m.team === me.team) continue; } // sem fogo amigo
     const p = r.model.position;
     // cabeça (esfera)
     const hx = p.x - _origin.x, hy = p.y + PLAYER.HEAD_Y - _origin.y, hz = p.z - _origin.z;
@@ -905,13 +930,15 @@ function addFeed(killer, victim, head, isMe) {
 
 function rebuildBoard() {
   const rows = [];
-  const mine = { name: me.name + ' (você)', color: me.color, k: me.k || 0, d: me.d || 0 };
+  const mine = { name: me.name + ' (você)', color: me.color, team: me.team, k: me.k || 0, d: me.d || 0 };
   rows.push(mine);
   for (const m of meta.values()) rows.push(m);
   rows.sort((a, b) => b.k - a.k);
-  hud.boardRows.innerHTML = rows.map(r =>
-    `<tr><td><span class="dot" style="background:${r.color}"></span>${r.name}${r.bot ? ' <span class="bot">BOT</span>' : ''}</td><td>${r.k}</td><td>${r.d}</td></tr>`
-  ).join('');
+  const rowHtml = r => {
+    const col = (roomInfo && roomInfo.gm === 'tdm' && (r.team === 0 || r.team === 1)) ? TEAM_COLORS[r.team] : r.color;
+    return `<tr><td><span class="dot" style="background:${col}"></span>${esc(r.name)}${r.bot ? ' <span class="bot">BOT</span>' : ''}</td><td>${r.k}</td><td>${r.d}</td></tr>`;
+  };
+  hud.boardRows.innerHTML = rows.map(rowHtml).join('');
 }
 
 function flashDamage() {
@@ -940,8 +967,9 @@ function clearRoomState() {
 net.on('init', msg => {
   clearRoomState();
   me.id = msg.id;
+  me.team = msg.team ?? null;
   inRoom = true;
-  roomInfo = { code: msg.code, mode: msg.mode, kl: msg.kl, end: msg.end };
+  roomInfo = { code: msg.code, mode: msg.mode, gm: msg.gm || 'ffa', kl: msg.kl, end: msg.end };
   for (const p of msg.players) {
     if (p.id === msg.id) {
       me.pos.set(p.pos[0], p.pos[1], p.pos[2]);
@@ -964,16 +992,34 @@ net.on('s', msg => {
     r.anim = a[5];
     r.hp = a[6];
   }
-  if (typeof msg.tl === 'number') updateMatchBar(msg.tl);
+  if (typeof msg.tl === 'number') updateMatchBar(msg.tl, msg.ts);
 });
 
-function updateMatchBar(secondsLeft) {
+function computeTeamScores() {
+  const s = [0, 0];
+  if (me.team === 0 || me.team === 1) s[me.team] += me.k || 0;
+  for (const m of meta.values()) if (m.team === 0 || m.team === 1) s[m.team] += m.k || 0;
+  return s;
+}
+
+function updateMatchBar(secondsLeft, teamScoresArr) {
   const m = Math.floor(secondsLeft / 60), s = secondsLeft % 60;
   hud.mbTime.textContent = `${m}:${String(s).padStart(2, '0')}`;
   hud.mbTime.classList.toggle('low', secondsLeft <= 60 && secondsLeft > 0);
-  let lead = me.k || 0;
-  for (const p of meta.values()) if (p.k > lead) lead = p.k;
-  hud.mbScore.textContent = `${lead}/${roomInfo ? roomInfo.kl : '-'}`;
+
+  if (roomInfo && roomInfo.gm === 'tdm') {
+    const ts = teamScoresArr || computeTeamScores();
+    const mine = me.team === 1 ? 1 : 0, foe = 1 - mine;
+    hud.mbScore.innerHTML =
+      `<span style="color:${TEAM_COLORS[mine]};font-weight:bold">${ts[mine]}</span>` +
+      ` <span style="opacity:.5">—</span> ` +
+      `<span style="color:${TEAM_COLORS[foe]}">${ts[foe]}</span>` +
+      ` <span style="opacity:.5;font-size:12px">/${roomInfo.kl}</span>`;
+  } else {
+    let lead = me.k || 0;
+    for (const p of meta.values()) if (p.k > lead) lead = p.k;
+    hud.mbScore.textContent = `${lead}/${roomInfo ? roomInfo.kl : '-'}`;
+  }
 }
 net.on('fire', msg => {
   if (msg.id === me.id) return;
@@ -1052,15 +1098,35 @@ net.on('end', msg => {
   mouseDown = false;
   setZoom(false);
   hud.death.classList.remove('show');
-  const win = msg.winId === me.id
-    ? { name: me.name + ' (você)', color: me.color }
-    : meta.get(msg.winId);
-  hud.endWinnerName.textContent = win ? win.name : '—';
-  hud.endWinnerName.style.color = win ? win.color : '';
-  hud.endRows.innerHTML = msg.board.map(r => {
-    const nm = r.id === me.id ? `${esc(r.name)} (você)` : esc(r.name);
-    return `<tr><td><span class="dot" style="background:${esc(r.color)}"></span>${nm}${r.bot ? ' <span class="bot">BOT</span>' : ''}</td><td>${r.k}</td><td>${r.d}</td></tr>`;
-  }).join('');
+
+  let won = false;
+  if (msg.gm === 'tdm') {
+    const wt = msg.winTeam;
+    if (wt === null || wt === undefined) {
+      hud.endWinnerName.textContent = 'EMPATE';
+      hud.endWinnerName.style.color = '#f2e3c8';
+    } else {
+      const sc = msg.teamScores || [0, 0];
+      hud.endWinnerName.textContent = `TIME ${TEAM_NAMES[wt]} — ${sc[wt]} × ${sc[1 - wt]}`;
+      hud.endWinnerName.style.color = TEAM_COLORS[wt];
+      won = wt === me.team;
+    }
+    hud.endRows.innerHTML = msg.board.map(r => {
+      const nm = r.id === me.id ? `${esc(r.name)} (você)` : esc(r.name);
+      const col = (r.team === 0 || r.team === 1) ? TEAM_COLORS[r.team] : r.color;
+      return `<tr><td><span class="dot" style="background:${esc(col)}"></span>${nm}${r.bot ? ' <span class="bot">BOT</span>' : ''}</td><td>${r.k}</td><td>${r.d}</td></tr>`;
+    }).join('');
+  } else {
+    const win = msg.winId === me.id ? { name: me.name + ' (você)', color: me.color } : meta.get(msg.winId);
+    hud.endWinnerName.textContent = win ? win.name : '—';
+    hud.endWinnerName.style.color = win ? win.color : '';
+    won = msg.winId === me.id;
+    hud.endRows.innerHTML = msg.board.map(r => {
+      const nm = r.id === me.id ? `${esc(r.name)} (você)` : esc(r.name);
+      return `<tr><td><span class="dot" style="background:${esc(r.color)}"></span>${nm}${r.bot ? ' <span class="bot">BOT</span>' : ''}</td><td>${r.k}</td><td>${r.d}</td></tr>`;
+    }).join('');
+  }
+
   hud.endscreen.classList.add('show');
   let count = msg.next || 10;
   hud.endCount.textContent = count;
@@ -1070,7 +1136,20 @@ net.on('end', msg => {
     hud.endCount.textContent = Math.max(0, count);
     if (count <= 0) { clearInterval(endCountTimer); endCountTimer = null; }
   }, 1000);
-  if (msg.winId === me.id) SFX.kill();
+  if (won) SFX.kill();
+});
+
+net.on('teamchg', msg => {
+  if (msg.id === me.id) {
+    me.team = msg.team;
+    me.dead = true;   // servidor respawna em ~600ms
+    setZoom(false);
+    mouseDown = false;
+    updateTeamButtons();
+  } else if (meta.has(msg.id)) {
+    meta.get(msg.id).team = msg.team;
+    rebuildRemoteModel(msg.id);
+  }
 });
 
 net.on('restart', msg => {
@@ -1163,7 +1242,7 @@ net.on('_close', () => {
   setTimeout(connectPresence, wasPlaying ? 1500 : 3000);
 });
 
-// envio de estado a 20Hz
+// envio de estado a ~30Hz (menos delay percebido pelos outros jogadores)
 setInterval(() => {
   if (!playing || !connected || me.dead) return;
   const anim = (Math.hypot(me.vel.x, me.vel.z) > 1.5 ? 1 : 0) | (me.sliding ? 2 : 0) | (curW << 2);
@@ -1173,7 +1252,7 @@ setInterval(() => {
     r: [+me.yaw.toFixed(3), +me.pitch.toFixed(3)],
     a: anim
   });
-}, 50);
+}, 33);
 
 // ---------------- Conta (login/registro) ----------------
 let auth = null; // {token, username}
@@ -1395,7 +1474,7 @@ function sendPlay(msg) {
 hud.mpBtn.addEventListener('click', () => sendPlay({ t: 'play', mode: 'public' }));
 hud.customBtn.addEventListener('click', () => hud.customPanel.classList.toggle('hidden'));
 hud.createBtn.addEventListener('click', () => sendPlay({
-  t: 'play', mode: 'create',
+  t: 'play', mode: 'create', gm: hud.cfgGm.value,
   bots: +hud.cfgBots.value, kl: +hud.cfgKl.value, tl: +hud.cfgTl.value
 }));
 hud.joinBtn.addEventListener('click', () => {
@@ -1422,10 +1501,21 @@ hud.inviteDismiss.addEventListener('click', () => {
   lastInvite = null;
 });
 
+hud.team0.addEventListener('click', () => net.send({ t: 'team', team: 0 }));
+hud.team1.addEventListener('click', () => net.send({ t: 'team', team: 1 }));
+
+function updateTeamButtons() {
+  hud.team0.classList.toggle('mine', me.team === 0);
+  hud.team1.classList.toggle('mine', me.team === 1);
+}
+
 function setMenuMode(paused) {
   hud.modeBtns.classList.toggle('hidden', paused);
   hud.customPanel.classList.add('hidden');
   hud.pauseBtns.classList.toggle('hidden', !paused);
+  const isTdm = paused && roomInfo && roomInfo.gm === 'tdm';
+  hud.teamSwitch.classList.toggle('hidden', !isTdm);
+  if (isTdm) updateTeamButtons();
   if (paused && roomInfo && roomInfo.mode === 'custom') {
     hud.roomLine.classList.remove('hidden');
     hud.roomCode.textContent = roomInfo.code;

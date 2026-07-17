@@ -119,6 +119,13 @@
 
         <div id="custom-panel" class="hidden">
           <div class="cfg-row">
+            <label>Modo</label>
+            <select id="cfg-gm">
+              <option value="ffa" selected>Todos contra Todos</option>
+              <option value="tdm">Mata-mata em Equipe</option>
+            </select>
+          </div>
+          <div class="cfg-row">
             <label>Bots</label>
             <select id="cfg-bots">
               <option>0</option><option>1</option><option selected>2</option>
@@ -143,6 +150,11 @@
 
         <div id="pause-btns" class="hidden">
           <div id="room-line" class="hidden">SALA <b id="room-code">----</b> — compartilhe o código com amigos</div>
+          <div id="team-switch" class="hidden">
+            <span class="team-label">TIME:</span>
+            <button type="button" id="team-0" class="team-btn">LARANJA</button>
+            <button type="button" id="team-1" class="team-btn">AZUL</button>
+          </div>
           <button type="button" id="resume-btn">VOLTAR</button>
           <button type="button" id="leave-btn">SAIR DA PARTIDA</button>
         </div>

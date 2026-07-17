@@ -327,6 +327,21 @@ body {
 #room-line { font-size: 13px; letter-spacing: 1px; opacity: .85; margin-bottom: 2px; }
 #room-line b { color: #f0c04c; letter-spacing: 4px; font-size: 16px; }
 
+#team-switch { display: flex; align-items: center; gap: 8px; }
+#team-switch.hidden { display: none; }
+.team-label { font-size: 11px; letter-spacing: 2px; opacity: .6; }
+.team-btn {
+  flex: 1; padding: 10px; font-family: inherit; font-size: 13px; font-weight: bold;
+  letter-spacing: 2px; cursor: pointer; color: #f2e3c8;
+  background: rgba(14,10,6,.5); border: 2px solid rgba(242,227,200,.2); border-radius: 10px;
+  transition: border-color .15s, background .15s;
+}
+#team-0 { color: #f0a860; }
+#team-1 { color: #7cb4e8; }
+.team-btn.mine { background: rgba(63,200,180,.14); }
+#team-0.mine { border-color: #f0844c; }
+#team-1.mine { border-color: #5c9ce8; }
+
 #invite-banner {
   display: flex; align-items: center; gap: 8px; margin-top: 12px;
   background: rgba(63,200,180,.12); border: 2px solid rgba(63,200,180,.4);

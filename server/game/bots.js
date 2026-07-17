@@ -2,7 +2,7 @@
 // SUNFALL ARENA — bots: patrulha, mira e tiro (por sala)
 // ============================================================
 import { PATROL, raycastSolids, pushOut } from '../../shared/mapdata.js';
-import { nextPlayerId, nextColor, spawnPos, broadcastRoom } from './rooms.js';
+import { nextPlayerId, nextColor, spawnPos, broadcastRoom, assignTeam } from './rooms.js';
 
 const BOT_NAMES = [
   'Tuca', 'Zumbi-77', 'Nina.exe', 'Kadu', 'Foguete', 'Piolho',
@@ -16,6 +16,7 @@ export function makeBot(room) {
     accountId: null,
     name: BOT_NAMES[botNameIdx++ % BOT_NAMES.length],
     color: nextColor(room),
+    team: room.settings.gm === 'tdm' ? assignTeam(room) : null,
     pos: spawnPos(room), yaw: 0, pitch: 0, anim: 1,
     hp: 100, kills: 0, deaths: 0, alive: true, bot: true, ws: null,
     wp: (Math.random() * PATROL.length) | 0,
@@ -36,11 +37,13 @@ function hasLOS(a, b) {
 export function updateBot(room, bot, dt, damage) {
   if (!bot.alive) return;
 
-  // alvo: humano mais próximo com LOS; senão outro bot
+  // alvo: humano mais próximo com LOS; senão outro bot (nunca do próprio time)
+  const tdm = room.settings.gm === 'tdm';
   let target = null, tDist = 40;
   for (const pass of [false, true]) {
     for (const p of room.players.values()) {
       if (p === bot || !p.alive || p.bot !== pass) continue;
+      if (tdm && p.team === bot.team) continue;
       const d = Math.hypot(p.pos.x - bot.pos.x, p.pos.z - bot.pos.z);
       if (d < tDist && hasLOS(bot, p)) { target = p; tDist = d; }
     }

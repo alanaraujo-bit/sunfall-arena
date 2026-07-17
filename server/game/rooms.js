@@ -10,6 +10,7 @@ import { awardWin, persistMatchPlayed } from './stats.js';
 export const COLORS = ['#3fc8b4', '#f0844c', '#b07ce0', '#8ac850', '#e86a9c', '#f0c04c', '#5c9ce8', '#e05c50'];
 
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const GAME_MODES = ['ffa', 'tdm'];
 const PUBLIC_KL = 30;
 const PUBLIC_TL = 10 * 60 * 1000;
 const PUBLIC_BOT_TARGET = 4;   // bots = max(0, 4 - jogadores reais)
@@ -33,7 +34,7 @@ function makeRoom(mode, settings, hostAccountId = null) {
   const room = {
     code: makeCode(),
     mode,                        // 'public' | 'custom'
-    settings,                    // { bots, kl, tl }  (bots: alvo fixo em custom; dinâmico em public)
+    settings,                    // { gm, bots, kl, tl }  (gm: 'ffa'|'tdm')
     hostAccountId,
     players: new Map(),
     colorIdx: 0,
@@ -49,11 +50,29 @@ export function findOrCreatePublic() {
   for (const room of rooms.values()) {
     if (room.mode === 'public' && realCount(room) < MAX_REAL) return room;
   }
-  return makeRoom('public', { bots: PUBLIC_BOT_TARGET, kl: PUBLIC_KL, tl: PUBLIC_TL });
+  return makeRoom('public', { gm: 'ffa', bots: PUBLIC_BOT_TARGET, kl: PUBLIC_KL, tl: PUBLIC_TL });
 }
 
-export function createCustom({ bots, kl, tl }, hostAccountId) {
-  return makeRoom('custom', { bots, kl, tl }, hostAccountId);
+export function createCustom({ gm, bots, kl, tl }, hostAccountId) {
+  const mode = GAME_MODES.includes(gm) ? gm : 'ffa';
+  return makeRoom('custom', { gm: mode, bots, kl, tl }, hostAccountId);
+}
+
+// menor equipe (empate -> 0). Considera todos (reais + bots).
+export function assignTeam(room) {
+  let t0 = 0, t1 = 0;
+  for (const p of room.players.values()) {
+    if (p.team === 0) t0++; else if (p.team === 1) t1++;
+  }
+  return t0 <= t1 ? 0 : 1;
+}
+
+export function teamScores(room) {
+  const s = [0, 0];
+  for (const p of room.players.values()) {
+    if (p.team === 0 || p.team === 1) s[p.team] += p.kills;
+  }
+  return s;
 }
 
 export function getByCode(code) {
@@ -88,6 +107,7 @@ export function spawnPos(room) {
 export function snapshot(p) {
   return {
     id: p.id, name: p.name, color: p.color, bot: !!p.bot,
+    team: p.team ?? null,
     pos: [p.pos.x, p.pos.y, p.pos.z], hp: p.hp, k: p.kills, d: p.deaths
   };
 }
@@ -141,11 +161,19 @@ function boardOf(room) {
     .sort((a, b) => b.k - a.k || a.d - b.d);
 }
 
-export function endMatch(room, winner = null) {
+export function endMatch(room, winner = null, winTeam = null) {
   if (room.state !== 'playing') return;
   room.state = 'ended';
 
-  if (!winner) {
+  const tdm = room.settings.gm === 'tdm';
+
+  if (tdm) {
+    if (winTeam === null) {
+      // fim por tempo: time com mais kills (empate -> null)
+      const [a, b] = teamScores(room);
+      winTeam = a === b ? null : (a > b ? 0 : 1);
+    }
+  } else if (!winner) {
     // fim por tempo: líder em kills, desempate por menos mortes
     for (const p of room.players.values()) {
       if (!winner || p.kills > winner.kills || (p.kills === winner.kills && p.deaths < winner.deaths)) winner = p;
@@ -154,7 +182,10 @@ export function endMatch(room, winner = null) {
 
   broadcastRoom(room, {
     t: 'end',
-    winId: winner ? winner.id : null,
+    gm: room.settings.gm,
+    winId: !tdm && winner ? winner.id : null,
+    winTeam: tdm ? winTeam : null,
+    teamScores: tdm ? teamScores(room) : null,
     board: boardOf(room),
     next: RESTART_DELAY / 1000
   });
@@ -162,9 +193,8 @@ export function endMatch(room, winner = null) {
   for (const p of room.players.values()) {
     if (!p.accountId) continue;
     persistMatchPlayed(p.accountId).catch(err => console.error('[stats] match persist failed', err));
-    if (winner && p.id === winner.id) {
-      awardWin(p.accountId).catch(err => console.error('[stats] win persist failed', err));
-    }
+    const won = tdm ? (winTeam !== null && p.team === winTeam) : (winner && p.id === winner.id);
+    if (won) awardWin(p.accountId).catch(err => console.error('[stats] win persist failed', err));
   }
 
   room.resetTimer = setTimeout(() => {

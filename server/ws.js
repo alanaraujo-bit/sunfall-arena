@@ -6,7 +6,7 @@ import { WebSocketServer } from 'ws';
 import {
   rooms, findOrCreatePublic, createCustom, getByCode, realCount, MAX_REAL,
   nextPlayerId, nextColor, spawnPos, snapshot, broadcastRoom,
-  adjustBots, removePlayer, endMatch
+  adjustBots, removePlayer, endMatch, assignTeam, teamScores
 } from './game/rooms.js';
 import { updateBot } from './game/bots.js';
 import { awardXpAndPersist, persistDeath, loadProfileForJoin } from './game/stats.js';
@@ -17,6 +17,8 @@ import { query } from './db.js';
 function damage(room, attacker, victim, dmg, head = false) {
   if (room.state !== 'playing') return;
   if (!victim || !victim.alive || !attacker || !attacker.alive) return;
+  // TDM: sem fogo amigo (aliados não se ferem)
+  if (room.settings.gm === 'tdm' && attacker !== victim && attacker.team === victim.team) return;
   victim.hp -= dmg;
   if (victim.hp > 0) {
     broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id });
@@ -38,9 +40,17 @@ function damage(room, attacker, victim, dmg, head = false) {
       .catch(err => console.error('[stats] death persist failed for', victim.accountId, err));
   }
 
-  if (attacker !== victim && attacker.kills >= room.settings.kl) {
-    endMatch(room, attacker);
-    return;
+  if (attacker !== victim) {
+    if (room.settings.gm === 'tdm') {
+      const [a, b] = teamScores(room);
+      if (a >= room.settings.kl || b >= room.settings.kl) {
+        endMatch(room, null, a >= b ? 0 : 1);
+        return;
+      }
+    } else if (attacker.kills >= room.settings.kl) {
+      endMatch(room, attacker);
+      return;
+    }
   }
 
   setTimeout(() => {
@@ -93,6 +103,7 @@ export function attachWs(server) {
         accountId: auth ? auth.accountId : null,
         name: displayName,
         color: (auth && auth.color) || nextColor(target),
+        team: target.settings.gm === 'tdm' ? assignTeam(target) : null,
         pos: spawnPos(target), yaw: 0, pitch: 0, anim: 0,
         hp: 100, kills: 0, deaths: 0, alive: true, bot: false, ws
       };
@@ -103,13 +114,15 @@ export function attachWs(server) {
         id: self.id,
         code: room.code,
         mode: room.mode,
+        gm: room.settings.gm,
+        team: self.team,
         kl: room.settings.kl,
         end: room.endsAt,
         players: [...room.players.values()].map(snapshot)
       });
       broadcastRoom(room, { t: 'j', p: snapshot(self) }, self.id);
       adjustBots(room);
-      console.log(`+ ${self.name} (${self.accountId ? 'conta' : 'convidado'}) entrou na sala ${room.code} [${room.mode}] — ${realCount(room)} reais`);
+      console.log(`+ ${self.name} (${self.accountId ? 'conta' : 'convidado'}) entrou na sala ${room.code} [${room.mode}/${room.settings.gm}] — ${realCount(room)} reais`);
     }
 
     ws.on('message', async raw => {
@@ -142,10 +155,11 @@ export function attachWs(server) {
           if (msg.mode === 'public') {
             joinRoom(findOrCreatePublic(), displayName);
           } else if (msg.mode === 'create') {
+            const gm = msg.gm === 'tdm' ? 'tdm' : 'ffa';
             const bots = Math.min(6, Math.max(0, msg.bots | 0));
             const kl = [10, 20, 30].includes(+msg.kl) ? +msg.kl : 20;
             const tlMin = [5, 10, 15].includes(+msg.tl) ? +msg.tl : 10;
-            joinRoom(createCustom({ bots, kl, tl: tlMin * 60 * 1000 }, auth ? auth.accountId : null), displayName);
+            joinRoom(createCustom({ gm, bots, kl, tl: tlMin * 60 * 1000 }, auth ? auth.accountId : null), displayName);
           } else if (msg.mode === 'join') {
             const target = getByCode(msg.code);
             if (!target) { send({ t: 'err', code: 'room_not_found' }); return; }
@@ -158,6 +172,24 @@ export function attachWs(server) {
         case 'leave':
           leaveRoom();
           return;
+
+        case 'team': {
+          if (!self || !room || room.settings.gm !== 'tdm') return;
+          const wanted = msg.team === 1 ? 1 : 0;
+          if (self.team === wanted) return;
+          self.team = wanted;
+          self.deaths++;               // trocar de time custa uma morte (respawn)
+          self.alive = false;
+          broadcastRoom(room, { t: 'teamchg', id: self.id, team: wanted });
+          setTimeout(() => {
+            if (!rooms.has(room.code) || !room.players.has(self.id)) return;
+            self.pos = spawnPos(room);
+            self.hp = 100;
+            self.alive = true;
+            broadcastRoom(room, { t: 'spawn', id: self.id, pos: [self.pos.x, self.pos.y, self.pos.z] });
+          }, 600);
+          return;
+        }
 
         case 'invite': {
           if (!auth) { send({ t: 'err', code: 'unauthorized' }); return; }
@@ -208,14 +240,16 @@ export function attachWs(server) {
   return wss;
 }
 
+const TICK_MS = 33;               // ~30 Hz (antes 15 Hz) — movimento mais fluido
+const TICK_DT = TICK_MS / 1000;
+
 export function startGameLoop() {
   setInterval(() => {
-    const dt = 1 / 15;
     const now = Date.now();
 
     for (const room of rooms.values()) {
       if (room.state === 'playing') {
-        for (const p of room.players.values()) if (p.bot) updateBot(room, p, dt, damage);
+        for (const p of room.players.values()) if (p.bot) updateBot(room, p, TICK_DT, damage);
         if (now >= room.endsAt) endMatch(room);
       }
 
@@ -228,8 +262,9 @@ export function startGameLoop() {
       }
       broadcastRoom(room, {
         t: 's', p: state,
-        tl: room.state === 'playing' ? Math.max(0, Math.ceil((room.endsAt - now) / 1000)) : 0
+        tl: room.state === 'playing' ? Math.max(0, Math.ceil((room.endsAt - now) / 1000)) : 0,
+        ts: room.settings.gm === 'tdm' ? teamScores(room) : undefined
       });
     }
-  }, 66);
+  }, TICK_MS);
 }
