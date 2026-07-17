@@ -446,6 +446,7 @@ export function buildWorld(scene) {
   }
 
   return {
+    sun,
     update(t) { for (const fn of animated) fn(t); }
   };
 }

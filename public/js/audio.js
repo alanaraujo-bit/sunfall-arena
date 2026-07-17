@@ -2,12 +2,13 @@
 // SFX 100% procedural via WebAudio — sem arquivos de áudio.
 // ============================================================
 let AC = null, master = null, noiseBuf = null;
+let volume = 0.5;
 
 function ensure() {
   if (!AC) {
     AC = new (window.AudioContext || window.webkitAudioContext)();
     master = AC.createGain();
-    master.gain.value = 0.5;
+    master.gain.value = volume;
     master.connect(AC.destination);
     // buffer de ruído branco reutilizável
     noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.6, AC.sampleRate);
@@ -47,6 +48,11 @@ function tone(freq, dur, vol, type = 'sine', slideTo = null, delay = 0) {
 
 export const SFX = {
   unlock() { ensure(); },
+
+  setVolume(v) {
+    volume = Math.max(0, Math.min(1, v));
+    if (master) master.gain.value = volume;
+  },
 
   shot(sniper = false, vol = 1) {
     ensure();

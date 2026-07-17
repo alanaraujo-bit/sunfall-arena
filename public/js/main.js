@@ -25,7 +25,8 @@ renderer.toneMappingExposure = 1.05;
 document.getElementById('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const BASE_FOV = 78, ZOOM_FOV = 24;
+let BASE_FOV = 78;
+const ZOOM_FOV = 24;
 const camera = new THREE.PerspectiveCamera(BASE_FOV, innerWidth / innerHeight, 0.08, 600);
 camera.rotation.order = 'YXZ';
 
@@ -65,7 +66,16 @@ const hud = {
   loginBtn: $('login-btn'), registerBtn: $('register-btn'),
   friendsBox: $('friends-box'), friendName: $('friend-name'),
   friendAddBtn: $('friend-add-btn'), friendStatus: $('friend-status'),
-  friendsList: $('friends-list')
+  friendsList: $('friends-list'),
+  navPlay: $('nav-play'), navProfile: $('nav-profile'), navConfig: $('nav-config'),
+  panelPlay: $('panel-play'), panelProfile: $('panel-profile'), panelConfig: $('panel-config'),
+  profileHint: $('profile-hint'), profileContent: $('profile-content'),
+  pfName: $('pf-name'), pfLevel: $('pf-level'), pfXpFill: $('pf-xpfill'), pfXpText: $('pf-xptext'),
+  stWins: $('st-wins'), stMatches: $('st-matches'), stKills: $('st-kills'),
+  stDeaths: $('st-deaths'), stKd: $('st-kd'), stHs: $('st-hs'),
+  setQuality: $('set-quality'), setFov: $('set-fov'), setFovVal: $('set-fov-val'),
+  setVol: $('set-vol'), setVolVal: $('set-vol-val'),
+  bindsList: $('binds-list'), bindsReset: $('binds-reset')
 };
 hud.nameInput.value = localStorage.getItem('sf_name') || '';
 hud.sens.value = localStorage.getItem('sf_sens') || '1';
@@ -74,6 +84,156 @@ hud.sens.oninput = () => {
   hud.sensVal.textContent = (+hud.sens.value).toFixed(1);
   localStorage.setItem('sf_sens', hud.sens.value);
 };
+
+// ---------------- Configurações ----------------
+const DEFAULT_BINDS = {
+  forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
+  jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR',
+  w1: 'Digit1', w2: 'Digit2', board: 'Tab'
+};
+const BIND_LABELS = {
+  forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
+  jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar',
+  w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
+};
+
+let settings = { quality: 'high', fov: 78, vol: 50, binds: { ...DEFAULT_BINDS } };
+try {
+  const saved = JSON.parse(localStorage.getItem('sf_settings') || '{}');
+  settings = { ...settings, ...saved, binds: { ...DEFAULT_BINDS, ...(saved.binds || {}) } };
+} catch { /* settings corrompidas: usa padrão */ }
+const binds = settings.binds;
+const saveSettings = () => localStorage.setItem('sf_settings', JSON.stringify(settings));
+
+function applyGraphics() {
+  if (settings.quality === 'low') {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 0.85));
+    world.sun.castShadow = false;
+  } else if (settings.quality === 'med') {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.3));
+    world.sun.castShadow = true;
+  } else {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    world.sun.castShadow = true;
+  }
+  BASE_FOV = settings.fov;
+}
+
+function keyLabel(code) {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  const nice = {
+    Space: 'ESPAÇO', ShiftLeft: 'SHIFT', ShiftRight: 'SHIFT D.',
+    ControlLeft: 'CTRL', ControlRight: 'CTRL D.', AltLeft: 'ALT', Tab: 'TAB',
+    CapsLock: 'CAPS', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→'
+  };
+  return nice[code] || code.toUpperCase();
+}
+
+let listeningBind = null; // {action, btn}
+function buildBindsUI() {
+  hud.bindsList.textContent = '';
+  for (const action of Object.keys(DEFAULT_BINDS)) {
+    const row = document.createElement('div');
+    row.className = 'bind-row';
+    const label = document.createElement('label');
+    label.textContent = BIND_LABELS[action];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bind-key';
+    btn.textContent = keyLabel(binds[action]);
+    btn.onclick = () => {
+      if (listeningBind) {
+        listeningBind.btn.classList.remove('listening');
+        listeningBind.btn.textContent = keyLabel(binds[listeningBind.action]);
+      }
+      listeningBind = { action, btn };
+      btn.classList.add('listening');
+      btn.textContent = 'PRESSIONE…';
+    };
+    row.append(label, btn);
+    hud.bindsList.appendChild(row);
+  }
+}
+
+// captura da nova tecla (fase de captura, para não vazar pro jogo)
+addEventListener('keydown', e => {
+  if (!listeningBind) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.code !== 'Escape') {
+    binds[listeningBind.action] = e.code;
+    saveSettings();
+  }
+  listeningBind.btn.classList.remove('listening');
+  listeningBind.btn.textContent = keyLabel(binds[listeningBind.action]);
+  listeningBind = null;
+}, true);
+
+hud.bindsReset.onclick = () => {
+  Object.assign(binds, DEFAULT_BINDS);
+  saveSettings();
+  buildBindsUI();
+};
+
+hud.setQuality.value = settings.quality;
+hud.setQuality.onchange = () => { settings.quality = hud.setQuality.value; applyGraphics(); saveSettings(); };
+hud.setFov.value = settings.fov;
+hud.setFovVal.textContent = settings.fov;
+hud.setFov.oninput = () => {
+  settings.fov = +hud.setFov.value;
+  hud.setFovVal.textContent = settings.fov;
+  applyGraphics(); saveSettings();
+};
+hud.setVol.value = settings.vol;
+hud.setVolVal.textContent = settings.vol;
+hud.setVol.oninput = () => {
+  settings.vol = +hud.setVol.value;
+  hud.setVolVal.textContent = settings.vol;
+  SFX.setVolume(settings.vol / 100);
+  saveSettings();
+};
+SFX.setVolume(settings.vol / 100);
+applyGraphics();
+buildBindsUI();
+
+// ---------------- Navegação do menu ----------------
+function showPanel(name) {
+  hud.navPlay.classList.toggle('active', name === 'play');
+  hud.navProfile.classList.toggle('active', name === 'profile');
+  hud.navConfig.classList.toggle('active', name === 'config');
+  hud.panelPlay.classList.toggle('hidden', name !== 'play');
+  hud.panelProfile.classList.toggle('hidden', name !== 'profile');
+  hud.panelConfig.classList.toggle('hidden', name !== 'config');
+  if (name === 'profile') loadProfile();
+}
+hud.navPlay.onclick = () => showPanel('play');
+hud.navProfile.onclick = () => showPanel('profile');
+hud.navConfig.onclick = () => showPanel('config');
+
+async function loadProfile() {
+  const logged = !!auth;
+  hud.profileHint.classList.toggle('hidden', logged);
+  hud.profileContent.classList.toggle('hidden', !logged);
+  if (!logged) return;
+  try {
+    const [prof, stats] = await Promise.all([
+      apiAuth('GET', '/profile/me', auth.token),
+      apiAuth('GET', '/stats/me', auth.token)
+    ]);
+    hud.pfName.textContent = prof.username;
+    hud.pfLevel.textContent = prof.level;
+    const inLevel = prof.xp - (prof.level - 1) * 500;
+    hud.pfXpFill.style.width = `${Math.min(100, (inLevel / 500) * 100)}%`;
+    hud.pfXpText.textContent = `${inLevel} / 500 XP · total ${prof.xp}`;
+    hud.stWins.textContent = stats.wins ?? 0;
+    hud.stMatches.textContent = stats.matchesPlayed;
+    hud.stKills.textContent = stats.kills;
+    hud.stDeaths.textContent = stats.deaths;
+    hud.stKd.textContent = (stats.kills / Math.max(1, stats.deaths)).toFixed(2);
+    hud.stHs.textContent = stats.headshots;
+  } catch { /* mantém últimos valores */ }
+}
 
 // ---------------- Estado ----------------
 const me = {
@@ -273,18 +433,18 @@ let mouseDown = false, wantJump = false;
 const canvas = renderer.domElement;
 
 addEventListener('keydown', e => {
-  if (e.code === 'Tab') { e.preventDefault(); hud.board.classList.add('show'); rebuildBoard(); }
+  if (playing && e.code === binds.board) { e.preventDefault(); hud.board.classList.add('show'); rebuildBoard(); }
   if (e.repeat) return;
   keys[e.code] = true;
   if (!playing || me.dead) return;
-  if (e.code === 'Space') wantJump = true;
-  if (e.code === 'KeyR') startReload();
-  if (e.code === 'Digit1') switchWeapon(0);
-  if (e.code === 'Digit2') switchWeapon(1);
+  if (e.code === binds.jump) wantJump = true;
+  if (e.code === binds.reload) startReload();
+  if (e.code === binds.w1) switchWeapon(0);
+  if (e.code === binds.w2) switchWeapon(1);
 });
 addEventListener('keyup', e => {
   keys[e.code] = false;
-  if (e.code === 'Tab') hud.board.classList.remove('show');
+  if (e.code === binds.board) hud.board.classList.remove('show');
 });
 addEventListener('wheel', () => { if (playing && !me.dead) switchWeapon(1 - curW); });
 canvas.addEventListener('mousedown', e => {
@@ -309,6 +469,7 @@ document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas && playing) {
     hud.menu.classList.remove('hidden');
     hud.menuTitle.textContent = 'PAUSADO';
+    showPanel('play');
     setMenuMode(true);
     mouseDown = false;
   } else if (playing) {
@@ -381,10 +542,10 @@ function updateMovement(dt) {
   const spd = 8.2, accG = 60, accA = 16, fric = me.sliding ? 1.6 : 10;
   // direção desejada
   let fx = 0, fz = 0;
-  if (keys.KeyW) fz += 1;
-  if (keys.KeyS) fz -= 1;
-  if (keys.KeyA) fx -= 1;
-  if (keys.KeyD) fx += 1;
+  if (keys[binds.forward]) fz += 1;
+  if (keys[binds.back]) fz -= 1;
+  if (keys[binds.left]) fx -= 1;
+  if (keys[binds.right]) fx += 1;
   const len = Math.hypot(fx, fz) || 1;
   fx /= len; fz /= len;
   const sy = Math.sin(me.yaw), cy = Math.cos(me.yaw);
@@ -392,7 +553,7 @@ function updateMovement(dt) {
   const wz = (-cy) * fz + (-sy) * fx;
 
   // slide
-  if (keys.ShiftLeft && me.grounded && !me.sliding && (fx || fz) &&
+  if (keys[binds.slide] && me.grounded && !me.sliding && (fx || fz) &&
       Math.hypot(me.vel.x, me.vel.z) > 4) {
     me.sliding = true;
     me.slideT = 0.85;
@@ -404,7 +565,7 @@ function updateMovement(dt) {
   }
   if (me.sliding) {
     me.slideT -= dt;
-    if (me.slideT <= 0 || !keys.ShiftLeft || !me.grounded) me.sliding = false;
+    if (me.slideT <= 0 || !keys[binds.slide] || !me.grounded) me.sliding = false;
   }
 
   // fricção + aceleração
@@ -933,6 +1094,7 @@ function renderAccountPanel() {
     hud.friendsBox.classList.add('hidden');
     hud.friendsList.textContent = '';
   }
+  if (!hud.panelProfile.classList.contains('hidden')) loadProfile();
 }
 renderAccountPanel();
 
@@ -1160,6 +1322,7 @@ function exitToMenu() {
   clearRoomState();
   hud.menuTitle.innerHTML = 'SUNFALL<span>ARENA</span>';
   hud.menuStatus.textContent = '';
+  showPanel('play');
   setMenuMode(false);
   hud.menu.classList.remove('hidden');
   if (document.exitPointerLock) document.exitPointerLock();
