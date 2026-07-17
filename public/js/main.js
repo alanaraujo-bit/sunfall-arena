@@ -909,16 +909,21 @@ function tryFire() {
   SFX.shot(w.sniper);
 
   if (hitId !== null) {
-    spawnBurst(endPoint, bloodTex, 6, 2.5, 0.16);
-    const dmg = Math.round(w.dmg * (headshot ? w.head : 1));
-    net.send({ t: 'hit', id: hitId, dmg, h: headshot });
-    showHitmarker(headshot);
-    if (headshot) SFX.headshot(); else SFX.hit();
+    spawnBurst(endPoint, bloodTex, 6, 2.5, 0.16);   // sangue previsto; o dano real vem do servidor
   } else if (hitT < 150) {
     spawnBurst(endPoint, dustTex, 5, 2, 0.13);
   }
 
-  net.send({ t: 'fire', o: [_origin.x, _origin.y, _origin.z], d: [_dir.x, _dir.y, _dir.z], w: curW });
+  // O servidor é quem decide o acerto: enviamos direção + o instante do mundo
+  // que estamos vendo (sv); ele rebobina e valida (lag compensation).
+  const smp = sampleSnapshots();
+  net.send({
+    t: 'fire',
+    o: [_origin.x, _origin.y, _origin.z],
+    d: [_dir.x, _dir.y, _dir.z],
+    w: curW,
+    sv: smp && smp.sv ? smp.sv : undefined
+  });
   updateAmmoHUD();
   if (ammo[curW] <= 0) startReload();
 }
@@ -1045,7 +1050,7 @@ const SNAP_INTERP_MS = 100;
 const snapBuf = []; // { t: performance.now() na chegada, p: estados }
 
 net.on('s', msg => {
-  snapBuf.push({ t: performance.now(), p: msg.p });
+  snapBuf.push({ t: performance.now(), sv: msg.sv, p: msg.p });
   while (snapBuf.length > 60) snapBuf.shift();
   for (const [id, a] of Object.entries(msg.p)) {
     const r = remotes.get(+id);
@@ -1056,19 +1061,21 @@ net.on('s', msg => {
   if (typeof msg.tl === 'number') updateMatchBar(msg.tl, msg.ts);
 });
 
-// Acha o par de snapshots que envolve o tempo de render (agora - atraso)
+// Acha o par de snapshots que envolve o tempo de render (agora - atraso).
+// `sv` = instante do SERVIDOR que está sendo renderizado — enviado junto com o
+// tiro para o servidor rebobinar o mundo exatamente para o que o atirador via.
 function sampleSnapshots() {
   if (!snapBuf.length) return null;
   const rt = performance.now() - SNAP_INTERP_MS;
   for (let i = snapBuf.length - 1; i >= 0; i--) {
     if (snapBuf[i].t <= rt) {
       const s0 = snapBuf[i], s1 = snapBuf[i + 1];
-      if (!s1) return { a: s0, b: null, alpha: 0 };  // sem snapshot novo: congela no último
+      if (!s1) return { a: s0, b: null, alpha: 0, sv: s0.sv };
       const alpha = Math.min(1, (rt - s0.t) / ((s1.t - s0.t) || 1));
-      return { a: s0, b: s1, alpha };
+      return { a: s0, b: s1, alpha, sv: s0.sv && s1.sv ? Math.round(s0.sv + (s1.sv - s0.sv) * alpha) : s0.sv };
     }
   }
-  return { a: snapBuf[0], b: null, alpha: 0 };        // tudo mais novo que rt: usa o mais antigo
+  return { a: snapBuf[0], b: null, alpha: 0, sv: snapBuf[0].sv };
 }
 
 function computeTeamScores() {
@@ -1116,6 +1123,11 @@ net.on('dmg', msg => {
   } else {
     const r = remotes.get(msg.id);
     if (r) r.hp = msg.hp;
+  }
+  // confirmação do servidor de que MEU tiro acertou → hitmarker/som
+  if (msg.by === me.id && msg.id !== me.id) {
+    showHitmarker(!!msg.h);
+    if (msg.h) SFX.headshot(); else SFX.hit();
   }
 });
 net.on('die', msg => {

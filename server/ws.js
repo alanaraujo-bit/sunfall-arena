@@ -3,6 +3,7 @@
 // convites e combate autoritativo com partidas que terminam.
 // ============================================================
 import { WebSocketServer } from 'ws';
+import { PLAYER, rayBox, raycastSolids } from '../shared/mapdata.js';
 import {
   rooms, findOrCreatePublic, createCustom, getByCode, realCount, MAX_REAL,
   nextPlayerId, nextColor, spawnPos, snapshot, broadcastRoom,
@@ -14,6 +15,28 @@ import { verifyToken } from './auth.js';
 import { setPresence, clearPresence, getPresence } from './presence.js';
 import { query } from './db.js';
 
+// ---------------- Armas (fonte da verdade — o cliente não decide dano) ----------------
+const WEAPONS = [
+  { dmg: 16, head: 1.75, int: 0.115 },   // FALCÃO-9
+  { dmg: 92, head: 2, int: 1.05 }        // FERRÃO-SR
+];
+const REWIND_MAX_MS = 1000;
+
+// posição do jogador rebobinada para o instante `sv` (lag compensation)
+function rewindPos(p, sv) {
+  const h = p.hist;
+  if (!h || !h.length) return p.pos;
+  if (sv >= h[h.length - 1].t) return h[h.length - 1];
+  for (let i = h.length - 1; i > 0; i--) {
+    if (h[i - 1].t <= sv) {
+      const a = h[i - 1], b = h[i];
+      const al = (sv - a.t) / ((b.t - a.t) || 1);
+      return { x: a.x + (b.x - a.x) * al, y: a.y + (b.y - a.y) * al, z: a.z + (b.z - a.z) * al };
+    }
+  }
+  return h[0];
+}
+
 function damage(room, attacker, victim, dmg, head = false) {
   if (room.state !== 'playing') return;
   if (!victim || !victim.alive || !attacker || !attacker.alive) return;
@@ -21,14 +44,14 @@ function damage(room, attacker, victim, dmg, head = false) {
   if (room.settings.gm === 'tdm' && attacker !== victim && attacker.team === victim.team) return;
   victim.hp -= dmg;
   if (victim.hp > 0) {
-    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id });
+    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id, h: head });
     return;
   }
   victim.hp = 0;
   victim.alive = false;
   victim.deaths++;
   if (attacker !== victim) attacker.kills++;
-  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id });
+  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head });
   broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head });
 
   if (attacker !== victim && attacker.accountId) {
@@ -126,6 +149,7 @@ export function attachWs(server) {
     }
 
     ws.on('message', async raw => {
+      try {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
 
@@ -211,24 +235,78 @@ export function attachWs(server) {
       if (!self || !room) return;
 
       switch (msg.t) {
-        case 's':
+        case 's': {
           if (!self.alive || !Array.isArray(msg.p)) break;
-          self.pos.x = +msg.p[0] || 0;
-          self.pos.y = +msg.p[1] || 0;
-          self.pos.z = +msg.p[2] || 0;
+          const nx = +msg.p[0] || 0, ny = +msg.p[1] || 0, nz = +msg.p[2] || 0;
+          // anti-speedhack: rejeita deslocamento horizontal implausível
+          const now = Date.now();
+          const sdt = Math.min(0.5, (now - (self.lastS || now)) / 1000) || 0.033;
+          self.lastS = now;
+          if (Math.hypot(nx - self.pos.x, nz - self.pos.z) > Math.max(1.5, 30 * sdt)) break;
+          self.pos.x = nx; self.pos.y = ny; self.pos.z = nz;
           self.yaw = +msg.r[0] || 0;
           self.pitch = +msg.r[1] || 0;
           self.anim = msg.a | 0;
           break;
-        case 'fire':
-          broadcastRoom(room, { t: 'fire', id: self.id, o: msg.o, d: msg.d, w: msg.w }, self.id);
-          break;
-        case 'hit': {
-          const victim = room.players.get(msg.id);
-          const dmg = Math.min(200, Math.max(1, +msg.dmg || 0));
-          damage(room, self, victim, dmg, !!msg.h);
+        }
+        case 'fire': {
+          // Tiro autoritativo: o servidor valida cadência e origem, rebobina o
+          // mundo para o instante que o atirador via (sv) e refaz o raycast.
+          if (!self.alive || room.state !== 'playing') break;
+          const wi = msg.w === 1 ? 1 : 0;
+          const w = WEAPONS[wi];
+          const now = Date.now();
+          self.lastFire = self.lastFire || [0, 0];
+          if (now - self.lastFire[wi] < w.int * 1000 * 0.85) break;   // cadência da arma
+          self.lastFire[wi] = now;
+
+          if (!Array.isArray(msg.o) || !Array.isArray(msg.d)) break;
+          const ox = +msg.o[0], oy = +msg.o[1], oz = +msg.o[2];
+          let dx = +msg.d[0], dy = +msg.d[1], dz = +msg.d[2];
+          const dl = Math.hypot(dx, dy, dz);
+          if (!(dl > 0.5 && dl < 2)) break;
+          dx /= dl; dy /= dl; dz /= dl;
+          // origem precisa ser plausível (perto da posição conhecida do jogador)
+          if (Math.hypot(ox - self.pos.x, oz - self.pos.z) > 3 ||
+              Math.abs(oy - (self.pos.y + PLAYER.EYE)) > 2) break;
+
+          broadcastRoom(room, { t: 'fire', id: self.id, o: [ox, oy, oz], d: [dx, dy, dz], w: wi }, self.id);
+
+          const sv = Math.min(now, Math.max(now - REWIND_MAX_MS, +msg.sv || now));
+          const tMap = raycastSolids(ox, oy, oz, dx, dy, dz);
+          let victim = null, hitT = tMap, head = false;
+          for (const p of room.players.values()) {
+            if (p === self || !p.alive) continue;
+            if (room.settings.gm === 'tdm' && p.team === self.team) continue;
+            const rp = rewindPos(p, sv);
+            // cabeça (esfera)
+            const hx = rp.x - ox, hy = rp.y + PLAYER.HEAD_Y - oy, hz = rp.z - oz;
+            const tc = hx * dx + hy * dy + hz * dz;
+            if (tc > 0) {
+              const d2 = hx * hx + hy * hy + hz * hz - tc * tc;
+              if (d2 < PLAYER.HEAD_R * PLAYER.HEAD_R && tc < hitT) {
+                hitT = tc; victim = p; head = true;
+                continue;
+              }
+            }
+            // corpo (AABB)
+            const R = PLAYER.R;
+            const tb = rayBox(ox, oy, oz, dx, dy, dz, {
+              minx: rp.x - R, maxx: rp.x + R,
+              miny: rp.y, maxy: rp.y + PLAYER.BODY_H,
+              minz: rp.z - R, maxz: rp.z + R
+            });
+            if (tb < hitT) { hitT = tb; victim = p; head = false; }
+          }
+          if (victim) {
+            damage(room, self, victim, Math.round(w.dmg * (head ? w.head : 1)), head);
+          }
           break;
         }
+      }
+      } catch (err) {
+        // uma mensagem malformada nunca pode derrubar o servidor
+        console.error('[ws] erro no handler de mensagem:', err);
       }
     });
 
@@ -257,13 +335,16 @@ export function startGameLoop() {
 
       const state = {};
       for (const p of room.players.values()) {
+        // histórico p/ lag compensation (~1.3s)
+        (p.hist ||= []).push({ t: now, x: p.pos.x, y: p.pos.y, z: p.pos.z });
+        if (p.hist.length > 40) p.hist.shift();
         state[p.id] = [
           +p.pos.x.toFixed(2), +p.pos.y.toFixed(2), +p.pos.z.toFixed(2),
           +p.yaw.toFixed(3), +p.pitch.toFixed(3), p.anim, p.hp
         ];
       }
       broadcastRoom(room, {
-        t: 's', p: state,
+        t: 's', p: state, sv: now,
         tl: room.state === 'playing' ? Math.max(0, Math.ceil((room.endsAt - now) / 1000)) : 0,
         ts: room.settings.gm === 'tdm' ? teamScores(room) : undefined
       });

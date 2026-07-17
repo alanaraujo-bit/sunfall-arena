@@ -14,6 +14,10 @@ import playersRoutes from './routes/players.routes.js';
 import { attachWs, startGameLoop } from './ws.js';
 import { staticMiddleware } from './static.js';
 
+// disponibilidade acima de tudo: erro inesperado é logado, não derruba o jogo
+process.on('uncaughtException', err => console.error('[fatal] uncaughtException:', err));
+process.on('unhandledRejection', err => console.error('[fatal] unhandledRejection:', err));
+
 const PORT = process.env.PORT || 3000;
 const CORS_ORIGIN = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(s => s.trim());
 
