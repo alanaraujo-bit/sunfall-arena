@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunfall Arena</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="cross"><span></span><span></span><span></span><span></span><i></i></div>
+    <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
+    <div id="dmg-flash"></div>
+    <div id="scope"><div class="ring"></div><div class="hline"></div><div class="vline"></div></div>
+
+    <div id="hp-box">
+      <div id="hp-bar"><div id="hp-fill"></div></div>
+      <div id="hp-num">100</div>
+    </div>
+
+    <div id="ammo-box">
+      <div id="weapon-name">FALCÃO-9</div>
+      <div id="ammo">26</div>
+    </div>
+
+    <div id="feed"></div>
+    <div id="kill-pop">ELIMINAÇÃO&nbsp;+1</div>
+
+    <div id="board">
+      <div class="board-card">
+        <h3>PLACAR</h3>
+        <table>
+          <thead><tr><th>JOGADOR</th><th>E</th><th>M</th></tr></thead>
+          <tbody id="board-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="death">
+      <div class="death-card">
+        <div class="skull">☠</div>
+        <div>Eliminado por <b id="death-by">?</b></div>
+        <div class="sub">renascendo…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MENU -->
+  <div id="menu">
+    <div class="menu-card">
+      <div class="logo">
+        <h1 id="menu-title">SUNFALL<span>ARENA</span></h1>
+        <div class="tagline">FPS competitivo de navegador</div>
+      </div>
+      <div id="menu-form">
+        <input id="name-input" type="text" maxlength="14" placeholder="Seu apelido" autocomplete="off">
+        <div class="sens-row">
+          <label>Sensibilidade</label>
+          <input id="sens" type="range" min="0.2" max="2.5" step="0.1" value="1">
+          <b id="sens-val">1.0</b>
+        </div>
+        <button id="play-btn">JOGAR</button>
+        <div id="menu-status"></div>
+      </div>
+      <div class="controls">
+        <span><b>WASD</b> mover</span>
+        <span><b>ESPAÇO</b> pular</span>
+        <span><b>SHIFT</b> deslizar</span>
+        <span><b>1/2</b> arma</span>
+        <span><b>R</b> recarregar</span>
+        <span><b>BOTÃO DIR.</b> luneta</span>
+        <span><b>TAB</b> placar</span>
+      </div>
+    </div>
+  </div>
+
+  <pre id="errlog"></pre>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

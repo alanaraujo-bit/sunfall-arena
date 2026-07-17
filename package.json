@@ -1,0 +1,12 @@
+{
+  "name": "sunfall-arena",
+  "version": "1.0.0",
+  "description": "FPS multiplayer estilizado para navegador — inspirado em krunker.io",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  }
+}
