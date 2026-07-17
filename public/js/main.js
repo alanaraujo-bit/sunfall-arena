@@ -228,11 +228,7 @@ function updatePerf(dt, t) {
   }
 }
 
-net.on('pong', msg => {
-  const rtt = performance.now() - msg.ts;
-  ping = ping ? Math.round(ping * 0.6 + rtt * 0.4) : Math.round(rtt);
-});
-setInterval(() => { if (net.open) net.send({ t: 'ping', ts: performance.now() }); }, 2000);
+// (o handler de 'pong' e o envio de ping ficam após `const net` ser criado)
 
 // ---------------- Navegação do menu ----------------
 function showPanel(name) {
@@ -404,6 +400,13 @@ const remotes = new Map();   // id -> {model, meta, target, dead...}
 const meta = new Map();      // id -> {name,color,k,d,bot}
 const net = new Net();
 const TESTMODE = new URLSearchParams(location.search).has('test');
+
+// medição de ping (RTT real via ping/pong no WebSocket)
+net.on('pong', msg => {
+  const rtt = performance.now() - msg.ts;
+  ping = ping ? Math.round(ping * 0.6 + rtt * 0.4) : Math.round(rtt);
+});
+setInterval(() => { if (net.open) net.send({ t: 'ping', ts: performance.now() }); }, 2000);
 
 // nascer olhando para o centro da arena
 function faceCenter() {
