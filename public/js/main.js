@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
 import { buildWorld, makeCharacter, makeViewmodel } from './world.js';
 import { tex, spriteTex } from './textures.js';
-import { Net, api } from './net.js';
+import { Net, api, apiAuth } from './net.js';
 import { SFX } from './audio.js';
 
 // Log de erros visível no DOM (debug em headless)
@@ -51,7 +51,10 @@ const hud = {
   guestPanel: $('guest-panel'), accountPanel: $('account-panel'),
   accUser: $('acc-user'), accPass: $('acc-pass'), accountStatus: $('account-status'),
   accountInfo: $('account-info'), accountBtns: $('account-btns'),
-  loginBtn: $('login-btn'), registerBtn: $('register-btn')
+  loginBtn: $('login-btn'), registerBtn: $('register-btn'),
+  friendsBox: $('friends-box'), friendName: $('friend-name'),
+  friendAddBtn: $('friend-add-btn'), friendStatus: $('friend-status'),
+  friendsList: $('friends-list')
 };
 hud.nameInput.value = localStorage.getItem('sf_name') || '';
 hud.sens.value = localStorage.getItem('sf_sens') || '1';
@@ -763,6 +766,8 @@ function renderAccountPanel() {
     hud.accUser.classList.add('hidden');
     hud.accPass.classList.add('hidden');
     hud.accountInfo.classList.remove('hidden');
+    hud.friendsBox.classList.remove('hidden');
+    refreshFriends();
     hud.accountInfo.append(`Logado como ${auth.username} · `);
     const logout = document.createElement('a');
     logout.href = '#'; logout.textContent = 'Sair'; logout.style.color = '#f0806a';
@@ -779,6 +784,8 @@ function renderAccountPanel() {
     hud.accUser.classList.remove('hidden');
     hud.accPass.classList.remove('hidden');
     hud.accountInfo.classList.add('hidden');
+    hud.friendsBox.classList.add('hidden');
+    hud.friendsList.textContent = '';
   }
 }
 renderAccountPanel();
@@ -815,6 +822,106 @@ async function doAuth(path) {
 }
 hud.loginBtn.addEventListener('click', () => doAuth('/auth/login'));
 hud.registerBtn.addEventListener('click', () => doAuth('/auth/register'));
+
+// ---------------- Amigos ----------------
+const FRIEND_ERRORS = {
+  user_not_found: 'Usuário não encontrado.',
+  already_friends: 'Vocês já são amigos.',
+  request_pending: 'Pedido já enviado.',
+  cannot_add_self: 'Você não pode se adicionar.',
+  invalid_input: 'Digite um nome de usuário.'
+};
+
+async function refreshFriends() {
+  if (!auth) return;
+  try {
+    const data = await apiAuth('GET', '/friends', auth.token);
+    renderFriends(data);
+  } catch (err) {
+    if (err.status === 401) {
+      // token expirado — volta ao estado deslogado
+      auth = null;
+      localStorage.removeItem('sf_token'); localStorage.removeItem('sf_username');
+      renderAccountPanel();
+    }
+  }
+}
+
+function friendAction(fn) {
+  return async () => {
+    hud.friendStatus.textContent = '';
+    try { await fn(); await refreshFriends(); }
+    catch (err) { hud.friendStatus.textContent = FRIEND_ERRORS[err.code] || 'Falha na conexão.'; }
+  };
+}
+
+function friendRow(u, kind) {
+  const row = document.createElement('div');
+  row.className = 'friend-row';
+
+  const dot = document.createElement('span');
+  dot.className = 'fdot' + (u.online ? ' on' : '');
+  row.appendChild(dot);
+
+  const name = document.createElement('span');
+  name.className = 'fname';
+  name.textContent = u.username;
+  row.appendChild(name);
+
+  if (kind === 'friend') {
+    const lvl = document.createElement('span');
+    lvl.className = 'flvl';
+    lvl.textContent = `nv ${u.level}`;
+    row.appendChild(lvl);
+  } else {
+    const tag = document.createElement('span');
+    tag.className = 'ftag';
+    tag.textContent = kind === 'incoming' ? 'PEDIDO' : 'ENVIADO';
+    row.appendChild(tag);
+  }
+
+  if (kind === 'incoming') {
+    const ok = document.createElement('button');
+    ok.className = 'f-accept'; ok.textContent = '✓'; ok.title = 'Aceitar';
+    ok.onclick = friendAction(() => apiAuth('POST', '/friends/accept', auth.token, { userId: u.id }));
+    row.appendChild(ok);
+  }
+  const rm = document.createElement('button');
+  rm.className = 'f-remove'; rm.textContent = '✕';
+  rm.title = kind === 'friend' ? 'Remover amigo' : (kind === 'incoming' ? 'Recusar' : 'Cancelar pedido');
+  rm.onclick = friendAction(() => apiAuth('DELETE', `/friends/${u.id}`, auth.token));
+  row.appendChild(rm);
+
+  return row;
+}
+
+function renderFriends({ friends, incoming, outgoing }) {
+  hud.friendsList.textContent = '';
+  for (const u of incoming) hud.friendsList.appendChild(friendRow(u, 'incoming'));
+  for (const u of friends) hud.friendsList.appendChild(friendRow(u, 'friend'));
+  for (const u of outgoing) hud.friendsList.appendChild(friendRow(u, 'outgoing'));
+  if (!hud.friendsList.children.length) {
+    const empty = document.createElement('div');
+    empty.className = 'friend-row';
+    empty.style.opacity = '.5';
+    empty.textContent = 'Nenhum amigo ainda — adicione pelo nome de usuário.';
+    hud.friendsList.appendChild(empty);
+  }
+}
+
+hud.friendAddBtn.addEventListener('click', friendAction(async () => {
+  const username = hud.friendName.value.trim();
+  await apiAuth('POST', '/friends/request', auth.token, { username });
+  hud.friendName.value = '';
+}));
+hud.friendName.addEventListener('keydown', e => {
+  if (e.key === 'Enter') hud.friendAddBtn.click();
+});
+
+// atualiza status online enquanto o menu está aberto
+setInterval(() => {
+  if (auth && !playing && !hud.accountPanel.classList.contains('hidden')) refreshFriends();
+}, 20000);
 
 // ---------------- Menu / fluxo ----------------
 hud.playBtn.addEventListener('click', () => {

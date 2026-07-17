@@ -43,5 +43,15 @@ export async function migrate() {
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS friendships (
+      requester_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      addressee_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status       VARCHAR(10) NOT NULL DEFAULT 'pending',
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (requester_id, addressee_id),
+      CHECK (requester_id <> addressee_id)
+    );
+  `);
   console.log('[db] migrate ok');
 }

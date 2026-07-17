@@ -16,7 +16,18 @@ export async function api(path, body) {
 }
 
 export async function apiGet(path, token) {
-  const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  return apiAuth('GET', path, token);
+}
+
+export async function apiAuth(method, path, token, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, status: res.status });
   return data;

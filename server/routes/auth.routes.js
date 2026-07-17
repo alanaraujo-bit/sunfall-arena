@@ -9,7 +9,8 @@ const router = Router();
 
 function validCreds(username, password) {
   return typeof username === 'string' && typeof password === 'string' &&
-    username.trim().length >= 3 && username.trim().length <= 20 && password.length >= 8;
+    username.trim().length >= 3 && username.trim().length <= 20 &&
+    /^[A-Za-z0-9_.-]+$/.test(username.trim()) && password.length >= 8;
 }
 
 router.post('/register', async (req, res) => {

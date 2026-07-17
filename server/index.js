@@ -9,6 +9,7 @@ import http from 'http';
 import { migrate } from './db.js';
 import authRoutes from './routes/auth.routes.js';
 import profileRoutes from './routes/profile.routes.js';
+import friendsRoutes from './routes/friends.routes.js';
 import { attachWs, startGameLoop } from './ws.js';
 import { staticMiddleware } from './static.js';
 
@@ -20,6 +21,7 @@ app.use(cors({ origin: CORS_ORIGIN, credentials: false }));
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api', profileRoutes);
+app.use('/api/friends', friendsRoutes);
 
 // Em produção o frontend é servido pelo Vercel; localmente, `npm start`
 // continua servindo public/ direto deste processo por conveniência.

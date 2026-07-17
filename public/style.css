@@ -206,6 +206,40 @@ body {
 #register-btn { background: rgba(242,227,200,.12); color: #f2e3c8; border: 2px solid rgba(242,227,200,.2); }
 #account-status { margin-top: 10px; font-size: 12px; min-height: 16px; color: #f0806a; letter-spacing: .5px; }
 #account-info { margin-top: 10px; font-size: 13px; color: #6ee0c8; letter-spacing: .5px; }
+
+/* ---------- Amigos ---------- */
+#friends-box { margin-top: 16px; text-align: left; border-top: 1px solid rgba(242,227,200,.12); padding-top: 14px; }
+#friends-title { font-size: 11px; letter-spacing: 4px; opacity: .6; text-align: center; margin-bottom: 10px; }
+#friend-add-row { display: flex; gap: 6px; }
+#friend-name {
+  flex: 1; min-width: 0; padding: 9px 12px; font-size: 14px;
+  background: rgba(14,10,6,.7); color: #f2e3c8;
+  border: 2px solid rgba(242,227,200,.2); border-radius: 10px; outline: none;
+  font-family: inherit;
+}
+#friend-name:focus { border-color: #3fc8b4; }
+#friend-add-btn {
+  width: 42px; font-size: 18px; font-weight: bold; cursor: pointer;
+  background: linear-gradient(180deg, #6ee0c8, #3fc8b4); color: #241408;
+  border: none; border-radius: 10px; transition: filter .1s;
+}
+#friend-add-btn:hover { filter: brightness(1.1); }
+#friend-status { margin-top: 8px; font-size: 12px; min-height: 14px; color: #f0806a; }
+#friends-list { max-height: 150px; overflow-y: auto; margin-top: 4px; }
+.friend-row { display: flex; align-items: center; gap: 8px; padding: 7px 2px; border-top: 1px solid rgba(242,227,200,.08); font-size: 14px; }
+.friend-row:first-child { border-top: none; }
+.friend-row .fdot { width: 8px; height: 8px; border-radius: 50%; background: rgba(242,227,200,.25); flex: none; }
+.friend-row .fdot.on { background: #8ac850; box-shadow: 0 0 6px rgba(138,200,80,.8); }
+.friend-row .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-row .flvl { font-size: 11px; opacity: .55; }
+.friend-row .ftag { font-size: 10px; letter-spacing: 1px; opacity: .55; border: 1px solid currentColor; border-radius: 4px; padding: 1px 4px; }
+.friend-row button {
+  width: 26px; height: 26px; font-size: 13px; cursor: pointer; flex: none;
+  border: none; border-radius: 7px; font-family: inherit; transition: filter .1s;
+}
+.friend-row button:hover { filter: brightness(1.15); }
+.friend-row .f-accept { background: linear-gradient(180deg, #6ee0c8, #3fc8b4); color: #241408; }
+.friend-row .f-remove { background: rgba(217,83,80,.25); color: #f0806a; border: 1px solid rgba(217,83,80,.4); }
 .sens-row { display: flex; align-items: center; gap: 10px; margin: 14px 2px; font-size: 13px; opacity: .9; }
 .sens-row label { letter-spacing: 1px; white-space: nowrap; }
 .sens-row input { flex: 1; accent-color: #3fc8b4; }
