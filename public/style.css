@@ -301,8 +301,8 @@ body {
   box-shadow: 0 0 8px rgba(224,85,78,.6);
 }
 
-/* durante o killcam, esconde o HUD de jogo (visual limpo/cinematográfico) */
-#hud:has(#killcam.show) #cross,
+/* durante o killcam, esconde o HUD de jogo (mira do assassino permanece,
+   pra ler como a visão de quem está mirando em você) */
 #hud:has(#killcam.show) #hitmarker,
 #hud:has(#killcam.show) #hp-box,
 #hud:has(#killcam.show) #ammo-box,

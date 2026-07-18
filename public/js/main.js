@@ -1358,8 +1358,8 @@ net.on('l', msg => removeRemote(msg.id));
 // renderizamos os remotos ~100ms no passado, interpolando entre dois
 // estados conhecidos — movimento liso mesmo com ping alto/oscilante.
 const SNAP_INTERP_MS = 100;
-// cap alto o bastante para o killcam rebobinar ~4s (30 Hz → ~120 snapshots)
-const SNAP_BUF_MAX = 140;
+// cap alto o bastante para o killcam rebobinar ~5s (30 Hz → ~150 snapshots)
+const SNAP_BUF_MAX = 200;
 const snapBuf = []; // { t: performance.now() na chegada, sv: tempo do servidor, p: estados }
 
 net.on('s', msg => {
@@ -1397,8 +1397,9 @@ function sampleSnapshots() {
 // 30 Hz (guardado em snapBuf), então reconstruímos a cena e colocamos a
 // câmera nos olhos do assassino. Estilo Black Ops 2.
 // ============================================================
-const KILLCAM_MS = 2500;        // quanto do passado reproduzir
+const KILLCAM_MS = 5000;        // quanto do passado reproduzir (~5s)
 const KILLCAM_HOLD_MS = 900;    // pausa no instante da morte (queda da vítima)
+const KILLCAM_AIM_MS = 1500;    // rampa do "abrir a mira" (ADS) antes do tiro final
 const DEATH_FALLBACK_MS = 2200; // morte sem killcam: tempo até pedir respawn sozinho
 
 const killcam = {
@@ -1406,18 +1407,29 @@ const killcam = {
   frames: null,          // [{ sv, p }] copiados no instante da morte
   startSv: 0, endSv: 0,
   t0: 0,                 // performance.now() do início do replay
+  deathWall: 0,          // performance.now() da morte (âncora p/ replay dos tiros)
   killerId: null,
+  killerW: 0,            // arma que te matou (0 = SMG, 1 = sniper)
   killerHidden: false,   // escondemos o modelo do assassino (câmera fica dentro dele)
   victim: null,          // modelo temporário do seu corpo
+  shots: null,           // disparos do assassino a reproduzir: [{ wall, o, d, w, played }]
   fallT: 0,              // progresso da queda da vítima (0..1)
+  aim: 0,                // ADS simulado (0..1) — "abrindo a mira"
+  recoil: 0, vmKick: 0, bobT: 0,
   respawnSent: false
 };
 let deathTimer = null;   // failsafe client-side para morte sem killcam
+// disparos remotos recentes (p/ reproduzir no killcam): { wall, id, o:[3], d:[3], w }
+const fireLog = [];
 
 // interpola a entidade `id` entre dois frames do histórico
 function kcLerp(a, b, alpha, id) {
   const p0 = a && a.p[id], p1 = b && b.p[id];
   if (p0 && p1) {
+    // teleporte (respawn dentro da janela): não desliza pelo mapa
+    if (Math.hypot(p1[0] - p0[0], p1[2] - p0[2]) > 12) {
+      return { x: p1[0], y: p1[1], z: p1[2], yaw: p1[3], pitch: p1[4], anim: p1[5] | 0 };
+    }
     let dyw = p1[3] - p0[3];
     while (dyw > Math.PI) dyw -= Math.PI * 2;
     while (dyw < -Math.PI) dyw += Math.PI * 2;
@@ -1451,12 +1463,12 @@ function kcSample(frames, sv) {
 }
 
 // Decide entre killcam (assassino válido + histórico) ou morte simples.
-function startDeathSequence(killerId) {
+function startDeathSequence(killerId, killerW) {
   clearTimeout(deathTimer); deathTimer = null;
   killcam.respawnSent = false;
 
   if (collectKillcamFrames(killerId)) {
-    enterKillcam(killerId);
+    enterKillcam(killerId, killerW);
   } else {
     // sem killcam: card de morte + renasce sozinho (F também funciona)
     hud.death.classList.add('show');
@@ -1484,11 +1496,20 @@ function collectKillcamFrames(killerId) {
   return true;
 }
 
-function enterKillcam(killerId) {
+function enterKillcam(killerId, killerW) {
   killcam.active = true;
   killcam.killerId = killerId;
+  killcam.killerW = killerW === 1 ? 1 : 0;
   killcam.t0 = performance.now();
+  killcam.deathWall = killcam.t0;
   killcam.fallT = 0;
+  killcam.aim = 0; killcam.recoil = 0; killcam.vmKick = 0; killcam.bobT = 0;
+
+  // disparos do assassino dentro da janela do replay (p/ reproduzir os tiros)
+  const w0 = killcam.deathWall - KILLCAM_MS - 300;
+  killcam.shots = fireLog
+    .filter(f => f.id === killerId && f.wall >= w0 && f.wall <= killcam.deathWall + 60)
+    .map(f => ({ wall: f.wall, o: f.o, d: f.d, w: f.w, played: false }));
 
   // corpo temporário da vítima — para você se ver levando o tiro
   const vm = makeCharacter(teamOf(me.team, me.color));
@@ -1500,7 +1521,12 @@ function enterKillcam(killerId) {
   if (kr && kr.model) { kr.model.visible = false; killcam.killerHidden = true; }
   else killcam.killerHidden = false;
 
-  vmRoot.visible = false;   // some com seus braços/arma (câmera não é mais sua)
+  // mostra a ARMA de quem te matou (visão de primeira pessoa dele)
+  viewmodels[0].group.visible = killcam.killerW === 0;
+  viewmodels[1].group.visible = killcam.killerW === 1;
+  vmRoot.position.set(0.26, -0.24, -0.5);
+  vmRoot.rotation.set(0, 0, 0);
+  vmRoot.visible = true;
 
   hud.death.classList.remove('show');
   const killer = meta.get(killerId);
@@ -1544,7 +1570,16 @@ function endKillcam() {
   killcam.active = false;
   killcam.frames = null;
   killcam.killerId = null;
+  killcam.shots = null;
+
+  // devolve a viewmodel/FOV/scope pro estado do jogador local
+  viewmodels[0].group.visible = curW === 0;
+  viewmodels[1].group.visible = curW === 1;
+  vmRoot.position.set(0.26, -0.24, -0.5);
+  vmRoot.rotation.set(0, 0, 0);
   vmRoot.visible = true;
+  hud.scope.classList.toggle('show', false);
+  camera.fov = BASE_FOV; camera.updateProjectionMatrix();
   hud.killcam.classList.remove('show');
 }
 
@@ -1577,11 +1612,32 @@ function poseKillcamEntity(model, e, dt, fallT) {
   }
 }
 
+// reproduz um disparo do assassino durante o killcam (clarão + tracer + recuo)
+const _kcMuzzle = new THREE.Vector3();
+function replayKillerShot(shot) {
+  const W = WEAPONS[shot.w] || WEAPONS[0];
+  const [ox, oy, oz] = shot.o, [dx, dy, dz] = shot.d;
+  const dist = Math.min(raycastSolids(ox, oy, oz, dx, dy, dz), 150);
+  const end = new THREE.Vector3(ox + dx * dist, oy + dy * dist, oz + dz * dist);
+  let start;
+  if (vmRoot.visible) {
+    viewmodels[shot.w].muzzle.getWorldPosition(_kcMuzzle);
+    start = _kcMuzzle.clone();
+  } else {
+    start = new THREE.Vector3(ox + dx * 0.6, oy + dy * 0.6, oz + dz * 0.6);
+  }
+  spawnFlash(start);
+  spawnTracer(start, end, 0xffc080);
+  killcam.recoil += W.kick;
+  killcam.vmKick = Math.min(killcam.vmKick + 0.06, 0.14);
+  SFX.shot(shot.w === 1, 0.4);
+}
+
 // chamada todo frame enquanto o killcam roda
 function updateKillcam(dt) {
   const frames = killcam.frames;
   const elapsed = performance.now() - killcam.t0;
-  const replayMs = Math.max(1, killcam.endSv - killcam.startSv);
+  const replayMs = KILLCAM_MS;   // == endSv - startSv por construção
 
   let sv;
   if (elapsed <= replayMs) {
@@ -1594,14 +1650,50 @@ function updateKillcam(dt) {
   hud.killcamProgress.style.width =
     (Math.min(1, elapsed / (replayMs + KILLCAM_HOLD_MS)) * 100).toFixed(1) + '%';
 
+  // "abrir a mira" (ADS): rampa nos instantes finais antes do tiro e segura no fim
+  const aimTarget = elapsed >= replayMs
+    ? 1
+    : Math.min(1, Math.max(0, (elapsed - (replayMs - KILLCAM_AIM_MS)) / KILLCAM_AIM_MS));
+  killcam.aim += (aimTarget - killcam.aim) * Math.min(1, 6 * dt);
+
+  // sniper mira → luneta (esconde a arma, mostra o scope); SMG → só estreita o FOV
+  const scoped = killcam.killerW === 1 && killcam.aim > 0.55;
+  hud.scope.classList.toggle('show', scoped);
+
   const smp = kcSample(frames, sv);
 
-  // câmera nos olhos do assassino
+  // câmera nos olhos do assassino (+ recuo dos disparos)
   const k = kcLerp(smp.a, smp.b, smp.alpha, killcam.killerId);
+  killcam.recoil *= Math.exp(-11 * dt);
   if (k) {
     camera.position.set(k.x, k.y + PLAYER.EYE, k.z);
-    camera.rotation.set(k.pitch, k.yaw, 0);
-    if (Math.abs(camera.fov - BASE_FOV) > 0.01) { camera.fov = BASE_FOV; camera.updateProjectionMatrix(); }
+    camera.rotation.set(k.pitch + killcam.recoil, k.yaw, 0);
+  }
+
+  // FOV do ADS
+  const adsFov = killcam.killerW === 1 ? ZOOM_FOV : BASE_FOV * 0.72;
+  const fov = BASE_FOV + (adsFov - BASE_FOV) * killcam.aim;
+  if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
+
+  // arma na mão do assassino: bob ao andar + recuo; some quando entra na luneta
+  vmRoot.visible = !scoped;
+  if (vmRoot.visible) {
+    if (k && (k.anim & 1)) killcam.bobT += dt * 7;
+    const vmY = -0.24 + Math.abs(Math.sin(killcam.bobT)) * 0.014;
+    const vmX = 0.26 + Math.sin(killcam.bobT) * 0.008;
+    vmRoot.position.x += (vmX - vmRoot.position.x) * Math.min(1, 10 * dt);
+    vmRoot.position.y += (vmY - vmRoot.position.y) * Math.min(1, 10 * dt);
+    vmRoot.position.z += ((-0.5 + killcam.vmKick) - vmRoot.position.z) * Math.min(1, 14 * dt);
+    vmRoot.rotation.x = killcam.vmKick * 1.2;
+  }
+  killcam.vmKick *= Math.exp(-10 * dt);
+
+  // reproduz os tiros do assassino no momento certo do replay
+  const playbackWall = killcam.deathWall - KILLCAM_MS + Math.min(elapsed, replayMs);
+  if (killcam.shots) {
+    for (const s of killcam.shots) {
+      if (!s.played && s.wall <= playbackWall) { s.played = true; replayKillerShot(s); }
+    }
   }
 
   // corpo da vítima (você) — cai no fim
@@ -1665,6 +1757,10 @@ net.on('fire', msg => {
   spawnFlash(o);
   const dist = o.distanceTo(me.pos);
   SFX.shot(msg.w === 1, Math.max(0.06, 1 / (1 + dist * 0.09)));
+  // grava p/ o killcam reproduzir os tiros de quem te matou
+  const nowW = performance.now();
+  fireLog.push({ wall: nowW, id: msg.id, o: [msg.o[0], msg.o[1], msg.o[2]], d: [msg.d[0], msg.d[1], msg.d[2]], w: msg.w | 0 });
+  while (fireLog.length && fireLog[0].wall < nowW - (KILLCAM_MS + 800)) fireLog.shift();
 });
 net.on('dmg', msg => {
   if (msg.id === me.id) {
@@ -1713,7 +1809,7 @@ net.on('die', msg => {
     const killer = meta.get(msg.by);
     hud.deathBy.textContent = killer ? killer.name : '???';
     SFX.die();
-    startDeathSequence(msg.by);
+    startDeathSequence(msg.by, msg.w | 0);
   } else {
     const r = remotes.get(msg.id);
     if (r) { r.alive = false; r.deadT = 0; }
