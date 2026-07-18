@@ -52,16 +52,19 @@ export function updateGrenades(room, dt, now) {
 export function explodeGrenade(room, nade, players, damageFn) {
   const owner = players.get(nade.ownerId);
   if (!owner) return;   // lançador já saiu da sala — sem autoria, sem dano
-  const { x, y, z } = nade.pos;
+  // centro da explosão um pouco acima do ponto de parada (a granada senta no
+  // chão, mas o estouro é uma esfera) — evita que pequenos ressaltos do terreno
+  // "bloqueiem" o dano contra um inimigo em pé bem ao lado
+  const x = nade.pos.x, y = nade.pos.y + 0.4, z = nade.pos.z;
   for (const p of players.values()) {
     if (!p.alive) continue;
     const cx = p.pos.x - x, cy = (p.pos.y + PLAYER.BODY_H * 0.5) - y, cz = p.pos.z - z;
     const dist = Math.hypot(cx, cy, cz);
     if (dist > NADE.DMG_RADIUS) continue;
     const dl = dist || 0.001;
-    if (raycastSolids(x, y, z, cx / dl, cy / dl, cz / dl) < dist - 0.35) continue; // cobertura bloqueia
+    if (raycastSolids(x, y, z, cx / dl, cy / dl, cz / dl) < dist - 0.4) continue; // cobertura bloqueia
     const t = Math.max(0, 1 - dist / NADE.DMG_RADIUS);
-    const dmg = Math.round(NADE.DMG_MAX * Math.pow(t, 1.4));
+    const dmg = Math.round(NADE.DMG_MAX * Math.pow(t, 1.15));   // queda mais suave: perto machuca mais
     if (dmg > 0) damageFn(room, owner, p, dmg, false, 3, false, false);
   }
 }

@@ -15,10 +15,10 @@ export const NADE = {
   SETTLE_SPEED: 0.35,
   SPEED_MIN: 9,
   SPEED_MAX: 19,
-  FUSE_MS: 2100,
+  FUSE_MS: 1500,       // fuse curto: pega alvo em movimento (2.1s era longo demais)
   COUNT_START: 2,
   DMG_MAX: 110,
-  DMG_RADIUS: 5.5
+  DMG_RADIUS: 6.5      // raio mais generoso — "perto" já machuca
 };
 
 // Granada de FUMAÇA (Módulo 03) — mesma física da explosiva; ao final do fuse,
