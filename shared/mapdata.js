@@ -12,6 +12,20 @@ export const PLAYER = {
   BODY_H: 1.5   // altura da hitbox do corpo
 };
 
+// Barris explosíveis (ver server/game/barrels.js) — posição no chão (y=0).
+// Ficam SEMPRE na colisão global (mesmo destruídos viram destroço sólido);
+// só o servidor sabe se um id está vivo ou já estourou.
+export const BARREL_W = 1.05, BARREL_H = 1.5;
+export const BARREL_HP = 60;
+export const BARREL_DMG_MAX = 130;
+export const BARREL_DMG_RADIUS = 6.5;
+export const BARRELS = [
+  { id: 0, x: -13, z: -20 },
+  { id: 1, x: -11.9, z: -20.6 },
+  { id: 2, x: 10, z: 24.5 },
+  { id: 3, x: 26, z: 13 }
+];
+
 // B(x, yBase, z, w, h, d, mat) -> caixa com y armazenado no CENTRO
 function B(x, y, z, w, h, d, mat) {
   return { x, y: y + h / 2, z, w, h, d, mat };
@@ -93,10 +107,10 @@ S.push(B(24.6, 0, -15.6, 1.35, 1.35, 1.35, 'crate'));
 S.push(B(19.5, 0, 8.5, 1.35, 1.35, 1.35, 'crate'));
 
 // ---- Barris ----
-S.push(B(-13, 0, -20, 1.05, 1.5, 1.05, 'barrel'));
-S.push(B(-11.9, 0, -20.6, 1.05, 1.5, 1.05, 'barrel'));
-S.push(B(10, 0, 24.5, 1.05, 1.5, 1.05, 'barrel'));
-S.push(B(26, 0, 13, 1.05, 1.5, 1.05, 'barrel'));
+// bid identifica QUAL barril, pra explodeGrenade/damageBarrel poderem excluir
+// a própria caixa do teste de cobertura (senão o raio de LOS "raspa" de volta
+// nela mesma e bloqueia o dano contra qualquer alvo por perto).
+for (const b of BARRELS) S.push({ ...B(b.x, 0, b.z, BARREL_W, BARREL_H, BARREL_W, 'barrel'), bid: b.id });
 
 // ---- Rochas internas ----
 S.push(B(-6, 0, 15, 3, 2.2, 2.6, 'rock'));
@@ -113,7 +127,7 @@ export const BOUNDS = SOLIDS.map(s => ({
   minx: s.x - s.w / 2, maxx: s.x + s.w / 2,
   miny: s.y - s.h / 2, maxy: s.y + s.h / 2,
   minz: s.z - s.d / 2, maxz: s.z + s.d / 2,
-  mat: s.mat
+  mat: s.mat, bid: s.bid
 }));
 
 export const SPAWNS = [
@@ -151,10 +165,13 @@ export function rayBox(ox, oy, oz, dx, dy, dz, b) {
   return tmin >= 0 ? tmin : 0;
 }
 
-// Menor t contra todos os sólidos (Infinity se livre)
-export function raycastSolids(ox, oy, oz, dx, dy, dz, maxT = Infinity) {
+// Menor t contra todos os sólidos (Infinity se livre). excludeBid pula a
+// caixa de UM barril específico — usado pela explosão dele mesmo, pra não
+// "raspar" na própria caixa e se achar bloqueado por si só (distância ~0).
+export function raycastSolids(ox, oy, oz, dx, dy, dz, maxT = Infinity, excludeBid = null) {
   let best = maxT;
   for (const b of BOUNDS) {
+    if (excludeBid != null && b.bid === excludeBid) continue;
     const t = rayBox(ox, oy, oz, dx, dy, dz, b);
     if (t < best) best = t;
   }

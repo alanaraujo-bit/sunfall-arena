@@ -104,6 +104,27 @@ setTexQuality(settings.texq);
 let world = buildWorld(scene, { decor: settings.decor !== 'off' });
 let worldDecor = settings.decor, worldTexq = settings.texq;
 
+// ---------------- Barris explosivos ----------------
+// ids destruídos persistem à parte de `world` — um rebuild (troca de
+// qualidade) recria os barris sempre intactos, então reaplicamos aqui.
+const destroyedBarrels = new Set();
+function applyBarrelState() {
+  for (const b of world.barrels) {
+    const alive = !destroyedBarrels.has(b.id);
+    b.alive = alive;
+    b.intact.visible = alive;
+    b.wreck.visible = !alive;
+  }
+}
+function setBarrelAlive(id, alive) {
+  if (alive) destroyedBarrels.delete(id); else destroyedBarrels.add(id);
+  const b = world.barrels.find(x => x.id === id);
+  if (!b) return;
+  b.alive = alive;
+  b.intact.visible = alive;
+  b.wreck.visible = !alive;
+}
+
 // Personagem em destaque no lobby (showcase giratório na praça central)
 const lobbyChar = makeCharacter('#3fc8b4');
 lobbyChar.position.set(0, 0, 6.5);
@@ -222,6 +243,7 @@ function maybeRebuildWorld() {
   setTexQuality(settings.texq);
   world = buildWorld(scene, { decor: settings.decor !== 'off' });
   applyGraphics(); // reaplica sombras/névoa no sol novo
+  applyBarrelState(); // barris destruídos continuam destruídos após o rebuild
 }
 
 function keyLabel(code) {
@@ -781,7 +803,7 @@ const WEAPONS = [
     light: { dmg: 55, range: 2.5, arc: 0.62, cd: 0.5,  wind: 0.1,  lunge: 3.6, kick: 0.05 },   // arc = cos do meio-ângulo do cone
     heavy: { dmg: 80, range: 2.9, arc: 0.6,  cd: 0.85, wind: 0.22, lunge: 6.4, kick: 0.09 } }
 ];
-const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣'];
+const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️'];
 const ammo = [WEAPONS[0].mag, WEAPONS[1].mag];
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
 let recoilY = 0;   // componente lateral do recuo (yaw)
@@ -2279,6 +2301,9 @@ net.on('init', msg => {
       faceCenter();
     } else addRemote(p);
   }
+  destroyedBarrels.clear();
+  for (const id of msg.deadBarrels || []) destroyedBarrels.add(id);
+  applyBarrelState();
   refreshNadeHUD();
   startPlaying();
 });
@@ -2339,6 +2364,13 @@ net.on('nadeboom', msg => {
   const pos = r ? r.mesh.position.clone() : new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]);
   if (r) { scene.remove(r.mesh); remoteNades.delete(id); nadeKinds.delete(id); }
   spawnNadeExplosionFX(pos);
+});
+
+// barril explosivo estourou (bala ou reação em cadeia de granada) — troca
+// pro visual de destroço; o dano de quem estava perto chega via 'dmg'/'die'
+net.on('barrelboom', msg => {
+  setBarrelAlive(msg.id, false);
+  spawnNadeExplosionFX(new THREE.Vector3(msg.x, msg.y, msg.z));
 });
 
 // deploy da fumaça: remove o canister em voo e materializa a nuvem no lugar
@@ -2757,7 +2789,7 @@ net.on('dmg', msg => {
     showHitmarker(!!msg.h || !!msg.bs);
     if (msg.bs) SFX.backstab();
     else if (msg.h) SFX.headshot();
-    else if (msg.w === 3) SFX.nadeHit();
+    else if (msg.w === 3 || msg.w === 4) SFX.nadeHit();
     else if (knifeHit) SFX.knifeHit();
     else SFX.hit();
     const rv = remotes.get(msg.id);
@@ -2930,6 +2962,8 @@ net.on('restart', msg => {
   hud.endscreen.classList.remove('show');
   if (endCountTimer) { clearInterval(endCountTimer); endCountTimer = null; }
   if (roomInfo) roomInfo.end = msg.end;
+  destroyedBarrels.clear();
+  applyBarrelState();
   me.k = 0; me.d = 0;
   for (const m of meta.values()) { m.k = 0; m.d = 0; }
   for (const p of msg.players) {

@@ -3,7 +3,7 @@
 // convites e combate autoritativo com partidas que terminam.
 // ============================================================
 import { WebSocketServer } from 'ws';
-import { PLAYER, rayBox, raycastSolids } from '../shared/mapdata.js';
+import { PLAYER, rayBox, raycastSolids, BARREL_DMG_RADIUS } from '../shared/mapdata.js';
 import {
   rooms, findOrCreatePublic, createCustom, getByCode, realCount, MAX_REAL,
   nextPlayerId, nextColor, spawnPos, snapshot, broadcastRoom,
@@ -14,6 +14,7 @@ import {
   NADE_COUNT_START, SMOKE_COUNT_START, NADE_THROW_COOLDOWN_MS, SMOKE_LIFE_MS,
   throwGrenade, updateGrenades, explodeGrenade, deploySmoke, updateSmokes
 } from './game/grenades.js';
+import { barrelBounds, damageBarrel } from './game/barrels.js';
 import { awardXpAndPersist, persistDeath, loadProfileForJoin } from './game/stats.js';
 import { verifyToken } from './auth.js';
 import { setPresence, clearPresence, getPresence } from './presence.js';
@@ -199,7 +200,8 @@ export function attachWs(server) {
         team: self.team,
         kl: room.settings.kl,
         end: room.endsAt,
-        players: [...room.players.values()].map(snapshot)
+        players: [...room.players.values()].map(snapshot),
+        deadBarrels: room.barrels.filter(b => !b.alive).map(b => b.id)
       });
       broadcastRoom(room, { t: 'j', p: snapshot(self) }, self.id);
       adjustBots(room);
@@ -391,6 +393,18 @@ export function attachWs(server) {
           }
           if (victim) {
             damage(room, self, victim, Math.round(w.dmg * (head ? w.head : 1)), head, wi);
+          } else {
+            // ninguém no meio da bala — ela pode ter parado num barril vivo
+            let barrelHit = null, barrelT = hitT;
+            for (const b of room.barrels) {
+              if (!b.alive) continue;
+              const t = rayBox(ox, oy, oz, dx, dy, dz, barrelBounds(b));
+              if (t < barrelT) { barrelT = t; barrelHit = b; }
+            }
+            if (barrelHit) {
+              const res = damageBarrel(room, barrelHit, w.dmg, self, room.players, damage);
+              if (res) broadcastRoom(room, { t: 'barrelboom', id: res.id, x: res.x, y: res.y, z: res.z });
+            }
           }
           break;
         }
@@ -511,6 +525,17 @@ export function startGameLoop() {
           t: 'nadeboom', id: nade.id, o: [+nade.pos.x.toFixed(2), +nade.pos.y.toFixed(2), +nade.pos.z.toFixed(2)]
         });
         explodeGrenade(room, nade, room.players, damage);
+        // reação em cadeia: granada perto o bastante detona um barril vivo
+        const thrower = room.players.get(nade.ownerId);
+        if (thrower) {
+          for (const b of room.barrels) {
+            if (!b.alive) continue;
+            const dist = Math.hypot(b.x - nade.pos.x, b.z - nade.pos.z);
+            if (dist > BARREL_DMG_RADIUS) continue;
+            const res = damageBarrel(room, b, 9999, thrower, room.players, damage);
+            if (res) broadcastRoom(room, { t: 'barrelboom', id: res.id, x: res.x, y: res.y, z: res.z });
+          }
+        }
       }
       for (const nade of smokeDeploys) {
         const s = deploySmoke(room, nade, now);

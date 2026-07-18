@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
-import { SOLIDS } from '/shared/mapdata.js';
+import { SOLIDS, BARRELS, BARREL_W, BARREL_H } from '/shared/mapdata.js';
 import { tex, skyTex } from './textures.js';
 
 const TEAL = 0x3fc8b4, CORAL = 0xd95350, CREAM = 0xf2e3c8;
@@ -91,6 +91,30 @@ function makeBarrel(s) {
   const lid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.8, 0.05, 14), lidMat);
   lid.position.y = s.h / 2;
   grp.add(lid);
+  return grp;
+}
+
+// Destroço do barril depois de explodir: casco baixo e chamuscado + estilhaços
+// espalhados. Fica escondido até o servidor confirmar o estouro (ver 'barrelboom').
+function makeBarrelWreck(s) {
+  const grp = new THREE.Group();
+  const r = s.w / 2;
+  const scorchMat = cmat('barrel-scorch', () =>
+    new THREE.MeshStandardMaterial({ color: 0x1c1a18, roughness: 1 }));
+  const husk = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r * 0.9, s.h * 0.3, 12), scorchMat);
+  husk.position.y = s.h * 0.15;
+  husk.rotation.z = 0.35;
+  husk.castShadow = husk.receiveShadow = true;
+  grp.add(husk);
+  const shardMat = cmat('barrel-shard', () =>
+    new THREE.MeshStandardMaterial({ color: 0x2c2620, roughness: 0.9, metalness: 0.2 }));
+  for (let i = 0; i < 4; i++) {
+    const shard = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.32, s.h * 0.1, 0.05), shardMat);
+    const ang = (i / 4) * Math.PI * 2 + 0.4;
+    shard.position.set(Math.cos(ang) * r * 0.9, s.h * 0.04, Math.sin(ang) * r * 0.9);
+    shard.rotation.set((Math.random() - 0.5) * 0.6, ang, (Math.random() - 0.5) * 0.8);
+    grp.add(shard);
+  }
   return grp;
 }
 
@@ -373,12 +397,14 @@ export function buildWorld(scene, opts = {}) {
 
   // Sólidos do mapa
   for (const s of SOLIDS) {
+    // barris ficam FORA do merge: cada um precisa ser escondido/trocado por
+    // destroço individualmente quando explode (ver loop dedicado abaixo)
+    if (s.mat === 'barrel') continue;
     let m;
     switch (s.mat) {
       case 'cliff': m = makeCliff(s); break;
       case 'rock': m = makeRock(s); break;
       case 'crate': m = makeCrate(s); break;
-      case 'barrel': m = makeBarrel(s); break;
       case 'palm': m = makePalm(s); break;
       default: m = makeBlock(s);
     }
@@ -388,6 +414,20 @@ export function buildWorld(scene, opts = {}) {
     // fachada nas casas grandes (só com decoração ligada — visual puro)
     if (decor && s.mat === 'plaster' && s.h >= 4) decorateBuilding(staticRoot, s);
   }
+
+  // Barris explosivos — individuais (não fundidos): cada um alterna entre o
+  // corpo intacto e o destroço conforme o servidor confirma dano/reset.
+  const barrelDims = { w: BARREL_W, h: BARREL_H, d: BARREL_W };
+  const barrels = BARRELS.map(b => {
+    const intact = makeBarrel(barrelDims);
+    const wreck = makeBarrelWreck(barrelDims);
+    wreck.visible = false;
+    const grp = new THREE.Group();
+    grp.position.set(b.x, 0, b.z);
+    grp.add(intact, wreck);
+    liveRoot.add(grp);
+    return { id: b.id, group: grp, intact, wreck, alive: true };
+  });
 
   // ---- Decoração ----
 
@@ -539,6 +579,7 @@ export function buildWorld(scene, opts = {}) {
   return {
     group: root,
     sun,
+    barrels,
     update(t) { for (const fn of animated) fn(t); },
     dispose() {
       const seenM = new Set();

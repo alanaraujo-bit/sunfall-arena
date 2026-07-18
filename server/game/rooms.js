@@ -7,6 +7,7 @@ import { SPAWNS } from '../../shared/mapdata.js';
 import { makeBot } from './bots.js';
 import { awardWin, persistMatchPlayed } from './stats.js';
 import { NADE_COUNT_START, SMOKE_COUNT_START } from './grenades.js';
+import { initBarrels } from './barrels.js';
 
 export const COLORS = ['#3fc8b4', '#f0844c', '#b07ce0', '#8ac850', '#e86a9c', '#f0c04c', '#5c9ce8', '#e05c50'];
 
@@ -40,6 +41,7 @@ function makeRoom(mode, settings, hostAccountId = null) {
     players: new Map(),
     grenades: new Map(),
     smokes: new Map(),
+    barrels: initBarrels(),
     colorIdx: 0,
     state: 'playing',
     endsAt: Date.now() + settings.tl,
@@ -211,6 +213,7 @@ export function resetMatch(room) {
   room.endsAt = Date.now() + room.settings.tl;
   room.grenades.clear();
   room.smokes.clear();
+  room.barrels = initBarrels();
   for (const p of room.players.values()) {
     p.kills = 0; p.deaths = 0;
     p.hp = 100; p.alive = true;
