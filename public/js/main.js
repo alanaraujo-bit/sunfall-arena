@@ -2192,11 +2192,13 @@ function refreshNadeHUD() {
 let multiKillT = null;
 const MULTI_KILL_LABEL = { 2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'QUAD KILL' };
 function showMultiKill(n) {
-  hud.multiKill.textContent = MULTI_KILL_LABEL[n] || 'MULTI KILL';
+  const label = MULTI_KILL_LABEL[n] || 'MULTI KILL';
+  hud.multiKill.textContent = label;
   hud.multiKill.className = n >= 5 ? 'show t5' : n === 4 ? 'show t4' : n === 3 ? 'show t3' : 'show';
   clearTimeout(multiKillT);
   multiKillT = setTimeout(() => { hud.multiKill.className = ''; }, 1400);
   SFX.multiKill(n);
+  SFX.announce(label);
 }
 
 function tryUseKit() {
@@ -2258,10 +2260,13 @@ function flashDamage() {
   hud.dmgFlash.classList.add('show');
 }
 
-function showKillPop() {
-  hud.killPop.classList.remove('show');
+function showKillPop(head, backstab) {
+  hud.killPop.classList.remove('show', 'head', 'bs');
+  hud.killPop.textContent = backstab ? 'ELIMINAÇÃO PELAS COSTAS' : head ? 'ELIMINAÇÃO NA CABEÇA' : 'ELIMINAÇÃO +1';
   void hud.killPop.offsetWidth;
   hud.killPop.classList.add('show');
+  if (backstab) hud.killPop.classList.add('bs');
+  else if (head) hud.killPop.classList.add('head');
 }
 
 // ---------------- Rede ----------------
@@ -2847,7 +2852,7 @@ net.on('die', msg => {
     const r = remotes.get(msg.id);
     if (r) { r.alive = false; r.deadT = 0; }
     if (msg.by === me.id) {
-      SFX.kill(); showKillPop();
+      SFX.kill(); showKillPop(!!msg.h, !!msg.bs);
       const now = performance.now();
       multiKillCount = (now - lastKillTime <= MULTI_KILL_WINDOW * 1000) ? multiKillCount + 1 : 1;
       lastKillTime = now;

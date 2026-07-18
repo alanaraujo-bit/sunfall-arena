@@ -4,6 +4,22 @@
 let AC = null, master = null, noiseBuf = null;
 let volume = 0.5;
 
+// ---- Locutor (multi-kill) via Web Speech API — sem arquivo de voz, o
+// navegador sintetiza. Prefere uma voz em inglês (os rótulos são em inglês,
+// "DOUBLE KILL" etc., como em qualquer FPS — soa estranho numa voz pt-BR).
+let announcerVoice = null;
+function pickAnnouncerVoice() {
+  if (typeof speechSynthesis === 'undefined') return null;
+  const voices = speechSynthesis.getVoices();
+  return voices.find(v => /^en/i.test(v.lang) && /male|david|mark|daniel|george|guy/i.test(v.name)) ||
+         voices.find(v => /^en/i.test(v.lang)) ||
+         voices[0] || null;
+}
+if (typeof speechSynthesis !== 'undefined') {
+  announcerVoice = pickAnnouncerVoice();
+  speechSynthesis.onvoiceschanged = () => { announcerVoice = pickAnnouncerVoice(); };
+}
+
 // Exporta o AudioContext para o player de música (compartilha o mesmo contexto)
 export function getAudioContext() { return AC; }
 
@@ -168,5 +184,19 @@ export const SFX = {
     tone(base, 0.1, 0.32, 'triangle', base * 1.5);
     tone(base * 1.5, 0.14, 0.3, 'triangle', base * 2, 0.09);
     if (n >= 4) tone(base * 2, 0.18, 0.28, 'triangle', base * 2.6, 0.18);
+  },
+  // locutor: chama o multi-kill em voz alta (voz do navegador, sem arquivo).
+  // Corta um anúncio anterior ainda falando — kills muito rápidos em
+  // sequência não devem empilhar frases atrasadas.
+  announce(text) {
+    if (typeof speechSynthesis === 'undefined' || volume <= 0) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (announcerVoice) u.voice = announcerVoice;
+    u.lang = announcerVoice ? announcerVoice.lang : 'en-US';
+    u.pitch = 0.65;   // grave — tom de locutor, não de assistente de voz
+    u.rate = 0.95;
+    u.volume = volume;
+    speechSynthesis.speak(u);
   }
 };

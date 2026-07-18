@@ -234,6 +234,8 @@ body {
   text-shadow: 0 2px 8px rgba(0,0,0,.8); opacity: 0;
 }
 #kill-pop.show { animation: kpop 1s ease-out; }
+#kill-pop.head { color: #f0b34c; }
+#kill-pop.bs { color: #e0554e; font-size: 24px; }
 @keyframes kpop {
   0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(.8); }
   15% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
