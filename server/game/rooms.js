@@ -6,6 +6,7 @@
 import { SPAWNS } from '../../shared/mapdata.js';
 import { makeBot } from './bots.js';
 import { awardWin, persistMatchPlayed } from './stats.js';
+import { NADE_COUNT_START } from './grenades.js';
 
 export const COLORS = ['#3fc8b4', '#f0844c', '#b07ce0', '#8ac850', '#e86a9c', '#f0c04c', '#5c9ce8', '#e05c50'];
 
@@ -37,6 +38,7 @@ function makeRoom(mode, settings, hostAccountId = null) {
     settings,                    // { gm, bots, kl, tl }  (gm: 'ffa'|'tdm')
     hostAccountId,
     players: new Map(),
+    grenades: new Map(),
     colorIdx: 0,
     state: 'playing',
     endsAt: Date.now() + settings.tl,
@@ -108,7 +110,8 @@ export function snapshot(p) {
   return {
     id: p.id, name: p.name, color: p.color, bot: !!p.bot,
     team: p.team ?? null,
-    pos: [p.pos.x, p.pos.y, p.pos.z], hp: p.hp, k: p.kills, d: p.deaths
+    pos: [p.pos.x, p.pos.y, p.pos.z], hp: p.hp, k: p.kills, d: p.deaths,
+    nades: p.nades || 0
   };
 }
 
@@ -205,9 +208,11 @@ export function endMatch(room, winner = null, winTeam = null) {
 export function resetMatch(room) {
   room.state = 'playing';
   room.endsAt = Date.now() + room.settings.tl;
+  room.grenades.clear();
   for (const p of room.players.values()) {
     p.kills = 0; p.deaths = 0;
     p.hp = 100; p.alive = true;
+    p.nades = NADE_COUNT_START;
     p.pos = spawnPos(room);
   }
   broadcastRoom(room, {

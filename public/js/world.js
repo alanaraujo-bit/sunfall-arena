@@ -629,6 +629,42 @@ export function makeCharacter(colorHex) {
   return grp;
 }
 
+// ---------------- Granada em voo/rolando (mundo) ----------------
+// Corpo livre (sem alavanca — já foi lançada). O acento teal pulsa mais
+// rápido perto da explosão (ver updateNadeMesh em main.js) — leitura
+// visual clara de "vai explodir logo".
+export function makeGrenadeMesh() {
+  const grp = new THREE.Group();
+  const body = new THREE.MeshStandardMaterial({ color: 0x3a4a34, roughness: 0.75, metalness: 0.15 });
+  const groove = new THREE.MeshStandardMaterial({ color: 0x22301f, roughness: 0.85, metalness: 0.1 });
+  const capM = new THREE.MeshStandardMaterial({ color: 0x8a8f88, roughness: 0.4, metalness: 0.8 });
+  const accentM = new THREE.MeshStandardMaterial({
+    color: TEAL, roughness: 0.5, emissive: 0x35e0c8, emissiveIntensity: 0.6
+  });
+
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.052, 14, 12), body);
+  core.scale.set(1, 1.15, 1);
+  core.castShadow = true;
+  grp.add(core);
+  for (const gy of [-0.03, 0.005, 0.04]) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.053, 0.004, 6, 16), groove);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = gy;
+    grp.add(ring);
+  }
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.0535, 0.006, 6, 16), accentM);
+  band.rotation.x = Math.PI / 2;
+  band.position.y = -0.058;
+  grp.add(band);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.03, 0.03, 10), capM);
+  cap.position.y = 0.075;
+  cap.castShadow = true;
+  grp.add(cap);
+
+  grp.userData.accent = accentM;
+  return grp;
+}
+
 // ---------------- Armas em primeira pessoa ----------------
 
 export function makeViewmodel(kind) {
@@ -648,7 +684,65 @@ export function makeViewmodel(kind) {
   };
 
   let muzzle;
-  if (kind === 'knife') {
+  if (kind === 'nade') {
+    // ---------------- Granada de fragmentação "ROSCA-4" ----------------
+    // Corpo ovoide com sulcos de fragmentação, capuz da espoleta,
+    // alavanca de segurança e anel do pino — segurada na mão, pronta
+    // para o arremesso. A alavanca "voa" no lançamento (ver main.js).
+    const body = new THREE.MeshStandardMaterial({ color: 0x3a4a34, roughness: 0.75, metalness: 0.15 });
+    const groove = new THREE.MeshStandardMaterial({ color: 0x22301f, roughness: 0.85, metalness: 0.1 });
+    const capM = new THREE.MeshStandardMaterial({ color: 0x8a8f88, roughness: 0.4, metalness: 0.8 });
+    const leverM = new THREE.MeshStandardMaterial({ color: 0xb8bcb6, roughness: 0.35, metalness: 0.85 });
+    const pinM = new THREE.MeshStandardMaterial({ color: 0xe0c060, roughness: 0.3, metalness: 0.7 });
+    const accentM = new THREE.MeshStandardMaterial({ color: TEAL, roughness: 0.5, emissive: 0x0e4a42, emissiveIntensity: 0.6 });
+
+    const holder = new THREE.Group();
+    holder.rotation.set(0.1, 0.2, -0.1);
+    holder.position.set(0, 0, 0.05);
+
+    // corpo (levemente ovoide)
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.052, 16, 14), body);
+    core.scale.set(1, 1.15, 1);
+    holder.add(core);
+    // sulcos horizontais e verticais (fragmentação clássica)
+    for (const gy of [-0.03, 0.005, 0.04]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.053, 0.004, 6, 20), groove);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = gy;
+      holder.add(ring);
+    }
+    for (let i = 0; i < 4; i++) {
+      const seam = new THREE.Mesh(new THREE.TorusGeometry(0.053, 0.0035, 6, 20, Math.PI), groove);
+      seam.rotation.y = (i / 4) * Math.PI * 2;
+      holder.add(seam);
+    }
+    // detalhe teal (faixa de identificação)
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.0535, 0.006, 6, 20), accentM);
+    band.rotation.x = Math.PI / 2;
+    band.position.y = -0.058;
+    holder.add(band);
+    // capuz da espoleta
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.03, 0.03, 12), capM);
+    cap.position.y = 0.075;
+    holder.add(cap);
+    // alavanca de segurança (spoon) — some ao lançar
+    const lever = new THREE.Mesh(new RoundedBoxGeometry(0.014, 0.09, 0.02, 2, 0.006), leverM);
+    lever.position.set(0.045, 0.045, 0);
+    lever.rotation.z = -0.12;
+    holder.add(lever);
+    // anel do pino
+    const pinRing = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.0035, 6, 14), pinM);
+    pinRing.position.set(0.06, 0.09, 0);
+    pinRing.rotation.y = Math.PI / 2;
+    holder.add(pinRing);
+
+    grp.add(holder);
+    grp.userData.lever = lever;   // main.js esconde ao "puxar o pino"
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.06, -0.15);
+    grp.add(muzzle);
+    return { group: grp, muzzle };
+  } else if (kind === 'knife') {
     // ---------------- Faca de combate "PRESA-7" ----------------
     // Lâmina de aço com ponta clip-point (silhueta marcante), guarda,
     // cabo emborrachado com sulcos de pegada, pomo e detalhe teal.

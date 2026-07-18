@@ -10,6 +10,10 @@ import {
   adjustBots, removePlayer, endMatch, assignTeam, teamScores
 } from './game/rooms.js';
 import { updateBot } from './game/bots.js';
+import {
+  NADE_COUNT_START, NADE_THROW_COOLDOWN_MS,
+  throwGrenade, updateGrenades, explodeGrenade
+} from './game/grenades.js';
 import { awardXpAndPersist, persistDeath, loadProfileForJoin } from './game/stats.js';
 import { verifyToken } from './auth.js';
 import { setPresence, clearPresence, getPresence } from './presence.js';
@@ -61,17 +65,20 @@ function respawnPlayer(room, victim) {
   victim.pos = spawnPos(room);
   victim.hp = 100;
   victim.alive = true;
-  broadcastRoom(room, { t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z] });
+  victim.nades = NADE_COUNT_START;
+  broadcastRoom(room, {
+    t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z], nades: victim.nades
+  });
 }
 
-function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false) {
+function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false, requireAttackerAlive = true) {
   if (room.state !== 'playing') return;
-  if (!victim || !victim.alive || !attacker || !attacker.alive) return;
+  if (!victim || !victim.alive || !attacker || (requireAttackerAlive && !attacker.alive)) return;
   // TDM: sem fogo amigo (aliados não se ferem)
   if (room.settings.gm === 'tdm' && attacker !== victim && attacker.team === victim.team) return;
   victim.hp -= dmg;
   if (victim.hp > 0) {
-    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id, h: head, bs });
+    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id, h: head, bs, w: wi });
     return;
   }
   victim.hp = 0;
@@ -88,7 +95,7 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false) {
       }
     }
   }
-  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head, bs });
+  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head, bs, w: wi });
   broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi, bs });
 
   if (attacker !== victim && attacker.accountId) {
@@ -176,6 +183,7 @@ export function attachWs(server) {
         team: target.settings.gm === 'tdm' ? assignTeam(target) : null,
         pos: spawnPos(target), yaw: 0, pitch: 0, anim: 0,
         hp: 100, kills: 0, deaths: 0, streak: 0, kits: 0, healingKit: false,
+        nades: NADE_COUNT_START,
         alive: true, bot: false, ws
       };
       room = target;
@@ -261,7 +269,10 @@ export function attachWs(server) {
             self.pos = spawnPos(room);
             self.hp = 100;
             self.alive = true;
-            broadcastRoom(room, { t: 'spawn', id: self.id, pos: [self.pos.x, self.pos.y, self.pos.z] });
+            self.nades = NADE_COUNT_START;
+            broadcastRoom(room, {
+              t: 'spawn', id: self.id, pos: [self.pos.x, self.pos.y, self.pos.z], nades: self.nades
+            });
           }, 600);
           return;
         }
@@ -424,6 +435,32 @@ export function attachWs(server) {
           }
           break;
         }
+        case 'nade': {
+          // Lançamento de granada: física e explosão são 100% do servidor
+          // (ver server/game/grenades.js); o cliente só prevê o arco/efeito.
+          if (!self.alive || room.state !== 'playing') break;
+          if (!self.nades || self.nades <= 0) break;
+          const now = Date.now();
+          if (now - (self.lastNade || 0) < NADE_THROW_COOLDOWN_MS) break;
+
+          if (!Array.isArray(msg.o) || !Array.isArray(msg.d)) break;
+          const ox = +msg.o[0], oy = +msg.o[1], oz = +msg.o[2];
+          let dx = +msg.d[0], dy = +msg.d[1], dz = +msg.d[2];
+          const dl = Math.hypot(dx, dy, dz);
+          if (!(dl > 0.5 && dl < 2)) break;
+          dx /= dl; dy /= dl; dz /= dl;
+          if (Math.hypot(ox - self.pos.x, oz - self.pos.z) > 3 ||
+              Math.abs(oy - (self.pos.y + PLAYER.EYE)) > 2) break;
+          const pw = Math.max(0, Math.min(1, +msg.pw || 0));
+
+          self.lastNade = now;
+          self.nades--;
+          const nade = throwGrenade(room, self, { x: ox, y: oy, z: oz }, { x: dx, y: dy, z: dz }, pw);
+          // id incluído: o cliente "adota" o mesh previsto localmente sob
+          // este id real, em vez de renderizar a granada duas vezes
+          send({ t: 'nc', n: self.nades, id: nade.id });
+          break;
+        }
       }
       } catch (err) {
         // uma mensagem malformada nunca pode derrubar o servidor
@@ -454,6 +491,21 @@ export function startGameLoop() {
         if (now >= room.endsAt) endMatch(room);
       }
 
+      // física das granadas continua mesmo pós-fim de partida (uma granada já
+      // no ar não "congela" no ar); damage() se auto-bloqueia fora de 'playing'
+      const { bounces, explosions } = updateGrenades(room, TICK_DT, now);
+      for (const nade of bounces) {
+        broadcastRoom(room, {
+          t: 'nb', id: nade.id, o: [+nade.pos.x.toFixed(2), +nade.pos.y.toFixed(2), +nade.pos.z.toFixed(2)]
+        });
+      }
+      for (const nade of explosions) {
+        broadcastRoom(room, {
+          t: 'nadeboom', id: nade.id, o: [+nade.pos.x.toFixed(2), +nade.pos.y.toFixed(2), +nade.pos.z.toFixed(2)]
+        });
+        explodeGrenade(room, nade, room.players, damage);
+      }
+
       const state = {};
       for (const p of room.players.values()) {
         // histórico p/ lag compensation (~1.3s)
@@ -464,8 +516,12 @@ export function startGameLoop() {
           +p.yaw.toFixed(3), +p.pitch.toFixed(3), p.anim, p.hp
         ];
       }
+      const nstate = {};
+      for (const nade of room.grenades.values()) {
+        nstate[nade.id] = [+nade.pos.x.toFixed(2), +nade.pos.y.toFixed(2), +nade.pos.z.toFixed(2)];
+      }
       broadcastRoom(room, {
-        t: 's', p: state, sv: now,
+        t: 's', p: state, n: nstate, sv: now,
         tl: room.state === 'playing' ? Math.max(0, Math.ceil((room.endsAt - now) / 1000)) : 0,
         ts: room.settings.gm === 'tdm' ? teamScores(room) : undefined
       });

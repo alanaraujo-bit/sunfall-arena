@@ -94,6 +94,25 @@ export const SFX = {
   // sacar a faca: aço deslizando
   knifeEquip() { ensure(); noise(0.14, 0.16, 3200, 6000, 'highpass'); tone(760, 0.07, 0.09, 'triangle', 1300); },
 
+  // ---- Granada ----
+  // puxar o pino: clique metálico curto e seco
+  nadePin() { ensure(); noise(0.05, 0.14, 3000, 1800, 'highpass'); tone(900, 0.04, 0.1, 'square'); },
+  // arremesso: sopro do braço + liberação
+  nadeThrow() { ensure(); noise(0.22, 0.22, 2200, 500, 'bandpass'); tone(200, 0.14, 0.08, 'sine', 90); },
+  // quique no chão/parede: tinido metálico curto (volume por distância)
+  nadeBounce(vol = 1) { ensure(); tone(1400, 0.05, 0.18 * vol, 'triangle', 700); noise(0.04, 0.1 * vol, 2600, 900); },
+  // explosão: estalo agudo inicial + corpo grave + cauda de poeira assentando
+  nadeExplode(vol = 1) {
+    ensure();
+    noise(0.08, 0.5 * vol, 4000, 800, 'bandpass');
+    noise(0.55, 0.6 * vol, 900, 70);
+    tone(65, 0.5, 0.5 * vol, 'sawtooth', 30);
+    tone(38, 0.7, 0.45 * vol, 'sine', 22, 0.02);
+    noise(0.9, 0.22 * vol, 300, 60, 'lowpass');
+  },
+  // confirmação de dano em área (hitmarker de granada)
+  nadeHit() { ensure(); tone(600, 0.08, 0.28, 'sawtooth', 1000); tone(300, 0.06, 0.2, 'sine', 700, 0.02); },
+
   hit() { ensure(); tone(880, 0.06, 0.25, 'sine', 1200); },
   headshot() { ensure(); tone(1100, 0.05, 0.28, 'sine', 1600); tone(1500, 0.07, 0.2, 'sine', 2000, 0.04); },
   kill() { ensure(); tone(520, 0.09, 0.3, 'triangle'); tone(780, 0.12, 0.3, 'triangle', null, 0.09); tone(1040, 0.18, 0.28, 'triangle', null, 0.18); },

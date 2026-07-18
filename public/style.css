@@ -145,6 +145,30 @@ body {
 #kit-count { font-size: 15px; font-weight: bold; color: #7fe08a; min-width: 12px; }
 #kit-box.using #kit-count { display: none; }
 
+/* granada de fragmentação */
+#nade-box {
+  position: absolute; left: 246px; bottom: 24px;
+  display: flex; align-items: center; gap: 6px;
+  opacity: 0; transform: scale(.85); transition: opacity .25s, transform .25s;
+}
+#nade-box.show { opacity: 1; transform: scale(1); }
+#nade-icon {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(40,26,10,.7); border: 2px solid #ffb347;
+  color: #ffb347; display: flex; align-items: center; justify-content: center;
+  font-size: 15px; text-shadow: 0 0 6px rgba(255,179,71,.8);
+}
+#nade-box.using #nade-icon { animation: nadePulse .35s infinite; }
+@keyframes nadePulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+#nade-bar-track {
+  width: 46px; height: 5px; border-radius: 3px; overflow: hidden;
+  background: rgba(20,14,8,.6); display: none;
+}
+#nade-box.using #nade-bar-track { display: block; }
+#nade-bar { height: 100%; width: 0%; background: linear-gradient(90deg,#ffb347,#ff6a3d); transition: width .05s linear; }
+#nade-count { font-size: 15px; font-weight: bold; color: #ffb347; min-width: 12px; }
+#nade-box.using #nade-count { display: none; }
+
 /* munição */
 #ammo-box { position: absolute; right: 30px; bottom: 22px; text-align: right; }
 #weapon-name {
@@ -309,6 +333,7 @@ body {
 #hud:has(#killcam.show) #ammo-box,
 #hud:has(#killcam.show) #stam-box,
 #hud:has(#killcam.show) #kit-box,
+#hud:has(#killcam.show) #nade-box,
 #hud:has(#killcam.show) #match-bar { opacity: 0; transition: opacity .3s ease; }
 
 /* fade preto de transição (morte → killcam → renascimento) */

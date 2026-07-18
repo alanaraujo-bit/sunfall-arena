@@ -5,7 +5,8 @@
 // ============================================================
 import * as THREE from 'three';
 import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
-import { buildWorld, makeCharacter, makeViewmodel } from './world.js';
+import { buildWorld, makeCharacter, makeViewmodel, makeGrenadeMesh } from './world.js';
+import { NADE, advanceGrenade, launchGrenade } from '/shared/nadephysics.js';
 import { tex, spriteTex, setTexQuality } from './textures.js';
 import { Net, api, apiAuth, apiPublicGet } from './net.js';
 import { SFX, getAudioContext } from './audio.js';
@@ -20,12 +21,12 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', melee: 'KeyV', board: 'Tab'
+  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', melee: 'KeyV', nade: 'KeyG', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', melee: 'Golpe rápido', board: 'Placar'
+  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', melee: 'Golpe rápido', nade: 'Granada', board: 'Placar'
 };
 
 // Presets de qualidade — cada um define as opções individuais.
@@ -144,6 +145,7 @@ const hud = {
   killPop: $('kill-pop'), multiKill: $('multi-kill'),
   stamBox: $('stam-box'), stamFill: $('stam-fill'),
   kitBox: $('kit-box'), kitCount: $('kit-count'), kitBar: $('kit-bar'),
+  nadeBox: $('nade-box'), nadeCount: $('nade-count'), nadeBar: $('nade-bar'),
   tabGuest: $('tab-guest'), tabAccount: $('tab-account'),
   guestPanel: $('guest-panel'), accountPanel: $('account-panel'),
   accUser: $('acc-user'), accPass: $('acc-pass'), accountStatus: $('account-status'),
@@ -691,7 +693,8 @@ const me = {
   sliding: false, slideT: 0, slideDir: new THREE.Vector2(),
   slideEnergy: 100, slideCooldownT: 0,
   eyeH: PLAYER.EYE, stepT: 0,
-  kits: 0, usingKit: 0
+  kits: 0, usingKit: 0,
+  nades: NADE.COUNT_START
 };
 const SLIDE_MAX_ENERGY = 100, SLIDE_COST = 40, SLIDE_REGEN_DELAY = 1, SLIDE_REGEN_RATE = 30;
 const KIT_USE_TIME = 1, KIT_HEAL = 50;
@@ -730,6 +733,7 @@ function faceCenter() {
 // ---------------- Armas ----------------
 // Índice da faca no arsenal (slot de corpo a corpo)
 const KNIFE = 2;
+const GRENADE = 3;   // não é um "slot" de switchWeapon — ação overlay, como o golpe rápido
 const WEAPONS = [
   { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false },
   { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true },
@@ -738,22 +742,24 @@ const WEAPONS = [
     light: { dmg: 55, range: 2.5, arc: 0.62, cd: 0.5,  wind: 0.1,  lunge: 3.6, kick: 0.05 },   // arc = cos do meio-ângulo do cone
     heavy: { dmg: 80, range: 2.9, arc: 0.6,  cd: 0.85, wind: 0.22, lunge: 6.4, kick: 0.09 } }
 ];
-const WEAPON_ICONS = ['⚡', '◎', '🗡'];
+const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣'];
 const ammo = [WEAPONS[0].mag, WEAPONS[1].mag];
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
 
 const vmAR = makeViewmodel('ar');
 const vmSR = makeViewmodel('sr');
 const vmKnife = makeViewmodel('knife');
+const vmNade = makeViewmodel('nade');
 const vmRoot = new THREE.Group();
 vmRoot.position.set(0.26, -0.24, -0.5);
-vmRoot.add(vmAR.group, vmSR.group, vmKnife.group);
+vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group);
 vmSR.group.visible = false;
 vmKnife.group.visible = false;
+vmNade.group.visible = false;
 vmRoot.visible = false; // oculto até entrar na partida
 camera.add(vmRoot);
 scene.add(camera);
-const viewmodels = [vmAR, vmSR, vmKnife];
+const viewmodels = [vmAR, vmSR, vmKnife, vmNade];
 
 // mostra só a viewmodel do índice `i` (guns e faca)
 function showViewmodel(i) {
@@ -851,17 +857,26 @@ function updateEffects(dt) {
       if (e.kind === 'tracer') {
         e.obj.visible = false;
         _tracerPool.push(e.obj); // recycle tracer mesh
+      } else if (e.kind === 'shockwave') {
+        e.obj.geometry.dispose(); e.obj.material.dispose(); // geometria/material únicos por explosão
+      } else if (e.kind === 'nadeflash') {
+        e.obj.material.dispose(); // sprite: geometria é compartilhada internamente pelo THREE, não descartar
       }
       // shared materials are NOT disposed — they're reused
       effects.splice(i, 1);
       continue;
     }
-    if (e.kind === 'tracer' || e.kind === 'fade') {
+    if (e.kind === 'tracer' || e.kind === 'fade' || e.kind === 'nadeflash') {
       e.obj.material.opacity = e.ttl / e.life;
     } else if (e.kind === 'particle') {
       e.vel.y -= 9 * dt;
       e.obj.position.addScaledVector(e.vel, dt);
       e.obj.scale.setScalar(e.obj.scale.x * (0.92 + 0.08 * (e.ttl / e.life)));
+    } else if (e.kind === 'shockwave') {
+      const t = 1 - e.ttl / e.life;
+      const scale = 1 + t * (NADE.DMG_RADIUS * 2.2);
+      e.obj.scale.set(scale, scale, scale);
+      e.obj.material.opacity = (1 - t) * 0.8;
     }
   }
 }
@@ -1011,16 +1026,19 @@ addEventListener('keydown', e => {
   if (e.code === binds.w2) switchWeapon(1);
   if (e.code === binds.w3) switchWeapon(KNIFE);
   if (e.code === binds.melee) quickMelee();
+  if (e.code === binds.nade) startNadeCook();
   if (e.code === 'KeyF' && curW === KNIFE) startInspect();
 });
 addEventListener('keyup', e => {
   keys[e.code] = false;
   if (e.code === binds.board) hud.board.classList.remove('show');
+  if (e.code === binds.nade) releaseNadeThrow();
 });
 addEventListener('wheel', () => { if (playing && !me.dead) switchWeapon(1 - curW); });
 canvas.addEventListener('mousedown', e => {
   if (!playing) return;
   if (document.pointerLockElement !== canvas) { canvas.requestPointerLock(); return; }
+  if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   if (e.button === 0) {
     mouseDown = true;
     if (curW === KNIFE) startMelee(false); else tryFire();
@@ -1035,6 +1053,9 @@ addEventListener('mouseup', e => {
   if (e.button === 2) setZoom(false);
 });
 addEventListener('contextmenu', e => e.preventDefault());
+// perder o foco com a granada "puxada" nunca pode travar as outras ações —
+// se o keyup nunca chegar (alt-tab), cancela o cook defensivamente
+addEventListener('blur', () => cancelNadeCook());
 addEventListener('mousemove', e => {
   if (document.pointerLockElement !== canvas || !playing || me.dead) return;
   const s = (+hud.sens.value) * (zoomed ? 0.35 : 1) * 0.0022;
@@ -1062,6 +1083,7 @@ function setZoom(z) {
 function switchWeapon(i) {
   if (i === curW || reloading || me.dead || me.usingKit > 0) return;
   if (melee.active && melee.quick) return;   // não interromper um golpe rápido em curso
+  if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   curW = i;
   swapT = 0.25;
   setZoom(false);
@@ -1241,6 +1263,7 @@ function tryFire() {
   if (w.melee) return;   // a faca ataca por startMelee, não por tryFire
   const now = performance.now() / 1000;
   if (!playing || matchEnded || me.dead || reloading > 0 || swapT > 0 || me.usingKit > 0) return;
+  if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   if (now - lastShot < w.int) return;
   if (ammo[curW] <= 0) { SFX.empty(); startReload(); return; }
   lastShot = now;
@@ -1336,6 +1359,7 @@ function rayBoxLocal(o, d, b) {
 function startReload() {
   const w = WEAPONS[curW];
   if (w.melee || reloading > 0 || ammo[curW] === w.mag || me.dead || me.usingKit > 0) return;
+  if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   reloading = w.reload;
   setZoom(false);
   SFX.reload();
@@ -1373,6 +1397,7 @@ function meleeStats(heavy) { return WEAPONS[KNIFE][heavy ? 'heavy' : 'light']; }
 function startMelee(heavy, quick = false) {
   if (!playing || matchEnded || me.dead || me.usingKit > 0) return;
   if (melee.active || melee.cd > 0 || reloading > 0 || swapT > 0) return;
+  if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   const st = meleeStats(heavy);
   melee.active = true;
   melee.heavy = heavy;
@@ -1564,6 +1589,250 @@ function updateMeleeState(dt) {
   }
 }
 
+// ============================================================
+// GRANADA DE FRAGMENTAÇÃO — Módulo 02
+// Ação overlay (tecla G, padrão): segurar carrega a força do
+// arremesso (com arco de mira previsto), soltar lança. Física
+// server-authoritative (shared/nadephysics.js) — o cliente prevê
+// o próprio lançamento para resposta instantânea; o servidor tem
+// a palavra final sobre posição, quiques e dano (com bloqueio por
+// cobertura). Ver server/game/grenades.js.
+// ============================================================
+const NADE_MAX_CHARGE_MS = 900;   // tempo até atingir força máxima
+const NADE_MIN_POWER = 0.35;      // toque rápido ainda lança longe o bastante
+const NADE_THROW_ANIM_MS = 0.3;   // duração da animação de arremesso (s)
+
+const nadeState = { cooking: false, chargeT: 0, throwing: false, throwT: 0 };
+// minha própria granada, ainda sem confirmação do servidor (previsão local)
+let myNade = null;   // { mesh, phys:{pos,vel,grounded}, thrownAt, confirmedId }
+// granadas de todo mundo (a minha entra aqui assim que o servidor confirma
+// o id) — posicionadas via o mesmo buffer de interpolação dos jogadores
+const remoteNades = new Map();
+
+// pontinhos do arco previsto durante a carga (materiais individuais —
+// cada um precisa da própria opacidade, por isso não usam o cache global)
+const NADE_ARC_DOTS = 14;
+const nadeArcDots = [];
+const nadeDotTex = spriteTex('#eafff2', '#3fc8b4');
+for (let i = 0; i < NADE_ARC_DOTS; i++) {
+  const mat = new THREE.SpriteMaterial({ map: nadeDotTex, transparent: true, depthWrite: false });
+  const s = new THREE.Sprite(mat);
+  s.scale.setScalar(0.05);
+  s.visible = false;
+  scene.add(s);
+  nadeArcDots.push(s);
+}
+function hideNadeArc() { for (const d of nadeArcDots) d.visible = false; }
+
+// origem + direção do lançamento: câmera com leve viés pra cima (arremesso
+// natural mesmo mirando reto — senão a granada só cairia aos pés)
+const _nOrigin = new THREE.Vector3(), _nDir = new THREE.Vector3();
+function nadeThrowVector() {
+  camera.getWorldDirection(_nDir);
+  _nDir.y += 0.16;
+  _nDir.normalize();
+  _nOrigin.copy(me.pos); _nOrigin.y += me.eyeH;
+  _nOrigin.addScaledVector(_nDir, 0.3);
+  return { origin: _nOrigin, dir: _nDir };
+}
+
+// Simula a trajetória prevista (mesma física do servidor) e distribui os
+// pontinhos até o primeiro impacto — leitura limpa de onde ela vai parar.
+function updateNadeArc(power) {
+  const { origin, dir } = nadeThrowVector();
+  const phys = launchGrenade(origin, dir, power);
+  const dt = 1 / 60;
+  let shown = 0;
+  for (let i = 0; i < 240 && shown < NADE_ARC_DOTS; i++) {
+    const bounced = advanceGrenade(phys, dt);
+    if (i % 4 === 3) {
+      const dot = nadeArcDots[shown++];
+      dot.position.set(phys.pos.x, phys.pos.y, phys.pos.z);
+      dot.visible = true;
+      dot.material.opacity = 1 - (shown / NADE_ARC_DOTS) * 0.55;
+    }
+    if (bounced) break;
+  }
+  for (let i = shown; i < NADE_ARC_DOTS; i++) nadeArcDots[i].visible = false;
+}
+
+function canStartNade() {
+  return playing && !matchEnded && !me.dead && me.usingKit <= 0 &&
+    me.nades > 0 && reloading <= 0 && swapT <= 0 &&
+    !melee.active && !nadeState.cooking && !nadeState.throwing && !zoomed;
+}
+
+function startNadeCook() {
+  if (!canStartNade()) return;
+  nadeState.cooking = true;
+  nadeState.chargeT = 0;
+  setZoom(false);
+  showViewmodel(GRENADE);
+  updateNadeHUD();
+  SFX.nadePin();
+}
+
+function releaseNadeThrow() {
+  if (!nadeState.cooking) return;
+  nadeState.cooking = false;
+  hideNadeArc();
+  const power = Math.max(NADE_MIN_POWER, Math.min(1, nadeState.chargeT / NADE_MAX_CHARGE_MS));
+  const { origin, dir } = nadeThrowVector();
+
+  // previsão local: a granada já sai voando antes do servidor confirmar
+  const phys = launchGrenade(origin, dir, power);
+  const mesh = makeGrenadeMesh();
+  mesh.position.set(phys.pos.x, phys.pos.y, phys.pos.z);
+  scene.add(mesh);
+  myNade = { mesh, phys, thrownAt: performance.now(), confirmedId: null };
+
+  me.nades--;
+  updateNadeHUD();
+  net.send({ t: 'nade', o: [origin.x, origin.y, origin.z], d: [dir.x, dir.y, dir.z], pw: power });
+
+  nadeState.throwing = true;
+  nadeState.throwT = 0;
+  recoil += 0.02;
+  camShake = Math.min(camShake + 0.02, 0.05);
+  SFX.nadeThrow();
+}
+
+// segurança: nunca deixa o estado travado (perda de foco, morte, etc.)
+function cancelNadeCook() {
+  if (!nadeState.cooking) return;
+  nadeState.cooking = false;
+  hideNadeArc();
+  showViewmodel(curW);
+  vmRoot.rotation.set(0, 0, 0);
+  updateNadeHUD();
+}
+
+function updateNadeState(dt) {
+  if (nadeState.cooking) {
+    nadeState.chargeT = Math.min(NADE_MAX_CHARGE_MS, nadeState.chargeT + dt * 1000);
+    updateNadeArc(Math.max(NADE_MIN_POWER, Math.min(1, nadeState.chargeT / NADE_MAX_CHARGE_MS)));
+    updateNadeHUD();
+  }
+  if (nadeState.throwing) {
+    nadeState.throwT += dt;
+    if (nadeState.throwT >= NADE_THROW_ANIM_MS) {
+      nadeState.throwing = false;
+      showViewmodel(curW);
+      vmRoot.rotation.set(0, 0, 0);
+    }
+  }
+
+  // previsão local do meu lançamento, até o servidor confirmar o id
+  if (myNade && myNade.confirmedId === null) {
+    const bounced = advanceGrenade(myNade.phys, dt);
+    myNade.mesh.position.set(myNade.phys.pos.x, myNade.phys.pos.y, myNade.phys.pos.z);
+    myNade.mesh.rotation.x += dt * 7; myNade.mesh.rotation.z += dt * 5;
+    if (bounced) {
+      SFX.nadeBounce(Math.max(0.05, 1 / (1 + me.pos.distanceTo(myNade.mesh.position) * 0.12)));
+    }
+    // salvaguarda: se o servidor nunca confirmar, explode localmente mesmo
+    // assim — nunca fica uma granada fantasma presa na cena
+    if (performance.now() - myNade.thrownAt > NADE.FUSE_MS + 500) {
+      spawnNadeExplosionFX(myNade.mesh.position);
+      scene.remove(myNade.mesh);
+      myNade = null;
+    }
+  }
+
+  // pulso do acento teal — acelera perto da explosão ("vai estourar já")
+  const now = performance.now();
+  if (myNade) pulseNadeMesh(myNade.mesh, now - myNade.thrownAt);
+  for (const r of remoteNades.values()) pulseNadeMesh(r.mesh, now - r.spawnedAt);
+}
+
+function pulseNadeMesh(mesh, elapsedMs) {
+  const accent = mesh.userData.accent;
+  if (!accent) return;
+  const remain = Math.max(0, NADE.FUSE_MS - elapsedMs) / NADE.FUSE_MS;
+  const rate = 2 + (1 - remain) * 14;
+  accent.emissiveIntensity = 0.5 + (Math.sin(elapsedMs * 0.001 * rate * Math.PI * 2) * 0.5 + 0.5) * 1.6 * (1 - remain * 0.4);
+}
+
+// ---- granadas remotas: mesmo buffer/interpolação dos jogadores ----
+function sampleNades(smp) {
+  if (!smp) return null;
+  const an = smp.a.n || {}, bn = smp.b ? (smp.b.n || {}) : null;
+  const out = {};
+  for (const id of Object.keys(an)) out[id] = an[id];
+  if (bn) {
+    for (const id of Object.keys(bn)) {
+      const p0 = an[id], p1 = bn[id];
+      out[id] = (p0 && p1)
+        ? [p0[0] + (p1[0] - p0[0]) * smp.alpha, p0[1] + (p1[1] - p0[1]) * smp.alpha, p0[2] + (p1[2] - p0[2]) * smp.alpha]
+        : p1;
+    }
+  }
+  return out;
+}
+
+function updateRemoteNades(dt) {
+  const positions = sampleNades(sampleSnapshots());
+  if (!positions) return;
+  const seen = new Set();
+  for (const [id, pos] of Object.entries(positions)) {
+    seen.add(id);
+    if (myNade && myNade.confirmedId === id) continue;   // já é o mesmo mesh, tratado acima
+    let r = remoteNades.get(id);
+    if (!r) {
+      const mesh = makeGrenadeMesh();
+      scene.add(mesh);
+      r = { mesh, spawnedAt: performance.now() };
+      remoteNades.set(id, r);
+    }
+    r.mesh.position.set(pos[0], pos[1], pos[2]);
+    r.mesh.rotation.x += dt * 7; r.mesh.rotation.z += dt * 5;
+  }
+  for (const [id, r] of remoteNades) {
+    if (!seen.has(id)) { scene.remove(r.mesh); remoteNades.delete(id); }   // limpeza defensiva
+  }
+}
+
+function clearAllNadeMeshes() {
+  if (myNade) { scene.remove(myNade.mesh); myNade = null; }
+  for (const r of remoteNades.values()) scene.remove(r.mesh);
+  remoteNades.clear();
+  hideNadeArc();
+}
+
+// ---- explosão: flash, onda de choque, fragmentos, poeira, câmera ----
+const nadeFlashTex = spriteTex('#fff8e0', '#ff9040');
+const nadeFragTex = spriteTex('#3a2818', '#1a1006');
+function spawnNadeExplosionFX(pos) {
+  const flashMat = new THREE.SpriteMaterial({
+    map: nadeFlashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const flash = new THREE.Sprite(flashMat);
+  flash.position.copy(pos);
+  flash.scale.setScalar(2.6);
+  scene.add(flash);
+  effects.push({ obj: flash, ttl: 0.16, life: 0.16, kind: 'nadeflash' });
+
+  // onda de choque no chão (anel teal se expandindo)
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.4, 0.55, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0x6ee0c8, transparent: true, opacity: 0.8, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(pos.x, 0.06, pos.z);
+  scene.add(ring);
+  effects.push({ obj: ring, ttl: 0.4, life: 0.4, kind: 'shockwave' });
+
+  spawnBurst(pos, nadeFragTex, 16, 6.5, 0.14, 3.5);
+  spawnBurst(pos, dustTex, 14, 2.4, 0.3, 2.2);
+
+  const dist = me.pos.distanceTo(pos);
+  camShake = Math.min(0.22, camShake + Math.max(0, 0.26 - dist * 0.018));
+  SFX.nadeExplode(Math.max(0.15, 1 / (1 + dist * 0.05)));
+}
+
 // ---------------- HUD helpers ----------------
 function updateAmmoHUD() {
   const w = WEAPONS[curW];
@@ -1596,6 +1865,15 @@ function updateKitHUD() {
   hud.kitBox.classList.toggle('using', me.usingKit > 0);
 }
 
+function updateNadeHUD() {
+  hud.nadeCount.textContent = me.nades;
+  hud.nadeBox.classList.toggle('show', me.nades > 0 || nadeState.cooking);
+  hud.nadeBox.classList.toggle('using', nadeState.cooking);
+  hud.nadeBar.style.width = nadeState.cooking
+    ? (Math.max(NADE_MIN_POWER, Math.min(1, nadeState.chargeT / NADE_MAX_CHARGE_MS)) * 100) + '%'
+    : '0%';
+}
+
 let multiKillT = null;
 const MULTI_KILL_LABEL = { 2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'QUAD KILL' };
 function showMultiKill(n) {
@@ -1608,6 +1886,7 @@ function showMultiKill(n) {
 
 function tryUseKit() {
   if (!playing || matchEnded || me.dead || me.kits <= 0 || me.usingKit > 0 || me.hp >= 100) return;
+  if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   net.send({ t: 'usekit' });
   me.usingKit = KIT_USE_TIME;
   updateKitHUD();
@@ -1634,7 +1913,11 @@ function addFeed(killer, victim, head, isMe, weaponIndex, backstab) {
   const vc = victim === me.id ? me.color : (vm2 ? vm2.color : '#fff');
   const wi = weaponIndex !== undefined ? weaponIndex : 0;
   const mid = backstab ? '☠' : (head ? '⌖' : '⚔');
-  div.innerHTML = `<b style="color:${kc}">${kn}</b> <span class="fx w">${WEAPON_ICONS[wi] || '?'}</span> <span class="fx">${mid}</span> <b style="color:${vc}">${vn}</b>`;
+  // granada: única arma que permite auto-dano (bullets/faca sempre excluem o
+  // próprio atirador do alvo) — evita a leitura estranha de "Fulano ⚔ Fulano"
+  div.innerHTML = killer === victim
+    ? `<span class="fx w">${WEAPON_ICONS[wi] || '?'}</span> <b style="color:${vc}">${vn}</b> <span class="fx">se eliminou</span>`
+    : `<b style="color:${kc}">${kn}</b> <span class="fx w">${WEAPON_ICONS[wi] || '?'}</span> <span class="fx">${mid}</span> <b style="color:${vc}">${vn}</b>`;
   hud.feed.prepend(div);
   setTimeout(() => div.classList.add('out'), 4200);
   setTimeout(() => div.remove(), 4700);
@@ -1681,7 +1964,9 @@ function clearRoomState() {
   multiKillCount = 0; lastKillTime = 0;
   cancelMelee(); melee.cd = 0; knifeEquipT = 0; knifeInspectT = 0;
   curW = 0; showViewmodel(0); camShake = 0;
-  updateSlideHUD(); updateKitHUD();
+  cancelNadeCook(); nadeState.throwing = false; me.nades = NADE.COUNT_START;
+  clearAllNadeMeshes();
+  updateSlideHUD(); updateKitHUD(); updateNadeHUD();
 }
 
 net.on('init', msg => {
@@ -1695,9 +1980,11 @@ net.on('init', msg => {
       me.pos.set(p.pos[0], p.pos[1], p.pos[2]);
       me.color = p.color;
       me.hp = p.hp; me.k = 0; me.d = 0;
+      me.nades = p.nades ?? NADE.COUNT_START;
       faceCenter();
     } else addRemote(p);
   }
+  updateNadeHUD();
   startPlaying();
 });
 net.on('j', msg => addRemote(msg.p));
@@ -1711,7 +1998,7 @@ const SNAP_BUF_MAX = 200;
 const snapBuf = []; // { t: performance.now() na chegada, sv: tempo do servidor, p: estados }
 
 net.on('s', msg => {
-  snapBuf.push({ t: performance.now(), sv: msg.sv, p: msg.p });
+  snapBuf.push({ t: performance.now(), sv: msg.sv, p: msg.p, n: msg.n });
   while (snapBuf.length > SNAP_BUF_MAX) snapBuf.shift();
   for (const [id, a] of Object.entries(msg.p)) {
     const r = remotes.get(+id);
@@ -1720,6 +2007,37 @@ net.on('s', msg => {
     r.hp = a[6];
   }
   if (typeof msg.tl === 'number') updateMatchBar(msg.tl, msg.ts);
+});
+
+// confirmação do meu lançamento: sincroniza a contagem e "adota" o mesh
+// previsto sob o id real do servidor — dali em diante a posição vem do
+// buffer de snapshots, igual a qualquer outra granada
+net.on('nc', msg => {
+  me.nades = msg.n;
+  updateNadeHUD();
+  if (msg.id != null && myNade && myNade.confirmedId === null) {
+    myNade.confirmedId = String(msg.id);
+    remoteNades.set(myNade.confirmedId, { mesh: myNade.mesh, spawnedAt: myNade.thrownAt });
+    myNade = null;
+  }
+});
+
+// quique de uma granada (minha ou de outro jogador) — som posicional
+net.on('nb', msg => {
+  const r = remoteNades.get(String(msg.id));
+  const pos = r ? r.mesh.position : new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]);
+  SFX.nadeBounce(Math.max(0.05, 1 / (1 + pos.distanceTo(me.pos) * 0.12)));
+});
+
+// explosão confirmada pelo servidor — remove o mesh e dispara o efeito.
+// O dano de verdade chega em seguida via 'dmg'/'die' (mesmo pipeline das
+// outras armas — ver damage() no servidor).
+net.on('nadeboom', msg => {
+  const id = String(msg.id);
+  const r = remoteNades.get(id);
+  const pos = r ? r.mesh.position.clone() : new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]);
+  if (r) { scene.remove(r.mesh); remoteNades.delete(id); }
+  spawnNadeExplosionFX(pos);
 });
 
 // Acha o par de snapshots que envolve o tempo de render (agora - atraso).
@@ -2127,6 +2445,7 @@ net.on('dmg', msg => {
     showHitmarker(!!msg.h || !!msg.bs);
     if (msg.bs) SFX.backstab();
     else if (msg.h) SFX.headshot();
+    else if (msg.w === 3) SFX.nadeHit();
     else if (knifeHit) SFX.knifeHit();
     else SFX.hit();
   }
@@ -2163,12 +2482,13 @@ net.on('die', msg => {
     me.sliding = false;
     me.usingKit = 0;
     cancelMelee();
+    cancelNadeCook(); nadeState.throwing = false;
     updateKitHUD();
     multiKillCount = 0;
     setZoom(false);
     mouseDown = false;
     const killer = meta.get(msg.by);
-    hud.deathBy.textContent = killer ? killer.name : '???';
+    hud.deathBy.textContent = msg.by === me.id ? 'própria granada' : (killer ? killer.name : '???');
     SFX.die();
     startDeathSequence(msg.by, msg.w | 0);
   } else {
@@ -2193,12 +2513,14 @@ net.on('spawn', msg => {
     faceCenter();
     ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
     reloading = 0;
+    me.nades = msg.nades ?? NADE.COUNT_START;
+    cancelNadeCook(); nadeState.throwing = false;
     hud.death.classList.remove('show');
     endKillcam();
     clearTimeout(deathTimer); deathTimer = null;
     killcam.respawnSent = false;
     hud.fade.classList.remove('on');   // fade suave de volta ao jogo
-    updateHpHUD(); updateAmmoHUD();
+    updateHpHUD(); updateAmmoHUD(); updateNadeHUD();
     SFX.spawn();
   } else {
     const r = remotes.get(msg.id);
@@ -2297,7 +2619,9 @@ net.on('restart', msg => {
       faceCenter();
       ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
       reloading = 0;
-      updateHpHUD(); updateAmmoHUD();
+      me.nades = p.nades ?? NADE.COUNT_START;
+      cancelNadeCook(); nadeState.throwing = false;
+      updateHpHUD(); updateAmmoHUD(); updateNadeHUD();
     } else {
       const r = remotes.get(p.id);
       if (r) {
@@ -2732,7 +3056,7 @@ function frame() {
   updatePerf(dt);
   world.update(t);
   updateEffects(dt);
-  if (!killcam.active) updateRemotes(dt, t);   // durante o killcam quem posiciona é updateKillcam
+  if (!killcam.active) { updateRemotes(dt, t); updateRemoteNades(dt); }   // durante o killcam quem posiciona é updateKillcam
 
   if (playing && killcam.active) {
     updateKillcam(dt);
@@ -2756,6 +3080,7 @@ function frame() {
     }
     if (mouseDown && WEAPONS[curW].auto) tryFire();
     updateMeleeState(dt);
+    updateNadeState(dt);
 
     // câmera (+ tremor curto de impacto da faca)
     camera.position.set(me.pos.x, me.pos.y + me.eyeH, me.pos.z);

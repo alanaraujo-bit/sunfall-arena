@@ -8,5 +8,7 @@ import { dirname, join } from 'path';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 await mkdir(join(ROOT, 'public/shared'), { recursive: true });
-await copyFile(join(ROOT, 'shared/mapdata.js'), join(ROOT, 'public/shared/mapdata.js'));
-console.log('[build] shared/mapdata.js copiado para public/shared/');
+for (const file of ['mapdata.js', 'nadephysics.js']) {
+  await copyFile(join(ROOT, 'shared', file), join(ROOT, 'public/shared', file));
+  console.log(`[build] shared/${file} copiado para public/shared/`);
+}
