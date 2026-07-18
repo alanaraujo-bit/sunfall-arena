@@ -761,18 +761,21 @@ const GRENADE = 3;   // viewmodel da granada de frag — ação overlay, não um
 const SMOKE_VM = 4;  // viewmodel da granada de fumaça
 const WEAPONS = [
   // rec = personalidade do recuo:
-  //   climb  sobe por tiro (pitch)      drift  deriva lateral na rajada (yaw)
-  //   jitter aleatório lateral          ramp   tiros até a rajada "assentar"
-  //   recov  velocidade de recuperação  bloom  dispersão extra por tiro de rajada (até bloomMax)
+  //   climb     sobe por tiro (pitch)             drift    deriva lateral na rajada (yaw)
+  //   jitter    aleatório lateral                 ramp     tiros até a rajada "assentar"
+  //   max       teto do recuo acumulado           bloom    dispersão extra por tiro (até bloomMax)
+  //   recovHeld recuperação SEGURANDO o gatilho (lenta — deixa o recuo se acumular e ficar visível)
+  //   recov     recuperação ao SOLTAR o gatilho (rápida — a mira "cai" de volta pro centro)
   //   vmKick coice da viewmodel         shake  tremor de câmera por disparo
   { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false,
-    // sobe firme e previsível nos primeiros tiros; na rajada longa assenta e
-    // deriva devagar pro lado — dá pra compensar puxando a mira (lore: controle 86)
-    rec: { climb: 0.013, drift: 0.0062, jitter: 0.0022, ramp: 4, recov: 13, bloom: 0.0009, bloomMax: 0.010, vmKick: 0.055 } },
+    // sobe rápido e visível desde o 1º tiro; numa rajada segurada o recuo
+    // se acumula até o teto e deriva pro lado — dá pra compensar puxando a mira
+    // pra baixo (lore: controle 86, por isso o teto é domável e não foge)
+    rec: { climb: 0.034, drift: 0.011, jitter: 0.0035, ramp: 5, max: 0.12, recovHeld: 1.7, recov: 11, bloom: 0.0016, bloomMax: 0.018, vmKick: 0.06 } },
   { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true,
-    // coice pesado de ferrolho: um soco grande por tiro, recuperação lenta —
-    // cada disparo é um evento (ramp 0 = sem comportamento de rajada)
-    rec: { climb: 0.054, drift: 0, jitter: 0.007, ramp: 0, recov: 7, bloom: 0, bloomMax: 0, vmKick: 0.12, shake: 0.035 } },
+    // coice pesado de ferrolho: um soco grande e imediato por tiro, que some
+    // devagar — cada disparo é um evento (ramp 0 = sem comportamento de rajada)
+    rec: { climb: 0.095, drift: 0, jitter: 0.008, ramp: 0, max: 0.16, recovHeld: 3.2, recov: 6, bloom: 0, bloomMax: 0, vmKick: 0.13, shake: 0.045 } },
   // Faca: arma de oportunidade. Curtíssimo alcance, alto risco/recompensa.
   { name: 'PRESA-7', melee: true, sniper: false, auto: false,
     light: { dmg: 55, range: 2.5, arc: 0.62, cd: 0.5,  wind: 0.1,  lunge: 3.6, kick: 0.05 },   // arc = cos do meio-ângulo do cone
@@ -1439,7 +1442,7 @@ function tryFire() {
   // recuo com personalidade: sobe mais nos primeiros tiros; na rajada longa
   // assenta na vertical e passa a derivar de leve pro lado (padrão + jitter)
   const deep = rc && rc.ramp > 0 ? Math.min(1, sprayN / rc.ramp) : 0;
-  recoil += rc ? rc.climb * (1 - 0.35 * deep) : w.kick;
+  recoil = rc ? Math.min(rc.max, recoil + rc.climb * (1 - 0.35 * deep)) : recoil + w.kick;
   if (rc) {
     recoilY += rc.drift * deep * Math.sin(sprayN * 0.65) + (Math.random() - 0.5) * rc.jitter;
     if (rc.shake) camShake = Math.min(camShake + rc.shake, 0.09);
@@ -3379,8 +3382,13 @@ function frame() {
 
     // câmera (+ tremor curto de impacto da faca)
     camera.position.set(me.pos.x, me.pos.y + me.eyeH, me.pos.z);
-    // recuperação do recuo no ritmo da arma em mãos (FALCÃO volta rápido, FERRÃO demora)
-    const recov = WEAPONS[curW].rec ? WEAPONS[curW].rec.recov : 12;
+    // recuperação do recuo: enquanto a rajada segue, decai devagar (o recuo
+    // sobe e fica visível); ao soltar o gatilho, decai rápido (a mira "cai"
+    // de volta pro centro). Sem isso o recuo nunca se acumula o bastante
+    // pra ser percebido — decaía quase por inteiro entre um tiro e outro.
+    const curRec = WEAPONS[curW].rec;
+    const stillFiring = curRec && (performance.now() / 1000 - lastShot) < WEAPONS[curW].int * 1.6;
+    const recov = curRec ? (stillFiring ? curRec.recovHeld : curRec.recov) : 12;
     recoil *= Math.exp(-recov * dt);
     recoilY *= Math.exp(-recov * dt);
     camShake *= Math.exp(-16 * dt);
