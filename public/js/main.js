@@ -3190,6 +3190,19 @@ if (new URLSearchParams(location.search).has('armory')) {
   addEventListener('load', () => showScreen('armory'));
 }
 
+// atalho de demonstração: ?test&smokedemo entra na partida e lança uma fumaça
+// pra frente automaticamente (útil pra ver/rever a nuvem)
+if (new URLSearchParams(location.search).has('smokedemo')) {
+  let thrown = false;
+  const iv = setInterval(() => {
+    if (thrown || !playing || me.dead) return;
+    thrown = true; clearInterval(iv);
+    me.pitch = 0.06;
+    startNadeCook('smoke');
+    setTimeout(() => releaseNadeThrow(), 60);
+  }, 200);
+}
+
 // ---------------- Loop ----------------
 let vmKick = 0, bobT = 0;
 const clock = new THREE.Clock();
