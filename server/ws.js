@@ -80,7 +80,7 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false, r
   if (room.settings.gm === 'tdm' && attacker !== victim && attacker.team === victim.team) return;
   victim.hp -= dmg;
   if (victim.hp > 0) {
-    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id, h: head, bs, w: wi });
+    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id, h: head, bs, w: wi, dmg });
     return;
   }
   victim.hp = 0;
@@ -97,7 +97,7 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false, r
       }
     }
   }
-  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head, bs, w: wi });
+  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head, bs, w: wi, dmg });
   broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi, bs });
 
   if (attacker !== victim && attacker.accountId) {

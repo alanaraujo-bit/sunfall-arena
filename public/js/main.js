@@ -904,6 +904,8 @@ function updateEffects(dt) {
         e.obj.geometry.dispose(); e.obj.material.dispose(); // geometria/material únicos por explosão
       } else if (e.kind === 'nadeflash') {
         e.obj.material.dispose(); // sprite: geometria é compartilhada internamente pelo THREE, não descartar
+      } else if (e.kind === 'dmgnum') {
+        e.obj.material.map.dispose(); e.obj.material.dispose(); // canvas único por número, não é compartilhado
       }
       // shared materials are NOT disposed — they're reused
       effects.splice(i, 1);
@@ -920,8 +922,52 @@ function updateEffects(dt) {
       const scale = 1 + t * (NADE.DMG_RADIUS * 2.2);
       e.obj.scale.set(scale, scale, scale);
       e.obj.material.opacity = (1 - t) * 0.8;
+    } else if (e.kind === 'dmgnum') {
+      // sobe e desacelera; só desvanece no terço final de vida (fica legível)
+      e.obj.position.addScaledVector(e.vel, dt);
+      e.vel.y *= Math.exp(-3 * dt);
+      const t = e.ttl / e.life;
+      e.obj.material.opacity = t > 0.35 ? 1 : t / 0.35;
     }
   }
+}
+
+// ---------------- Números de dano flutuantes ----------------
+// Um canvas por número (o texto muda a cada acerto, não dá pra cachear como
+// as nametags) — mas só nasce quando VOCÊ acerta alguém, então o volume é
+// baixo. Amarelo no corpo, vermelho na cabeça/pelas costas (estilo Free Fire).
+function makeDamageNumberSprite(amount, headshot, backstab) {
+  const sz = 128;
+  const c = document.createElement('canvas');
+  c.width = sz; c.height = sz >> 1;
+  const ctx = c.getContext('2d');
+  const big = headshot || backstab;
+  ctx.font = `900 ${big ? 58 : 42}px "Trebuchet MS", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(20,10,6,0.9)';
+  const label = String(amount);
+  ctx.strokeText(label, sz >> 1, c.height >> 1);
+  ctx.fillStyle = backstab ? '#ff2d2d' : headshot ? '#ff3b30' : '#ffd23b';
+  ctx.fillText(label, sz >> 1, c.height >> 1);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }));
+  const w = big ? 1.05 : 0.8;
+  s.scale.set(w, w * 0.5, 1);
+  s.renderOrder = 999;
+  return s;
+}
+
+const _dmgNumPos = new THREE.Vector3();
+function spawnDamageNumber(pos, amount, headshot, backstab) {
+  if (settings.particles === 'off') return;
+  const s = makeDamageNumberSprite(amount, headshot, backstab);
+  s.position.copy(pos);
+  s.position.x += (Math.random() - 0.5) * 0.4;
+  scene.add(s);
+  effects.push({ obj: s, ttl: 0.75, life: 0.75, kind: 'dmgnum', vel: new THREE.Vector3(0, 1.7, 0) });
 }
 
 // ---------------- Nametags ----------------
@@ -2705,7 +2751,7 @@ net.on('dmg', msg => {
     const r = remotes.get(msg.id);
     if (r) r.hp = msg.hp;
   }
-  // confirmação do servidor de que MEU ataque acertou → hitmarker/som
+  // confirmação do servidor de que MEU ataque acertou → hitmarker/som/número
   if (msg.by === me.id && msg.id !== me.id) {
     const knifeHit = curW === KNIFE || (melee.active && melee.quick);
     showHitmarker(!!msg.h || !!msg.bs);
@@ -2714,6 +2760,14 @@ net.on('dmg', msg => {
     else if (msg.w === 3) SFX.nadeHit();
     else if (knifeHit) SFX.knifeHit();
     else SFX.hit();
+    const rv = remotes.get(msg.id);
+    if (rv && typeof msg.dmg === 'number') {
+      const y = rv.model.position.y + ((msg.h || msg.bs) ? PLAYER.HEAD_Y : PLAYER.BODY_H * 0.62);
+      spawnDamageNumber(
+        _dmgNumPos.set(rv.model.position.x, y, rv.model.position.z),
+        msg.dmg, !!msg.h, !!msg.bs
+      );
+    }
   }
 });
 // golpe de faca de um inimigo próximo → som do corte no ar
