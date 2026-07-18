@@ -5,13 +5,21 @@
 // ============================================================
 import * as THREE from 'three';
 
-// RNG determinístico — todos os clientes veem a mesma pintura
+// RNG determinístico — todos os clientes veem a mesma pintura.
+// Semente POR TEXTURA (nome+tamanho): o resultado não depende da ordem em
+// que as texturas são pintadas (ex.: entrar no Ocaso antes do Cânion).
 let _s = 987654321;
 function R() {
   _s ^= _s << 13; _s ^= _s >>> 17; _s ^= _s << 5; _s >>>= 0;
   return _s / 4294967296;
 }
 const rr = (a, b) => a + R() * (b - a);
+function seedFor(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  h >>>= 0;
+  return h || 987654321;
+}
 
 function hexA(hex, a) {
   const v = Math.round(a * 255).toString(16).padStart(2, '0');
@@ -493,6 +501,243 @@ const PAINTERS = {
     }
     blotches(ctx, s, 12, ['#e0d0b0', '#8a7458'], 0.06, 0.2, 0.08, 0.18);
     speckle(ctx, s, 40, ['#8a7458'], 3, 0.25);
+  },
+
+  // ============ MATERIAIS V2 (Ocaso) ============
+
+  // arenito aparelhado: silhares em fiadas desencontradas, junta escura
+  // funda, quina lascada, mancha de tempo — juntas escuras viram sulcos
+  // no normal map derivado.
+  sandstone(ctx, s) {
+    ctx.fillStyle = '#63492e'; ctx.fillRect(0, 0, s, s);   // argamassa (funda)
+    const rows = 4, bh = s / rows;
+    const tints = ['#d8bd92', '#c4a273', '#cfae80', '#bd9a6b', '#d3b489'];
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * (s / 6);
+      const bw = s / 3.2;
+      for (let cx = -bw; cx < s + bw; cx += bw) {
+        const x = cx + off + rr(-2, 2), y = r * bh + rr(-1.5, 1.5);
+        const col = tints[(R() * tints.length) | 0];
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.roundRect(x + 3, y + 3, bw - 6, bh - 6, 4);
+        ctx.fill();
+        // topo iluminado + base sombreada (volume)
+        ctx.strokeStyle = hexA('#f0e0b8', 0.55); ctx.lineWidth = 2;
+        wobbly(ctx, x + 6, y + 6, x + bw - 8, y + 6, 5, 1.2);
+        ctx.strokeStyle = hexA('#4e3a22', 0.55);
+        wobbly(ctx, x + 6, y + bh - 7, x + bw - 8, y + bh - 7, 5, 1.2);
+        // quina lascada de vez em quando
+        if (R() < 0.35) {
+          const chipX = R() < 0.5 ? x + 3 : x + bw - 12, chipY = R() < 0.5 ? y + 3 : y + bh - 12;
+          ctx.fillStyle = hexA('#ecd9ae', 0.8);
+          ctx.beginPath();
+          ctx.moveTo(chipX, chipY + 9); ctx.lineTo(chipX + rr(6, 10), chipY); ctx.lineTo(chipX + 9, chipY + 9);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+    blotches(ctx, s, 12, ['#e8d5a8', '#5e492e', '#8a6b44'], 0.05, 0.16, 0.08, 0.16);
+    speckle(ctx, s, 50, ['#6a5236', '#e8d8b0'], 2.5, 0.3);
+  },
+
+  // reboco envelhecido: creme manchado com REMENDOS caídos expondo tijolo
+  // (estilo HL2), rachaduras e rodapé terracota gasto na base.
+  plasterOld(ctx, s) {
+    ctx.fillStyle = '#e9dabc'; ctx.fillRect(0, 0, s, s);
+    blotches(ctx, s, 20, ['#f4e8cc', '#d4c09a', '#dcc9a4'], 0.1, 0.32, 0.12, 0.26);
+    strokes(ctx, s, 35, '#c2ac84', 0.08);
+    // remendos de reboco caído com tijolo exposto (mais perto da base)
+    const patches = 3 + (R() * 2 | 0);
+    for (let p = 0; p < patches; p++) {
+      const px = R() * s, py = s * rr(0.35, 0.85), prx = s * rr(0.06, 0.14), pry = prx * rr(0.55, 0.9);
+      ctx.save();
+      ctx.beginPath();
+      // contorno irregular do buraco
+      for (let a = 0; a <= 12; a++) {
+        const ang = (a / 12) * Math.PI * 2;
+        const rad = (a % 2 ? 1 : rr(0.75, 1)) * (ang < Math.PI ? prx : prx * 0.9);
+        const xx = px + Math.cos(ang) * rad, yy = py + Math.sin(ang) * pry / prx * rad;
+        a === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+      }
+      ctx.closePath();
+      // sombra do reboco em volta do buraco
+      ctx.strokeStyle = hexA('#8a7050', 0.7); ctx.lineWidth = 4; ctx.stroke();
+      ctx.clip();
+      ctx.fillStyle = '#8e5a3a';
+      ctx.fillRect(px - prx * 1.2, py - pry * 1.3, prx * 2.4, pry * 2.6);
+      // tijolinhos dentro do remendo
+      const bh2 = Math.max(7, s * 0.028);
+      for (let ry = py - pry * 1.3, rowi = 0; ry < py + pry * 1.3; ry += bh2, rowi++) {
+        ctx.fillStyle = hexA(rowi % 2 ? '#a5654a' : '#b0714e', 0.95);
+        for (let rx = px - prx * 1.3 + (rowi % 2) * bh2; rx < px + prx * 1.3; rx += bh2 * 2.1) {
+          ctx.fillRect(rx, ry, bh2 * 1.9, bh2 - 2);
+        }
+      }
+      ctx.restore();
+    }
+    // rachaduras saindo dos remendos
+    ctx.strokeStyle = hexA('#8a6a48', 0.4); ctx.lineWidth = 1.4;
+    for (let i = 0; i < 4; i++)
+      wobbly(ctx, R() * s, R() * s * 0.6, R() * s, R() * s * 0.5 + s * 0.3, 7, s * 0.02);
+    // rodapé terracota com topo gasto
+    const bandY = s * 0.82;
+    ctx.fillStyle = hexA('#c9714c', 0.92);
+    ctx.beginPath();
+    ctx.moveTo(0, s); ctx.lineTo(0, bandY);
+    for (let x = 0; x <= s; x += s / 14) ctx.lineTo(x, bandY + rr(-5, 5));
+    ctx.lineTo(s, s); ctx.closePath(); ctx.fill();
+    blotches(ctx, s, 7, ['#e08a60', '#9c4f32'], 0.04, 0.12, 0.15, 0.3);
+    edgeAO(ctx, s, 0.15);
+  },
+
+  // telha de barro capa-e-canal: colunas com gradiente de curvatura,
+  // fiadas com sombra de encaixe, variação de queima e poeira.
+  roofTile(ctx, s) {
+    const cols = 6, cw = s / cols, rows = 5, rh = s / rows;
+    for (let c = 0; c < cols; c++) {
+      const hot = rr(-14, 14);
+      const g = ctx.createLinearGradient(c * cw, 0, (c + 1) * cw, 0);
+      g.addColorStop(0, `rgb(${110 + hot},${58 + hot * 0.5},${38})`);
+      g.addColorStop(0.5, `rgb(${188 + hot},${106 + hot * 0.6},${66})`);
+      g.addColorStop(1, `rgb(${104 + hot},${54 + hot * 0.5},${36})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(c * cw, 0, cw, s);
+    }
+    // fiadas: sombra do encaixe + leve highlight abaixo
+    for (let r = 1; r <= rows; r++) {
+      const y = r * rh;
+      ctx.fillStyle = hexA('#4e2a18', 0.55);
+      ctx.fillRect(0, y - 5, s, 5);
+      ctx.fillStyle = hexA('#e8a670', 0.35);
+      ctx.fillRect(0, y, s, 3);
+    }
+    // telha trincada/deslocada ocasional
+    for (let i = 0; i < 3; i++) {
+      const c = (R() * cols) | 0, r = (R() * rows) | 0;
+      ctx.fillStyle = hexA(R() < 0.5 ? '#8a4c30' : '#c98a58', 0.5);
+      ctx.fillRect(c * cw + 2, r * rh + 2, cw - 4, rh * 0.4);
+    }
+    speckle(ctx, s, 60, ['#e8c9a0', '#5e3520'], 2.5, 0.3);
+    blotches(ctx, s, 8, ['#d8956a', '#6e3d26'], 0.06, 0.18, 0.08, 0.18);
+  },
+
+  // calçamento: LAJÕES irregulares claros (flagstones), junta fina escura,
+  // leve rotação por pedra e polimento de tráfego.
+  cobble(ctx, s) {
+    ctx.fillStyle = '#8a7458'; ctx.fillRect(0, 0, s, s);   // junta
+    const n = 4, cs = s / n;
+    const tints = ['#cbb794', '#bda884', '#d3c1a0', '#b19c7a', '#c6b28e'];
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const cx2 = x * cs + cs / 2 + rr(-2.5, 2.5), cy2 = y * cs + cs / 2 + rr(-2.5, 2.5);
+      const w2 = cs * rr(0.82, 0.94), h2 = cs * rr(0.8, 0.92);
+      ctx.save();
+      ctx.translate(cx2, cy2);
+      ctx.rotate(rr(-0.06, 0.06));
+      ctx.fillStyle = tints[(R() * tints.length) | 0];
+      ctx.beginPath();
+      ctx.roundRect(-w2 / 2, -h2 / 2, w2, h2, cs * 0.14);
+      ctx.fill();
+      // canto superior sutilmente iluminado, base sombreada (bem discreto)
+      ctx.strokeStyle = hexA('#e8dcc0', 0.28); ctx.lineWidth = 2;
+      wobbly(ctx, -w2 / 2 + 4, -h2 / 2 + 4, w2 / 2 - 4, -h2 / 2 + 4, 4, 1);
+      ctx.strokeStyle = hexA('#5e4c34', 0.3);
+      wobbly(ctx, -w2 / 2 + 4, h2 / 2 - 4, w2 / 2 - 4, h2 / 2 - 4, 4, 1);
+      ctx.restore();
+    }
+    // polimento de tráfego (centro mais claro)
+    const g = ctx.createRadialGradient(s / 2, s / 2, s * 0.1, s / 2, s / 2, s * 0.7);
+    g.addColorStop(0, hexA('#e8d8b4', 0.14));
+    g.addColorStop(1, hexA('#e8d8b4', 0));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+    blotches(ctx, s, 10, ['#dcc9a4', '#7e6a4e'], 0.06, 0.18, 0.06, 0.14);
+    speckle(ctx, s, 40, ['#6e5c42', '#dccaa6'], 2.5, 0.25);
+  },
+
+  // pedra clara do Templo: silhares grandes, junta fina, friso entalhado
+  // na fiada do meio.
+  templeStone(ctx, s) {
+    ctx.fillStyle = '#a89272'; ctx.fillRect(0, 0, s, s);
+    const rows = 3, bh = s / rows;
+    const tints = ['#eee1c2', '#e6d6b4', '#f2e7ca', '#e9dcbc'];
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * (s / 4), bw = s / 2;
+      for (let cx = -bw; cx < s + bw; cx += bw) {
+        ctx.fillStyle = tints[(R() * tints.length) | 0];
+        ctx.beginPath();
+        ctx.roundRect(cx + off + 2, r * bh + 2, bw - 4, bh - 4, 3);
+        ctx.fill();
+      }
+    }
+    // friso entalhado (sulco duplo) na fiada central
+    const fy = s * 0.5;
+    ctx.strokeStyle = hexA('#8a744f', 0.6); ctx.lineWidth = 3;
+    wobbly(ctx, 0, fy - s * 0.04, s, fy - s * 0.04, 8, 1);
+    wobbly(ctx, 0, fy + s * 0.04, s, fy + s * 0.04, 8, 1);
+    ctx.strokeStyle = hexA('#f6ecd2', 0.5); ctx.lineWidth = 1.6;
+    wobbly(ctx, 0, fy - s * 0.04 + 3, s, fy - s * 0.04 + 3, 8, 1);
+    blotches(ctx, s, 10, ['#f6ecd2', '#9c8862'], 0.06, 0.2, 0.06, 0.14);
+    speckle(ctx, s, 30, ['#9c8862'], 2, 0.2);
+  },
+
+  // ============ DECALQUES (alfa) ============
+
+  // areia acumulada na base de paredes (metade de baixo, borda ondulada)
+  sandDrift(ctx, s) {
+    ctx.clearRect(0, 0, s, s);
+    const g = ctx.createLinearGradient(0, s * 0.3, 0, s);
+    g.addColorStop(0, hexA('#dfb789', 0));
+    g.addColorStop(0.5, hexA('#dfb789', 0.75));
+    g.addColorStop(1, hexA('#d8ad7c', 0.95));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, s);
+    ctx.lineTo(0, s * 0.62);
+    for (let x = 0; x <= s; x += s / 9) ctx.lineTo(x, s * 0.62 + rr(-s * 0.16, s * 0.1));
+    ctx.lineTo(s, s); ctx.closePath(); ctx.fill();
+    speckle(ctx, s, 40, ['#c09068', '#f2dcb4'], 2.5, 0.4);
+  },
+
+  // escorrido de umidade (listras verticais que somem)
+  dampStreak(ctx, s) {
+    ctx.clearRect(0, 0, s, s);
+    for (let i = 0; i < 7; i++) {
+      const x = rr(s * 0.08, s * 0.92), w = rr(3, 10), len = rr(s * 0.4, s * 0.95);
+      const g = ctx.createLinearGradient(0, 0, 0, len);
+      g.addColorStop(0, hexA('#3e3222', rr(0.3, 0.5)));
+      g.addColorStop(1, hexA('#3e3222', 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x - w / 2, 0, w, len);
+    }
+  },
+
+  // fuligem (mancha radial escura irregular)
+  soot(ctx, s) {
+    ctx.clearRect(0, 0, s, s);
+    for (let i = 0; i < 5; i++) {
+      const bx = s / 2 + rr(-s * 0.14, s * 0.14), by = s * rr(0.3, 0.6);
+      const br = s * rr(0.2, 0.38);
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+      g.addColorStop(0, hexA('#1c140c', 0.5));
+      g.addColorStop(1, hexA('#1c140c', 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, s, s);
+    }
+  },
+
+  // trilha de carroça (faixa horizontal gasta, com falhas)
+  wearLine(ctx, s) {
+    ctx.clearRect(0, 0, s, s);
+    for (let seg = 0; seg < 6; seg++) {
+      const x0 = (seg / 6) * s, x1 = ((seg + 1) / 6) * s;
+      if (R() < 0.18) continue;   // falha na trilha
+      const g = ctx.createLinearGradient(0, s * 0.25, 0, s * 0.75);
+      g.addColorStop(0, hexA('#4a3a26', 0));
+      g.addColorStop(0.5, hexA('#4a3a26', rr(0.3, 0.45)));
+      g.addColorStop(1, hexA('#4a3a26', 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, s * 0.25 + rr(-6, 6), x1 - x0, s * 0.5);
+    }
   }
 };
 
@@ -509,16 +754,95 @@ export function setTexQuality(quality) {
   else { _texSize = 512; _aniso = 8; }
 }
 
+// canvases pintados por chave — fonte do texNormal/texRough (o mapa de
+// relevo tem que casar PIXEL A PIXEL com a pintura de cor)
+const canvases = new Map();
+
 export function tex(name, size) {
   const s = size || _texSize;
   const key = name + s;
   if (cache.has(key)) return cache.get(key);
   const [c, ctx] = canvas(s);
+  _s = seedFor(key);
   PAINTERS[name](ctx, s);
+  canvases.set(key, c);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = _aniso;
+  cache.set(key, t);
+  return t;
+}
+
+// Luminância (0..1) do canvas pintado, ponderada pelo alfa
+function lumOf(key, s) {
+  const src = canvases.get(key);
+  if (!src) return null;
+  const img = src.getContext('2d').getImageData(0, 0, s, s).data;
+  const lum = new Float32Array(s * s);
+  for (let i = 0; i < s * s; i++) {
+    lum[i] = ((img[i * 4] * 0.299 + img[i * 4 + 1] * 0.587 + img[i * 4 + 2] * 0.114) / 255) * (img[i * 4 + 3] / 255);
+  }
+  return lum;
+}
+
+// ---- MATERIAIS V2: normal map derivado da própria pintura (Sobel na
+// luminância — juntas escuras viram sulcos, pedras claras viram relevo).
+// Devolve null em qualidade baixa (economia de GPU fraca).
+export function texNormal(name, strength = 0.8, size) {
+  const s = size || _texSize;
+  if (_texSize <= 256) return null;
+  const key = 'nrm:' + name + s + ':' + strength;
+  if (cache.has(key)) return cache.get(key);
+  tex(name, s);                      // garante o canvas de cor pintado
+  const lum = lumOf(name + s, s);
+  if (!lum) return null;
+  const [c, ctx] = canvas(s);
+  const out = ctx.createImageData(s, s);
+  const k = strength * 5;
+  const at = (x, y) => lum[((y + s) % s) * s + ((x + s) % s)];
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const dx = at(x + 1, y) - at(x - 1, y);
+      const dy = at(x, y + 1) - at(x, y - 1);
+      const nx = -dx * k, ny = dy * k;
+      const inv = 1 / Math.sqrt(nx * nx + ny * ny + 1);
+      const o = (y * s + x) * 4;
+      out.data[o] = (nx * inv * 0.5 + 0.5) * 255;
+      out.data[o + 1] = (ny * inv * 0.5 + 0.5) * 255;
+      out.data[o + 2] = (inv * 0.5 + 0.5) * 255;
+      out.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  const t = new THREE.CanvasTexture(c);   // linear (sem SRGB): mapa de dados
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = _aniso;
+  cache.set(key, t);
+  return t;
+}
+
+// Roughness map da mesma pintura: áreas claras (pedra polida/gasta) ficam
+// um pouco menos ásperas. `base` é o nível médio, `amp` a variação.
+export function texRough(name, base = 0.9, amp = 0.25, size) {
+  const s = size || _texSize;
+  if (_texSize <= 256) return null;
+  const key = 'rgh:' + name + s + ':' + base + ':' + amp;
+  if (cache.has(key)) return cache.get(key);
+  tex(name, s);
+  const lum = lumOf(name + s, s);
+  if (!lum) return null;
+  const [c, ctx] = canvas(s);
+  const out = ctx.createImageData(s, s);
+  for (let i = 0; i < s * s; i++) {
+    const v = Math.max(0, Math.min(1, base + (0.5 - lum[i]) * amp)) * 255;
+    const o = i * 4;
+    out.data[o] = out.data[o + 1] = out.data[o + 2] = v;
+    out.data[o + 3] = 255;
+  }
+  ctx.putImageData(out, 0, 0);
+  const t = new THREE.CanvasTexture(c);   // linear
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
   cache.set(key, t);
   return t;
 }

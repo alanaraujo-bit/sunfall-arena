@@ -12,7 +12,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { BARREL_W, BARREL_H } from '/shared/mapdata.js';
-import { tex, skyTex } from './textures.js';
+import { tex, texNormal, texRough, skyTex } from './textures.js';
 import { mergeStatics, makeBarrel, makeBarrelWreck, scaleUV, jitterGeo } from './world.js';
 
 const TEAL = 0x3fc8b4;
@@ -31,16 +31,50 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     if (!m) { m = make(); mats.set(key, m); }
     return m;
   }
-  const mat = name => cmat('t:' + name, () => new THREE.MeshStandardMaterial({
-    map: tex(name), roughness: 0.95, metalness: 0
-  }));
+
+  // MATERIAIS V2: cada nome de colisor mapeia um painter (Ocaso usa o set
+  // novo: arenito, reboco velho, telha…) + normal map (Sobel da pintura)
+  // + roughness map. Em qualidade baixa texNormal/texRough devolvem null
+  // e o material cai no comportamento simples.
+  const V2 = {
+    stone: { t: 'sandstone', n: 0.9, rb: 0.92, ra: 0.25 },
+    stone2: { t: 'sandstone', tint: 0xbfae92, n: 0.9, rb: 0.93, ra: 0.2 },
+    plaster: { t: 'plasterOld', n: 0.55, rb: 0.9, ra: 0.2 },
+    wood: { t: 'wood', n: 0.5, rb: 0.87, ra: 0.2 },
+    wood2: { t: 'wood2', n: 0.5, rb: 0.88, ra: 0.2 },
+    crate: { t: 'crate', n: 0.6, rb: 0.87, ra: 0.2 }
+  };
+  function mat(name) {
+    const cfg = V2[name] || { t: name, n: 0.6, rb: 0.92, ra: 0.15 };
+    return cmat('t:' + name, () => {
+      const m = new THREE.MeshStandardMaterial({
+        map: tex(cfg.t), metalness: 0, color: cfg.tint ?? 0xffffff
+      });
+      const nm = texNormal(cfg.t, cfg.n);
+      if (nm) m.normalMap = nm;
+      const rm = texRough(cfg.t, cfg.rb, cfg.ra);
+      if (rm) { m.roughnessMap = rm; m.roughness = 1; } else m.roughness = cfg.rb;
+      return m;
+    });
+  }
   const flat = (key, color, extra = {}) => cmat('f:' + key, () => new THREE.MeshStandardMaterial({
     color, roughness: 0.9, ...extra
   }));
-  const rockM = () => cmat('rock-flat', () => new THREE.MeshStandardMaterial({
-    map: tex('rock'), roughness: 1, flatShading: true
-  }));
-  const roofM = () => flat('roof', 0xa85a3a, { roughness: 0.85, flatShading: true });
+  const rockM = () => cmat('rock-flat', () => {
+    const m = new THREE.MeshStandardMaterial({ map: tex('rock'), roughness: 1, flatShading: true });
+    const nm = texNormal('rock', 0.7);
+    if (nm) m.normalMap = nm;
+    return m;
+  });
+  const roofM = () => cmat('roof', () => {
+    const m = new THREE.MeshStandardMaterial({ map: tex('roofTile'), metalness: 0 });
+    const nm = texNormal('roofTile', 0.9);
+    if (nm) m.normalMap = nm;
+    const rm = texRough('roofTile', 0.82, 0.2);
+    if (rm) { m.roughnessMap = rm; m.roughness = 1; } else m.roughness = 0.82;
+    return m;
+  });
+  const roofFlatM = () => flat('roofFlat', 0xa85a3a, { roughness: 0.85, flatShading: true });
 
   // mesh de caixa com UV proporcional, já no staticRoot.
   // plasterUV: reboco não repete na vertical (o rodapé terracota fica na base)
@@ -92,14 +126,28 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   staticRoot.add(ground);
 
   // pisos por zona (identidade de material — orientação sem minimapa)
-  // repeat PROPORCIONAL às dimensões (tile quadrado — sem esticar em "tábua")
-  function overlay(x1, z1, x2, z2, y, texName, tint, scale = 4.5) {
+  // repeat PROPORCIONAL às dimensões (tile quadrado — sem esticar em "tábua"),
+  // com normal/roughness (piso reage à luz rasante do poente)
+  function overlay(x1, z1, x2, z2, y, texName, tint, scale = 4.5, ns = 0.5) {
     const key = 'ov:' + texName + tint + ':' + (x2 - x1).toFixed(0) + 'x' + (z2 - z1).toFixed(0);
     const m = cmat(key, () => {
       const t = tex(texName).clone();
       t.needsUpdate = true;
       t.repeat.set((x2 - x1) / scale, (z2 - z1) / scale);
-      return new THREE.MeshStandardMaterial({ map: t, color: tint, roughness: 1 });
+      const mm = new THREE.MeshStandardMaterial({ map: t, color: tint, roughness: 1 });
+      const nm = texNormal(texName, ns);
+      if (nm) {
+        mm.normalMap = nm.clone();
+        mm.normalMap.needsUpdate = true;
+        mm.normalMap.repeat.copy(t.repeat);
+      }
+      const rm = texRough(texName, 0.9, 0.2);
+      if (rm) {
+        mm.roughnessMap = rm.clone();
+        mm.roughnessMap.needsUpdate = true;
+        mm.roughnessMap.repeat.copy(t.repeat);
+      }
+      return mm;
     });
     const p = new THREE.Mesh(new THREE.PlaneGeometry(x2 - x1, z2 - z1), m);
     p.rotation.x = -Math.PI / 2;
@@ -107,16 +155,16 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     p.receiveShadow = true;
     staticRoot.add(p);
   }
-  overlay(-38, 18, 34, 27, 0.02, 'plaza', 0xcdab7e, 5);            // rua do Mercado
-  overlay(-43, -15.9, 2.6, 9.9, 2.62, 'stone2', 0xdcc9a4, 4.5);    // Vila oeste
-  overlay(5.4, -15.9, 36.5, 9.9, 2.62, 'stone2', 0xdcc9a4, 4.5);   // Vila leste
-  overlay(2.7, -15.9, 5.3, -4.1, 2.62, 'stone2', 0xdcc9a4, 4.5);   // faixa do Beco
-  overlay(-43, -43.5, -36.5, -16.1, 5.22, 'plaza', 0xffedc2, 5.5); // Templo oeste
-  overlay(-27.3, -43.5, 43, -16.1, 5.22, 'plaza', 0xffedc2, 5.5);  // Templo leste
-  overlay(-36.3, -28.5, -33.7, -16.1, 5.22, 'plaza', 0xffedc2, 5.5); // teto do corredor da Mina
-  overlay(-36.3, -43.5, -27.5, -28.7, 5.22, 'plaza', 0xffedc2, 5.5); // bloco norte
-  overlay(-33.7, -25.9, -27.5, -16.1, 5.22, 'plaza', 0xffedc2, 5.5); // bloco sul da trincheira
-  overlay(-29.4, -28.5, -27.5, -26, 5.22, 'plaza', 0xffedc2, 2);     // patamar de saída da Mina
+  overlay(-38, 18, 34, 27, 0.02, 'cobble', 0xf2e2c4, 3.6);           // rua do Mercado
+  overlay(-43, -15.9, 2.6, 9.9, 2.62, 'sandstone', 0xd8c8a8, 4.5);   // Vila oeste
+  overlay(5.4, -15.9, 36.5, 9.9, 2.62, 'sandstone', 0xd8c8a8, 4.5);  // Vila leste
+  overlay(2.7, -15.9, 5.3, -4.1, 2.62, 'sandstone', 0xd8c8a8, 4.5);  // faixa do Beco
+  overlay(-43, -43.5, -36.5, -16.1, 5.22, 'templeStone', 0xfff2d2, 5.5); // Templo oeste
+  overlay(-27.3, -43.5, 43, -16.1, 5.22, 'templeStone', 0xfff2d2, 5.5);  // Templo leste
+  overlay(-36.3, -28.5, -33.7, -16.1, 5.22, 'templeStone', 0xfff2d2, 5.5); // teto do corredor
+  overlay(-36.3, -43.5, -27.5, -28.7, 5.22, 'templeStone', 0xfff2d2, 5.5); // bloco norte
+  overlay(-33.7, -25.9, -27.5, -16.1, 5.22, 'templeStone', 0xfff2d2, 5.5); // bloco sul da trincheira
+  overlay(-29.4, -28.5, -27.5, -26, 5.22, 'templeStone', 0xfff2d2, 2);     // patamar de saída
 
   // ---------------- Kit ----------------
 
@@ -129,7 +177,9 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     const ang = Math.atan2(pitch, half);
     const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
     for (const s of [-1, 1]) {
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(alongX ? L : slope, 0.1, alongX ? slope : L), mat_);
+      const pGeo = new THREE.BoxGeometry(alongX ? L : slope, 0.1, alongX ? slope : L);
+      scaleUV(pGeo, Math.max(1, (alongX ? L : slope) / 2.4), Math.max(1, (alongX ? slope : L) / 2.4));
+      const panel = new THREE.Mesh(pGeo, mat_);
       if (alongX) {
         panel.rotation.x = s * ang;
         panel.position.set(cx, topY + pitch / 2, cz + s * half / 2);
@@ -147,7 +197,8 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     tri.moveTo(-half + over, 0); tri.lineTo(half - over, 0); tri.lineTo(0, pitch); tri.closePath();
     const triGeo = new THREE.ExtrudeGeometry(tri, { depth: 0.12, bevelEnabled: false });
     for (const e of [-1, 1]) {
-      const emp = new THREE.Mesh(triGeo.clone(), mat('plaster'));
+      // material liso: UV de extrude vem em metros e estraga painter com remendo
+      const emp = new THREE.Mesh(triGeo.clone(), flat('empena', 0xe8dabc));
       if (alongX) {
         emp.rotation.y = Math.PI / 2;
         emp.position.set(e > 0 ? x2 - 0.01 : x1 - 0.11, topY, cz);
@@ -163,7 +214,9 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   function shedRoof(x1, z1, x2, z2, topY, pitch = 0.6, over = 0.35) {
     const w = x2 - x1 + over * 2, d = z2 - z1 + over * 2;
     const slope = Math.hypot(d, pitch);
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(w, 0.09, slope), roofM());
+    const sGeo = new THREE.BoxGeometry(w, 0.09, slope);
+    scaleUV(sGeo, Math.max(1, w / 2.4), Math.max(1, slope / 2.4));
+    const panel = new THREE.Mesh(sGeo, roofM());
     panel.rotation.x = Math.atan2(pitch, d);
     panel.position.set((x1 + x2) / 2, topY + pitch / 2, (z1 + z2) / 2);
     panel.castShadow = true;
@@ -513,7 +566,7 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     for (const [px, pz] of [[24.4, -37.8], [28, -37.8], [24.4, -34.2], [28, -34.2]]) {
       boxAt(px, 9.95 + 0.9, pz, 0.35, 1.8, 0.35, mat('wood2'));
     }
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.4, 4), roofM());
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.4, 4), roofFlatM());
     cap.position.set(26.2, 12.4, -36);
     cap.rotation.y = Math.PI / 4;
     cap.castShadow = true;
@@ -524,6 +577,61 @@ export function buildOcasoWorld(scene, map, opts = {}) {
       bell.position.set(26.2, 11.1, -36);
       staticRoot.add(bell);
     }
+  }
+
+  // ---------------- Decalques de desgaste (o que mata a cara de protótipo) ----------------
+  if (decor) {
+    function decalMat(name, rx = 1) {
+      return cmat('dc:' + name + rx, () => {
+        let t = tex(name);
+        if (rx !== 1) {
+          t = t.clone();
+          t.needsUpdate = true;
+          t.repeat.set(rx, 1);
+        }
+        return new THREE.MeshStandardMaterial({
+          map: t, transparent: true, depthWrite: false, roughness: 1,
+          polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+        });
+      });
+    }
+    const wallDecal = (name, w, h, x, y, z, ry, rx = 1) => {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), decalMat(name, rx));
+      p.position.set(x, y, z);
+      p.rotation.y = ry;
+      staticRoot.add(p);
+    };
+    const floorDecal = (name, w, d, x, z, y, rx = 1) => {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), decalMat(name, rx));
+      p.rotation.x = -Math.PI / 2;
+      p.position.set(x, y, z);
+      staticRoot.add(p);
+    };
+
+    // trilhas de carroça na rua (entram pelo Portão)
+    floorDecal('wearLine', 62, 1.0, -4, 21.3, 0.045, 8);
+    floorDecal('wearLine', 62, 1.0, -4, 23.9, 0.045, 8);
+
+    // areia acumulada nas bases (paredes viradas pro vento oeste/norte)
+    wallDecal('sandDrift', 8, 1.1, -25, 0.55, 27.96, Math.PI);      // casa A
+    wallDecal('sandDrift', 9, 1.1, -6, 0.55, 28.96, Math.PI);       // casa B
+    wallDecal('sandDrift', 8, 1.1, 14, 0.55, 27.96, Math.PI);       // casa C
+    wallDecal('sandDrift', 7, 1.0, -34, 0.5, 9.96, 0);              // face da Vila oeste
+    wallDecal('sandDrift', 6, 1.0, -20, 0.5, 9.96, 0);
+    wallDecal('sandDrift', 8, 1.0, 28, 0.5, 9.96, 0);               // face da Vila leste
+    wallDecal('sandDrift', 9, 1.0, -8, 3.15, -16.04, 0);            // face do Templo
+    wallDecal('sandDrift', 8, 1.0, 20, 3.15, -16.04, 0);
+    wallDecal('sandDrift', 1.9, 0.8, -38.77, 0.4, 18.5, Math.PI / 2); // pilar do Portão
+    wallDecal('sandDrift', 1.9, 0.8, -38.77, 0.4, 26.5, Math.PI / 2);
+
+    // escorrido de umidade: face leste do Aqueduto (o canal respinga)
+    wallDecal('dampStreak', 3.4, 2.8, 41.34, 3.6, -10, Math.PI / 2);
+    wallDecal('dampStreak', 3.4, 2.8, 41.34, 3.6, -2, Math.PI / 2);
+    wallDecal('dampStreak', 2.4, 0.85, 0, 3.05, -4.66, 0);          // cisterna
+
+    // fuligem da forja (parede interna + chaminé)
+    wallDecal('soot', 1.7, 1.7, -8.53, 2.1, 11.3, -Math.PI / 2);
+    wallDecal('soot', 0.9, 1.1, -9.25, 6.5, 11.78, 0);
   }
 
   // ---------------- Barris ----------------
