@@ -3204,9 +3204,9 @@ if (SMOKEDEMO) {
   const iv = setInterval(() => {
     if (thrown || !playing || me.dead) return;
     thrown = true; clearInterval(iv);
-    me.pitch = -0.14;                 // mira levemente pra cima → arco mais longo
+    me.pitch = 0.05;                  // levemente pra baixo → cai no aberto à frente
     startNadeCook('smoke');
-    setTimeout(() => releaseNadeThrow(), 950);   // carrega força quase máxima
+    setTimeout(() => releaseNadeThrow(), 380);   // força média
   }, 200);
 }
 
