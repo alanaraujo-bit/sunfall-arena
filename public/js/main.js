@@ -3200,13 +3200,17 @@ if (SMOKEDEMO) {
     hud.nameInput.value = 'Demo';
     sendPlay({ t: 'play', mode: 'create', gm: 'ffa', bots: 0, kl: 30, tl: 10 });
   });
-  let thrown = false;
+  let done = false;
   const iv = setInterval(() => {
-    if (thrown || !playing || me.dead) return;
-    thrown = true; clearInterval(iv);
-    me.pitch = 0.05;                  // levemente pra baixo → cai no aberto à frente
-    startNadeCook('smoke');
-    setTimeout(() => releaseNadeThrow(), 380);   // força média
+    if (done || !playing || me.dead) return;
+    done = true; clearInterval(iv);
+    // materializa uma nuvem determinística ~7m à frente, no aberto, e olha
+    // pra ela — enquadramento confiável (a física do arremesso é validada à
+    // parte no smoke test de produção)
+    const fx = -Math.sin(me.yaw), fz = -Math.cos(me.yaw);
+    const c = new THREE.Vector3(me.pos.x + fx * 7, 1.2, me.pos.z + fz * 7);
+    me.pitch = 0.12;
+    spawnSmokeCloud('demo', c, SMOKE_LIFE_MS);
   }, 200);
 }
 
