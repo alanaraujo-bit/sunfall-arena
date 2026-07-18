@@ -421,9 +421,16 @@ export function buildWorld(scene, opts = {}) {
   const barrels = BARRELS.map(b => {
     const intact = makeBarrel(barrelDims);
     const wreck = makeBarrelWreck(barrelDims);
+    // wreck.position compensa: makeBarrelWreck() assume origem no CHÃO
+    // (destroço baixo, perto de y=0), enquanto makeBarrel() assume origem no
+    // CENTRO do barril (corpo de -h/2 a +h/2) — o grupo abaixo usa a
+    // convenção do intacto, então o destroço precisa descer de volta ao chão
+    wreck.position.y = -BARREL_H / 2;
     wreck.visible = false;
     const grp = new THREE.Group();
-    grp.position.set(b.x, 0, b.z);
+    // sem levantar o grupo pra h/2, metade do barril intacto fica enterrada
+    // no chão (quase invisível, fácil de não notar — foi o bug reportado)
+    grp.position.set(b.x, BARREL_H / 2, b.z);
     grp.add(intact, wreck);
     liveRoot.add(grp);
     return { id: b.id, group: grp, intact, wreck, alive: true };
