@@ -44,38 +44,52 @@ R(-47, 34, -39, 42, 0, 14, 'cliff');
 R(39, 34, 47, 42, 0, 14, 'cliff');
 
 // ================= MERCADO (y=0, z 10..44) =================
-// Portão da Vila (oeste): pilares + verga (passa-se por baixo, vão livre 3,4m)
+// Portão da Vila (oeste): pilares + verga (passa-se por baixo, vão livre 3,4m
+// no centro; 2,7m junto aos pilares por causa das enxilharias do arco)
 R(-44, 17.6, -40.6, 19.4, 0, 4.6, 'stone');
 R(-44, 25.6, -40.6, 27.4, 0, 4.6, 'stone');
 R(-40.6, 17.6, -38.8, 19.4, 0, 4.6, 'stone');
 R(-40.6, 25.6, -38.8, 27.4, 0, 4.6, 'stone');
 R(-40.6, 17.6, -38.8, 27.4, 3.4, 1.2, 'stone');   // verga
+R(-40.6, 19.4, -38.8, 20.6, 2.7, 0.7, 'stone');   // enxilharia norte (canto do arco)
+R(-40.6, 24.4, -38.8, 25.6, 2.7, 0.7, 'stone');   // enxilharia sul
 
-// Bancas do mercado (balcão + 2 postes + coberta) — quebram a linha da rua
-function banca(cx, cz) {
+// Bancas do mercado (balcão + 2 postes + coberta) — quebram a linha da rua.
+// Posições exportadas: o cliente decora (toldo listrado, mercadoria).
+export const BANCAS = [[-14, 21], [-4, 24.5], [6, 21], [16, 24]];
+for (const [cx, cz] of BANCAS) {
   R(cx - 1.2, cz - 0.65, cx + 1.2, cz + 0.65, 0, 1.05, 'wood');            // balcão
   R(cx - 1.5, cz - 0.85, cx - 1.32, cz - 0.67, 0, 2.05, 'wood2');          // poste
   R(cx + 1.32, cz + 0.67, cx + 1.5, cz + 0.85, 0, 2.05, 'wood2');          // poste
   R(cx - 1.6, cz - 1.0, cx + 1.6, cz + 1.0, 2.05, 0.15, 'wood2');          // coberta
 }
-banca(-14, 21);
-banca(-4, 24.5);
-banca(6, 21);
-banca(16, 24);
 
 // Arcos: passagem coberta no lado norte da rua (colunas + telhado baixo)
-for (const cx of [-3.5, 1, 5.5, 10, 14.5]) R(cx - 0.3, 16.9, cx + 0.3, 17.5, 0, 3.3, 'stone');
-for (const cx of [-3.5, 5.5, 14.5]) R(cx - 0.3, 15.1, cx + 0.3, 15.7, 0, 3.3, 'stone');
+export const ARCOS = { front: [-3.5, 1, 5.5, 10, 14.5], back: [-3.5, 5.5, 14.5], zf: 17.2, zb: 15.4, h: 3.3, roof: [-4.6, 14.8, 15.6, 17.8] };
+for (const cx of ARCOS.front) R(cx - 0.3, 16.9, cx + 0.3, 17.5, 0, 3.3, 'pillar');
+for (const cx of ARCOS.back) R(cx - 0.3, 15.1, cx + 0.3, 15.7, 0, 3.3, 'pillar');
 R(-4.6, 14.8, 15.6, 17.8, 3.3, 0.4, 'wood');
 
 // Praça da Fonte (leste)
 R(31.2, 20.2, 34.8, 23.8, 0, 0.95, 'stone2');     // bacia
 R(32.5, 21.5, 33.5, 22.5, 0.95, 1.5, 'stone');    // coluna d'água
 
-// Casas do lado sul da rua (fachadas fechadas — interiores na Fase 3)
-R(-30, 28, -20, 35, 0, 5, 'plaster');
-R(-12, 29, 0, 36, 0, 4.4, 'plaster');
-R(8, 28, 20, 34, 0, 4.8, 'plaster');
+// Casas fechadas (colisor = bloco; o cliente decora as fachadas com vãos
+// recuados, telhados, cornijas e vigas). face = lado voltado ao jogador:
+// N=-z S=+z W=-x E=+x. As do Mercado abrem pra rua (N); as da Vila, pro
+// miolo por onde se circula.
+export const CASAS = [
+  { x1: -30, z1: 28, x2: -20, z2: 35, y: 0, h: 5.0, mat: 'plaster', face: 'N', zone: 'mercado' },
+  { x1: -12, z1: 29, x2: 0, z2: 36, y: 0, h: 4.4, mat: 'plaster', face: 'N', zone: 'mercado' },
+  { x1: 8, z1: 28, x2: 20, z2: 34, y: 0, h: 4.8, mat: 'plaster', face: 'N', zone: 'mercado' },
+  { x1: -3, z1: 0, x2: 2.7, z2: 8, y: 2.6, h: 4.2, mat: 'plaster', face: 'S', zone: 'vila' },
+  { x1: 5.3, z1: 1, x2: 11, z2: 9, y: 2.6, h: 4.6, mat: 'plaster', face: 'W', zone: 'vila' },
+  { x1: -6, z1: -14, x2: 4, z2: -10, y: 2.6, h: 4.6, mat: 'plaster', face: 'S', zone: 'vila' },
+  { x1: -22, z1: -8, x2: -14, z2: 0, y: 2.6, h: 4.4, mat: 'plaster', face: 'E', zone: 'vila' },
+  { x1: 14, z1: -10, x2: 22, z2: -2, y: 2.6, h: 4.4, mat: 'plaster', face: 'W', zone: 'vila' },
+  { x1: 26, z1: -12, x2: 32, z2: -6, y: 2.6, h: 3.6, mat: 'stone', face: 'W', zone: 'vila', shed: true }
+];
+for (const c of CASAS.filter(c => c.zone === 'mercado')) R(c.x1, c.z1, c.x2, c.z2, c.y, c.h, c.mat);
 
 // Bolsão sul: caixotes e rocha (cobertura dos spawns)
 R(-16.7, 38.3, -15.35, 39.65, 0, 1.35, 'crate');
@@ -120,13 +134,8 @@ stairs(S, 4, 9.75, 0, -1, 9, 0.29, 0.45, 2.6, 'stone');
 R(2.7, -4, 5.3, 6.375, 0, 2.6, 'stone');
 R(2.7, 1.6, 4.0, 2.8, 2.6, 2.4, 'plaster');
 
-// Casario da Vila (blocos fechados — interiores na Fase 3)
-R(-3, 0, 2.7, 8, 2.6, 4.2, 'plaster');       // parede oeste do Beco
-R(5.3, 1, 11, 9, 2.6, 4.6, 'plaster');       // parede leste do Beco
-R(-6, -14, 4, -10, 2.6, 4.6, 'plaster');     // casa norte do Pátio
-R(-22, -8, -14, 0, 2.6, 4.4, 'plaster');     // casa oeste da Vila
-R(14, -10, 22, -2, 2.6, 4.4, 'plaster');     // casa leste da Vila
-R(26, -12, 32, -6, 2.6, 3.6, 'stone');       // depósito leste
+// Casario da Vila (mesmos blocos de CASAS — o cliente decora as fachadas)
+for (const c of CASAS.filter(c => c.zone === 'vila')) R(c.x1, c.z1, c.x2, c.z2, c.y, c.h, c.mat);
 
 // Pátio da Cisterna: cisterna + muretas de cobertura
 R(-1.3, -7.3, 1.3, -4.7, 2.6, 0.9, 'stone2');   // cisterna
@@ -153,6 +162,8 @@ R(-13.5, 10.5, -8.5, 16, 2.35, 0.25, 'wood');
 R(-15.5, 15, -13.5, 16, 2.35, 0.25, 'wood');
 // escada interna (térreo -> andar, junto à parede oeste)
 stairs(S, -14.5, 14.6, 0, -1, 9, 0.29, 0.4, 1.8, 'wood');
+// forja no canto NE do térreo (prop sólido — o cliente decora com chaminé/brasa)
+R(-9.9, 10.7, -8.6, 12, 0, 1.5, 'stone2');
 // varanda sobre a rua (posição forte com contra-jogo por 2 lados)
 R(-13.5, 16.5, -10.5, 17.7, 2.35, 0.25, 'wood');
 R(-13.5, 17.7, -10.5, 18.15, 2.6, 0.95, 'wood2');
@@ -176,9 +187,12 @@ stairs(S, -33.2, -27.3, 1, 0, 9, 0.29, 0.45, 2.6, 'stone', 2.6);
 R(-33.7, -26, -29.4, -25.45, 5.2, 0.6, 'stone2');
 R(-33.7, -29.15, -29.4, -28.6, 5.2, 0.6, 'stone2');
 
-// Longa: colunata (colunas a cada ~7m, vão central para o Altar)
-for (const cx of [-32, -25, -18, -11, 11, 18, 25, 32]) {
-  R(cx - 0.35, -21.95, cx + 0.35, -21.25, 5.2, 4.2, 'stone');
+// Longa: colunata (colunas a cada ~7m, vão central para o Altar).
+// mat 'pillar': o colisor é a caixa, mas o visual vem do kit (cilindro
+// com base/capitel) — o builder pula caixas 'pillar'.
+export const COLUNAS_LONGA = [-32, -25, -18, -11, 11, 18, 25, 32];
+for (const cx of COLUNAS_LONGA) {
+  R(cx - 0.35, -21.95, cx + 0.35, -21.25, 5.2, 4.2, 'pillar');
 }
 
 // Muretas de cobertura do Templo

@@ -102,7 +102,15 @@ addEventListener('resize', () => {
 
 // Mapa atual (física + visual). O menu mostra o mapa padrão; ao entrar numa
 // sala, o servidor informa o mapa dela no 'init' e o mundo é reconstruído.
-let MAP = getMap(DEFAULT_MAP);
+// DEV: ?map=ocaso pré-visualiza um mapa no lobby; ?cam=x,y,z,tx,ty,tz trava a
+// câmera do lobby (screenshots de verificação); ?nomenu=1 esconde o menu.
+const DEVQ = new URLSearchParams(location.search);
+let MAP = getMap(DEVQ.get('map') || DEFAULT_MAP);
+const DEVCAM = (DEVQ.get('cam') || '').split(',').map(Number);
+if (DEVQ.get('nomenu')) addEventListener('DOMContentLoaded', () => {
+  const m = document.getElementById('menu');
+  if (m) m.style.display = 'none';
+});
 
 // Constrói o mundo (texturas na qualidade configurada)
 setTexQuality(settings.texq);
@@ -3698,9 +3706,16 @@ function frame() {
     // lobby: personagem em destaque girando devagar + câmera com leve deriva
     lobbyCharRef.g.visible = true;
     lobbyCharRef.g.rotation.y += dt * 0.4;
-    const drift = Math.sin(t * 0.13) * 2.4;
-    camera.position.set(drift, 3.0, 15.8);
-    camera.lookAt(0, 1.45, 6.5);
+    if (DEVCAM.length === 6 && DEVCAM.every(isFinite)) {
+      // câmera travada por URL (screenshots de verificação de mapa)
+      lobbyCharRef.g.visible = false;
+      camera.position.set(DEVCAM[0], DEVCAM[1], DEVCAM[2]);
+      camera.lookAt(DEVCAM[3], DEVCAM[4], DEVCAM[5]);
+    } else {
+      const drift = Math.sin(t * 0.13) * 2.4;
+      camera.position.set(drift, 3.0, 15.8);
+      camera.lookAt(0, 1.45, 6.5);
+    }
     if (Math.abs(camera.fov - BASE_FOV) > 0.01) { camera.fov = BASE_FOV; camera.updateProjectionMatrix(); }
   }
   lobbyCharRef.g.visible = !playing;

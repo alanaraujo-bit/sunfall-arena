@@ -34,14 +34,16 @@ function mat(name) {
 
 // Multiplica as UVs da geometria — substitui clones de textura com
 // repeat próprio (permite compartilhar material e fundir geometria).
-function scaleUV(geo, rx, ry) {
+// (exportado para os builders de outros mapas)
+export function scaleUV(geo, rx, ry) {
   const uv = geo.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rx, uv.getY(i) * ry);
   return geo;
 }
 
 // Deslocamento pseudo-aleatório determinístico p/ rochas
-function jitterGeo(geo, amp, ampY = amp * 0.6, keepBottom = true) {
+// (exportado para os builders de outros mapas)
+export function jitterGeo(geo, amp, ampY = amp * 0.6, keepBottom = true) {
   const pos = geo.attributes.position;
   geo.computeBoundingBox();
   const bMin = geo.boundingBox.min.y;
