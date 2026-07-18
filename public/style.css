@@ -147,7 +147,7 @@ body {
 
 /* granada de fragmentação */
 #nade-box {
-  position: absolute; left: 246px; bottom: 24px;
+  position: absolute; left: 340px; bottom: 24px;
   display: flex; align-items: center; gap: 6px;
   opacity: 0; transform: scale(.85); transition: opacity .25s, transform .25s;
 }
