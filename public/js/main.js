@@ -8,7 +8,8 @@ import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
 import { buildWorld, makeCharacter, makeViewmodel } from './world.js';
 import { tex, spriteTex, setTexQuality } from './textures.js';
 import { Net, api, apiAuth, apiPublicGet } from './net.js';
-import { SFX } from './audio.js';
+import { SFX, getAudioContext } from './audio.js';
+import * as Music from './music.js';
 
 // Log de erros visível no DOM (debug em headless)
 const errlog = document.getElementById('errlog');
@@ -18,12 +19,12 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', board: 'Tab'
+  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', melee: 'KeyV', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', board: 'Placar'
+  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', melee: 'Golpe rápido', board: 'Placar'
 };
 
 // Presets de qualidade — cada um define as opções individuais.
@@ -356,6 +357,25 @@ hud.setVol.oninput = () => {
   SFX.setVolume(settings.vol / 100);
   saveSettings();
 };
+// Volume da música (config)
+const musicVolSlider = $('set-music-vol');
+const musicVolVal = $('set-music-vol-val');
+if (musicVolSlider) {
+  // Carrega volume salvo
+  const savedMusicVol = settings.musicVolume !== undefined ? settings.musicVolume : 0.35;
+  musicVolSlider.value = Math.round(savedMusicVol * 100);
+  musicVolVal.textContent = musicVolSlider.value;
+  Music.setMusicVolume(savedMusicVol / 100);
+  musicVolSlider.oninput = () => {
+    const v = +musicVolSlider.value / 100;
+    musicVolVal.textContent = musicVolSlider.value;
+    Music.setMusicVolume(v);
+    settings.musicVolume = v;
+    saveSettings();
+  };
+  // Atualiza label inicial
+  musicVolVal.textContent = musicVolSlider.value;
+}
 function applyPerf() { hud.perf.classList.toggle('hidden', settings.perf !== 'on'); }
 hud.setPerf.value = settings.perf;
 hud.setPerf.onchange = () => { settings.perf = hud.setPerf.value; applyPerf(); saveSettings(); };
@@ -363,6 +383,22 @@ SFX.setVolume(settings.vol / 100);
 applyGraphics();
 applyPerf();
 buildBindsUI();
+
+// Inicializa o player de música do lobby
+Music.init({
+  audioContext: getAudioContext(),
+  onTrackChange: (idx, label) => { /* música trocou, se quiser logar */ }
+});
+// Inicia a música do lobby após a primeira interação do usuário
+const firstInteraction = () => {
+  document.removeEventListener('click', firstInteraction);
+  document.removeEventListener('keydown', firstInteraction);
+  document.removeEventListener('touchstart', firstInteraction);
+  setTimeout(() => Music.startLobbyMusic(), 500);
+};
+document.addEventListener('click', firstInteraction);
+document.addEventListener('keydown', firstInteraction);
+document.addEventListener('touchstart', firstInteraction);
 
 // ---------------- FPS / Ping ----------------
 let fpsAccum = 0, fpsFrames = 0, fpsShown = 0, ping = 0;
@@ -639,24 +675,37 @@ function faceCenter() {
 }
 
 // ---------------- Armas ----------------
+// Índice da faca no arsenal (slot de corpo a corpo)
+const KNIFE = 2;
 const WEAPONS = [
   { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false },
-  { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true }
+  { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true },
+  // Faca: arma de oportunidade. Curtíssimo alcance, alto risco/recompensa.
+  { name: 'PRESA-7', melee: true, sniper: false, auto: false,
+    light: { dmg: 55, range: 2.5, arc: 0.62, cd: 0.5,  wind: 0.1,  lunge: 3.6, kick: 0.05 },   // arc = cos do meio-ângulo do cone
+    heavy: { dmg: 80, range: 2.9, arc: 0.6,  cd: 0.85, wind: 0.22, lunge: 6.4, kick: 0.09 } }
 ];
-const WEAPON_ICONS = ['⚡', '◎'];
+const WEAPON_ICONS = ['⚡', '◎', '🗡'];
 const ammo = [WEAPONS[0].mag, WEAPONS[1].mag];
-let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0;
+let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
 
 const vmAR = makeViewmodel('ar');
 const vmSR = makeViewmodel('sr');
+const vmKnife = makeViewmodel('knife');
 const vmRoot = new THREE.Group();
 vmRoot.position.set(0.26, -0.24, -0.5);
-vmRoot.add(vmAR.group, vmSR.group);
+vmRoot.add(vmAR.group, vmSR.group, vmKnife.group);
 vmSR.group.visible = false;
+vmKnife.group.visible = false;
 vmRoot.visible = false; // oculto até entrar na partida
 camera.add(vmRoot);
 scene.add(camera);
-const viewmodels = [vmAR, vmSR];
+const viewmodels = [vmAR, vmSR, vmKnife];
+
+// mostra só a viewmodel do índice `i` (guns e faca)
+function showViewmodel(i) {
+  for (let k = 0; k < viewmodels.length; k++) viewmodels[k].group.visible = k === i;
+}
 
 // ---------------- Efeitos ----------------
 const effects = [];
@@ -868,6 +917,9 @@ function updateRemotes(dt, t) {
       }
     }
     r.model.rotation.y = r.yaw;
+    const wsel = (r.anim >> 2) & 3;          // arma/faca em uso
+    if (u.gun) u.gun.visible = wsel !== 2;
+    if (u.knife) u.knife.visible = wsel === 2;
     u.arms.rotation.x = -r.pitch * 0.7;
     u.head.rotation.x = -r.pitch * 0.4;
     const moving = r.anim & 1, sliding = r.anim & 2;
@@ -904,6 +956,9 @@ addEventListener('keydown', e => {
   if (e.code === binds.kit) tryUseKit();
   if (e.code === binds.w1) switchWeapon(0);
   if (e.code === binds.w2) switchWeapon(1);
+  if (e.code === binds.w3) switchWeapon(KNIFE);
+  if (e.code === binds.melee) quickMelee();
+  if (e.code === 'KeyF' && curW === KNIFE) startInspect();
 });
 addEventListener('keyup', e => {
   keys[e.code] = false;
@@ -913,8 +968,14 @@ addEventListener('wheel', () => { if (playing && !me.dead) switchWeapon(1 - curW
 canvas.addEventListener('mousedown', e => {
   if (!playing) return;
   if (document.pointerLockElement !== canvas) { canvas.requestPointerLock(); return; }
-  if (e.button === 0) { mouseDown = true; tryFire(); }
-  if (e.button === 2 && WEAPONS[curW].sniper && !reloading && !me.dead) setZoom(true);
+  if (e.button === 0) {
+    mouseDown = true;
+    if (curW === KNIFE) startMelee(false); else tryFire();
+  }
+  if (e.button === 2) {
+    if (curW === KNIFE) startMelee(true);
+    else if (WEAPONS[curW].sniper && !reloading && !me.dead) setZoom(true);
+  }
 });
 addEventListener('mouseup', e => {
   if (e.button === 0) mouseDown = false;
@@ -947,12 +1008,13 @@ function setZoom(z) {
 
 function switchWeapon(i) {
   if (i === curW || reloading || me.dead || me.usingKit > 0) return;
+  if (melee.active && melee.quick) return;   // não interromper um golpe rápido em curso
   curW = i;
   swapT = 0.25;
   setZoom(false);
-  viewmodels[0].group.visible = i === 0;
-  viewmodels[1].group.visible = i === 1;
-  SFX.swap();
+  cancelMelee();
+  showViewmodel(i);
+  if (i === KNIFE) { SFX.knifeEquip(); knifeEquipT = 0.32; } else SFX.swap();
   updateAmmoHUD();
 }
 
@@ -1123,6 +1185,7 @@ const _dir = new THREE.Vector3(), _origin = new THREE.Vector3(), _muzzleV = new 
 
 function tryFire() {
   const w = WEAPONS[curW];
+  if (w.melee) return;   // a faca ataca por startMelee, não por tryFire
   const now = performance.now() / 1000;
   if (!playing || matchEnded || me.dead || reloading > 0 || swapT > 0 || me.usingKit > 0) return;
   if (now - lastShot < w.int) return;
@@ -1219,17 +1282,246 @@ function rayBoxLocal(o, d, b) {
 
 function startReload() {
   const w = WEAPONS[curW];
-  if (reloading > 0 || ammo[curW] === w.mag || me.dead || me.usingKit > 0) return;
+  if (w.melee || reloading > 0 || ammo[curW] === w.mag || me.dead || me.usingKit > 0) return;
   reloading = w.reload;
   setZoom(false);
   SFX.reload();
   hud.wname.textContent = 'RECARREGANDO…';
 }
 
+// ============================================================
+// FACA — combate corpo a corpo (Módulo 01)
+// Slot próprio (tecla 3) + golpe rápido (V) com qualquer arma.
+// Ataque leve (LMB) e ataque pesado/estocada (RMB). Servidor é
+// autoritativo: o cliente só prevê efeitos e envia o golpe.
+// ============================================================
+const melee = {
+  active: false,     // há um ataque em andamento
+  heavy: false,      // ataque pesado (estocada) vs leve (corte)
+  t: 0,              // tempo dentro do ataque
+  dur: 0,            // duração total da animação
+  wind: 0,          // wind-up antes do impacto
+  struck: false,     // já resolveu o impacto deste ataque
+  cd: 0,             // cooldown até o próximo ataque
+  quick: false,      // golpe rápido: volta para a arma anterior ao fim
+  prevW: 0,          // arma para restaurar após golpe rápido
+  swingSeed: 1       // ±1 alterna o lado do corte (esq/dir) para variar
+};
+let knifeEquipT = 0;   // animação de sacar (>0)
+let knifeInspectT = 0; // animação de inspeção (>0)
+let knifeIdleT = 0;    // fase da respiração no idle
+
+// origem/direção do golpe (reaproveitados)
+const _mOrigin = new THREE.Vector3(), _mDir = new THREE.Vector3(), _mTmp = new THREE.Vector3();
+
+function meleeStats(heavy) { return WEAPONS[KNIFE][heavy ? 'heavy' : 'light']; }
+
+// Inicia um ataque com a faca. `quick` = golpe relâmpago com outra arma na mão.
+function startMelee(heavy, quick = false) {
+  if (!playing || matchEnded || me.dead || me.usingKit > 0) return;
+  if (melee.active || melee.cd > 0 || reloading > 0 || swapT > 0) return;
+  const st = meleeStats(heavy);
+  melee.active = true;
+  melee.heavy = heavy;
+  melee.quick = quick;
+  melee.t = 0;
+  melee.wind = st.wind;
+  melee.dur = st.wind + (heavy ? 0.42 : 0.32);
+  melee.struck = false;
+  melee.cd = melee.dur + (heavy ? 0.12 : 0.06);
+  melee.swingSeed = -melee.swingSeed;
+  knifeInspectT = 0;
+
+  if (quick) {
+    melee.prevW = curW;
+    showViewmodel(KNIFE);
+  }
+
+  // pequena estocada para a frente (fecha distância — game feel)
+  const fx = -Math.sin(me.yaw), fz = -Math.cos(me.yaw);
+  me.vel.x += fx * st.lunge;
+  me.vel.z += fz * st.lunge;
+
+  SFX.knifeSwing();
+}
+
+// Golpe rápido (tecla V): saca a faca por um instante, ataca e volta.
+function quickMelee() {
+  if (curW === KNIFE) { startMelee(false, false); return; }
+  startMelee(false, true);
+}
+
+function cancelMelee() {
+  melee.active = false;
+  melee.quick = false;
+  melee.struck = true;
+  knifeInspectT = 0;
+}
+
+function startInspect() {
+  if (curW !== KNIFE || melee.active || me.dead) return;
+  knifeInspectT = 0.001; // dispara a animação
+}
+
+// Momento do impacto: resolve o golpe (efeito local previsto + envio ao servidor).
+function meleeStrike() {
+  const st = meleeStats(melee.heavy);
+  camera.getWorldDirection(_mDir);
+  _mOrigin.copy(me.pos); _mOrigin.y += me.eyeH;
+
+  // previsão local só para efeitos (o dano real vem do servidor)
+  const hit = predictMeleeTarget(_mOrigin, _mDir, st.range, st.arc);
+  if (hit) {
+    const bp = hit.model.position;
+    _mTmp.set(bp.x, bp.y + PLAYER.HEAD_Y * 0.7, bp.z);
+    spawnBurst(_mTmp, bloodTex, melee.heavy ? 9 : 6, 2.6, 0.16, 2);
+  } else {
+    // acertou parede/obstáculo dentro do alcance? faísca curta
+    const tMap = raycastSolids(_mOrigin.x, _mOrigin.y, _mOrigin.z, _mDir.x, _mDir.y, _mDir.z);
+    if (tMap <= st.range) {
+      _mTmp.copy(_mOrigin).addScaledVector(_mDir, tMap - 0.05);
+      spawnBurst(_mTmp, dustTex, 4, 1.6, 0.1, 1);
+    }
+  }
+
+  recoil += st.kick;
+  camShake = Math.min(camShake + (melee.heavy ? 0.05 : 0.03), 0.08);
+
+  // envia o golpe: servidor valida cadência, alcance, cone, rebobina e aplica dano
+  const smp = sampleSnapshots();
+  net.send({
+    t: 'melee',
+    o: [_mOrigin.x, _mOrigin.y, _mOrigin.z],
+    d: [_mDir.x, _mDir.y, _mDir.z],
+    h: melee.heavy ? 1 : 0,
+    sv: smp && smp.sv ? smp.sv : undefined
+  });
+}
+
+// Alvo mais próximo dentro do alcance e do cone frontal, com LOS livre.
+// Usado só para PREVER efeitos no cliente (autoridade é do servidor).
+function predictMeleeTarget(origin, dir, range, arc) {
+  const tdm = roomInfo && roomInfo.gm === 'tdm';
+  let best = null, bestD = range;
+  for (const [id, r] of remotes) {
+    if (!r.alive) continue;
+    if (tdm) { const m = meta.get(id); if (m && m.team === me.team) continue; }
+    const p = r.model.position;
+    const cx = p.x - origin.x, cy = (p.y + PLAYER.BODY_H * 0.5) - origin.y, cz = p.z - origin.z;
+    const d = Math.hypot(cx, cy, cz);
+    if (d > range || d < 0.001) continue;
+    const dot = (cx * dir.x + cy * dir.y + cz * dir.z) / d;
+    if (dot < arc) continue;                                   // fora do cone frontal
+    const tMap = raycastSolids(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z);
+    if (tMap < d - 0.4) continue;                              // parede no caminho
+    if (d < bestD) { bestD = d; best = r; }
+  }
+  return best;
+}
+
+// Anima a viewmodel da faca (idle, sacar, inspecionar e ataques leve/pesado).
+function updateKnifeViewmodel(dt) {
+  const hv = Math.hypot(me.vel.x, me.vel.z);
+  knifeIdleT += dt;
+
+  // pose base (offsets a partir da posição neutra da vmRoot)
+  let px = 0.02, py = 0.01, pz = 0.02;   // ligeiramente mais próxima e alta que as armas
+  let rx = 0, ry = 0, rz = 0;
+
+  // respiração/idle
+  py += Math.sin(knifeIdleT * 1.6) * 0.006;
+  rz += Math.sin(knifeIdleT * 1.1) * 0.02;
+
+  // bob ao andar
+  if (me.grounded && hv > 1 && !me.sliding) {
+    px += Math.sin(bobT) * 0.01;
+    py += Math.abs(Math.sin(bobT)) * 0.012;
+  }
+  // pose de corrida (sprint): faca recolhida/inclinada
+  const sprintK = Math.min(1, Math.max(0, (hv - 9) / 4));
+  rx += sprintK * 0.5; ry += sprintK * 0.5; py -= sprintK * 0.05; pz += sprintK * 0.06;
+
+  // sacar a faca
+  if (knifeEquipT > 0) {
+    knifeEquipT = Math.max(0, knifeEquipT - dt);
+    const k = knifeEquipT / 0.32;   // 1→0
+    py -= k * 0.22; rx += k * 1.1; rz += k * 0.5;
+  }
+
+  // inspeção (gira a lâmina para o jogador admirar)
+  if (knifeInspectT > 0 && !melee.active) {
+    knifeInspectT += dt;
+    const dur = 2.0, k = knifeInspectT / dur;
+    if (k >= 1) { knifeInspectT = 0; }
+    else {
+      const e = Math.sin(k * Math.PI);          // sobe e volta
+      ry += e * 2.0; rx -= e * 0.5; py += e * 0.05; px -= e * 0.05; pz += e * 0.04;
+    }
+  }
+
+  // ataque: wind-up → estocada/corte → recuperação
+  if (melee.active) {
+    const st = meleeStats(melee.heavy);
+    const side = melee.swingSeed;
+    const w = melee.wind;
+    if (melee.t < w) {
+      // wind-up: puxa a faca para trás/lado
+      const k = melee.t / w;                    // 0→1
+      rx -= k * 0.6; ry += side * k * 0.7; pz += k * 0.12; px -= side * k * 0.06;
+    } else {
+      // golpe: varre para frente cruzando a tela
+      const gk = Math.min(1, (melee.t - w) / (melee.heavy ? 0.16 : 0.12)); // fase rápida do talho
+      const rec = Math.max(0, 1 - (melee.t - w) / (melee.dur - w));         // recuperação
+      const swing = Math.sin(gk * Math.PI * 0.5);   // 0→1 acelerando
+      pz -= swing * (melee.heavy ? 0.34 : 0.24) * rec + 0.02;
+      px += side * (0.12 - swing * 0.26) * rec;
+      py -= swing * 0.05 * rec;
+      rx += swing * (melee.heavy ? 0.9 : 0.7) * rec;
+      rz += side * (0.5 - swing * 1.0) * rec;
+      ry -= side * swing * 0.6 * rec;
+    }
+  }
+
+  // aplica com suavização (a não ser no golpe, que é seco)
+  const lerp = melee.active && melee.t >= melee.wind ? 1 : Math.min(1, 16 * dt);
+  vmRoot.position.x += ((0.26 + px) - vmRoot.position.x) * lerp;
+  vmRoot.position.y += ((-0.24 + py) - vmRoot.position.y) * lerp;
+  vmRoot.position.z += ((-0.5 + pz) - vmRoot.position.z) * lerp;
+  vmRoot.rotation.x += (rx - vmRoot.rotation.x) * lerp;
+  vmRoot.rotation.y += (ry - vmRoot.rotation.y) * lerp;
+  vmRoot.rotation.z += (rz - vmRoot.rotation.z) * lerp;
+}
+
+// Avança o ataque (impacto no tempo certo e término/retorno de arma).
+function updateMeleeState(dt) {
+  if (melee.cd > 0) melee.cd = Math.max(0, melee.cd - dt);
+  if (!melee.active) return;
+  melee.t += dt;
+  if (!melee.struck && melee.t >= melee.wind) {
+    melee.struck = true;
+    meleeStrike();
+  }
+  if (melee.t >= melee.dur) {
+    melee.active = false;
+    if (melee.quick) {
+      melee.quick = false;
+      showViewmodel(curW);   // restaura a arma anterior
+      vmRoot.rotation.set(0, 0, 0);
+    }
+  }
+}
+
 // ---------------- HUD helpers ----------------
 function updateAmmoHUD() {
-  hud.ammo.textContent = ammo[curW];
-  hud.wname.textContent = WEAPONS[curW].name;
+  const w = WEAPONS[curW];
+  if (w.melee) {
+    hud.ammo.textContent = '🗡';
+    hud.ammo.classList.add('melee');
+  } else {
+    hud.ammo.textContent = ammo[curW];
+    hud.ammo.classList.remove('melee');
+  }
+  hud.wname.textContent = w.name;
 }
 
 function updateHpHUD() {
@@ -1278,9 +1570,9 @@ function showHitmarker(head) {
   hitmarkerT = setTimeout(() => hud.hitmarker.classList.remove('show', 'head'), 120);
 }
 
-function addFeed(killer, victim, head, isMe, weaponIndex) {
+function addFeed(killer, victim, head, isMe, weaponIndex, backstab) {
   const div = document.createElement('div');
-  div.className = 'feed-item' + (isMe ? ' me' : '') + (head ? ' head' : '');
+  div.className = 'feed-item' + (isMe ? ' me' : '') + (head || backstab ? ' head' : '');
   const km = meta.get(killer) || (killer === me.id ? me : null);
   const vm2 = meta.get(victim) || (victim === me.id ? me : null);
   const kn = killer === me.id ? me.name : (km ? km.name : '?');
@@ -1288,7 +1580,8 @@ function addFeed(killer, victim, head, isMe, weaponIndex) {
   const kc = killer === me.id ? me.color : (km ? km.color : '#fff');
   const vc = victim === me.id ? me.color : (vm2 ? vm2.color : '#fff');
   const wi = weaponIndex !== undefined ? weaponIndex : 0;
-  div.innerHTML = `<b style="color:${kc}">${kn}</b> <span class="fx w">${WEAPON_ICONS[wi] || '?'}</span> <span class="fx">${head ? '⌖' : '⚔'}</span> <b style="color:${vc}">${vn}</b>`;
+  const mid = backstab ? '☠' : (head ? '⌖' : '⚔');
+  div.innerHTML = `<b style="color:${kc}">${kn}</b> <span class="fx w">${WEAPON_ICONS[wi] || '?'}</span> <span class="fx">${mid}</span> <b style="color:${vc}">${vn}</b>`;
   hud.feed.prepend(div);
   setTimeout(() => div.classList.add('out'), 4200);
   setTimeout(() => div.remove(), 4700);
@@ -1333,6 +1626,8 @@ function clearRoomState() {
   me.slideEnergy = SLIDE_MAX_ENERGY; me.slideCooldownT = 0;
   me.kits = 0; me.usingKit = 0;
   multiKillCount = 0; lastKillTime = 0;
+  cancelMelee(); melee.cd = 0; knifeEquipT = 0; knifeInspectT = 0;
+  curW = 0; showViewmodel(0); camShake = 0;
   updateSlideHUD(); updateKitHUD();
 }
 
@@ -1499,7 +1794,7 @@ function collectKillcamFrames(killerId) {
 function enterKillcam(killerId, killerW) {
   killcam.active = true;
   killcam.killerId = killerId;
-  killcam.killerW = killerW === 1 ? 1 : 0;
+  killcam.killerW = (killerW === 1 || killerW === 2) ? killerW : 0;
   killcam.t0 = performance.now();
   killcam.deathWall = killcam.t0;
   killcam.fallT = 0;
@@ -1521,9 +1816,8 @@ function enterKillcam(killerId, killerW) {
   if (kr && kr.model) { kr.model.visible = false; killcam.killerHidden = true; }
   else killcam.killerHidden = false;
 
-  // mostra a ARMA de quem te matou (visão de primeira pessoa dele)
-  viewmodels[0].group.visible = killcam.killerW === 0;
-  viewmodels[1].group.visible = killcam.killerW === 1;
+  // mostra a ARMA/faca de quem te matou (visão de primeira pessoa dele)
+  showViewmodel(killcam.killerW);
   vmRoot.position.set(0.26, -0.24, -0.5);
   vmRoot.rotation.set(0, 0, 0);
   vmRoot.visible = true;
@@ -1573,8 +1867,7 @@ function endKillcam() {
   killcam.shots = null;
 
   // devolve a viewmodel/FOV/scope pro estado do jogador local
-  viewmodels[0].group.visible = curW === 0;
-  viewmodels[1].group.visible = curW === 1;
+  showViewmodel(curW);
   vmRoot.position.set(0.26, -0.24, -0.5);
   vmRoot.rotation.set(0, 0, 0);
   vmRoot.visible = true;
@@ -1598,6 +1891,9 @@ function poseKillcamEntity(model, e, dt, fallT) {
   }
   const u = model.userData;
   if (!u || !u.arms) return;
+  const wsel = (e.anim >> 2) & 3;          // arma/faca em uso
+  if (u.gun) u.gun.visible = wsel !== 2;
+  if (u.knife) u.knife.visible = wsel === 2;
   u.arms.rotation.x = -e.pitch * 0.7;
   u.head.rotation.x = -e.pitch * 0.4;
   const moving = e.anim & 1, sliding = e.anim & 2;
@@ -1670,8 +1966,8 @@ function updateKillcam(dt) {
     camera.rotation.set(k.pitch + killcam.recoil, k.yaw, 0);
   }
 
-  // FOV do ADS
-  const adsFov = killcam.killerW === 1 ? ZOOM_FOV : BASE_FOV * 0.72;
+  // FOV do ADS (faca não mira: mantém o FOV base)
+  const adsFov = killcam.killerW === 1 ? ZOOM_FOV : (killcam.killerW === 2 ? BASE_FOV : BASE_FOV * 0.72);
   const fov = BASE_FOV + (adsFov - BASE_FOV) * killcam.aim;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
 
@@ -1772,11 +2068,22 @@ net.on('dmg', msg => {
     const r = remotes.get(msg.id);
     if (r) r.hp = msg.hp;
   }
-  // confirmação do servidor de que MEU tiro acertou → hitmarker/som
+  // confirmação do servidor de que MEU ataque acertou → hitmarker/som
   if (msg.by === me.id && msg.id !== me.id) {
-    showHitmarker(!!msg.h);
-    if (msg.h) SFX.headshot(); else SFX.hit();
+    const knifeHit = curW === KNIFE || (melee.active && melee.quick);
+    showHitmarker(!!msg.h || !!msg.bs);
+    if (msg.bs) SFX.backstab();
+    else if (msg.h) SFX.headshot();
+    else if (knifeHit) SFX.knifeHit();
+    else SFX.hit();
   }
+});
+// golpe de faca de um inimigo próximo → som do corte no ar
+net.on('melee', msg => {
+  if (msg.id === me.id) return;
+  const r = remotes.get(msg.id);
+  const src = r ? r.model.position : new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]);
+  if (src.distanceTo(me.pos) < 13) SFX.knifeSwing();
 });
 net.on('kit', msg => {
   me.kits = msg.n;
@@ -1796,12 +2103,13 @@ net.on('die', msg => {
   if (msg.by === me.id) { me.k = msg.kk; }
   else if (meta.has(msg.by)) meta.get(msg.by).k = msg.kk;
 
-  addFeed(msg.by, msg.id, msg.h, msg.by === me.id || msg.id === me.id, msg.w);
+  addFeed(msg.by, msg.id, msg.h, msg.by === me.id || msg.id === me.id, msg.w, msg.bs);
 
   if (msg.id === me.id) {
     me.dead = true;
     me.sliding = false;
     me.usingKit = 0;
+    cancelMelee();
     updateKitHUD();
     multiKillCount = 0;
     setZoom(false);
@@ -2304,6 +2612,9 @@ function setMenuMode(paused) {
   const isTdm = paused && roomInfo && roomInfo.gm === 'tdm';
   hud.teamSwitch.classList.toggle('hidden', !isTdm);
   if (isTdm) updateTeamButtons();
+  // Se pausou (voltou ao lobby), inicia a música ambiente
+  if (paused) Music.startLobbyMusic();
+  else Music.stopLobbyMusic();
   if (paused && roomInfo && roomInfo.mode === 'custom') {
     hud.roomLine.classList.remove('hidden');
     hud.roomCode.textContent = roomInfo.code;
@@ -2386,12 +2697,16 @@ function frame() {
       updateKitHUD();
     }
     if (mouseDown && WEAPONS[curW].auto) tryFire();
+    updateMeleeState(dt);
 
-    // câmera
+    // câmera (+ tremor curto de impacto da faca)
     camera.position.set(me.pos.x, me.pos.y + me.eyeH, me.pos.z);
     recoil *= Math.exp(-12 * dt);
-    camera.rotation.y = me.yaw;
-    camera.rotation.x = me.pitch + recoil;
+    camShake *= Math.exp(-16 * dt);
+    const shX = camShake > 0.001 ? (Math.random() - 0.5) * camShake : 0;
+    const shY = camShake > 0.001 ? (Math.random() - 0.5) * camShake : 0;
+    camera.rotation.y = me.yaw + shY;
+    camera.rotation.x = me.pitch + recoil + shX;
     camera.rotation.z = me.sliding ? 0.05 : 0;
 
     // FOV dinâmico
@@ -2402,14 +2717,24 @@ function frame() {
     // só recalcula a projeção se o FOV de fato mudou (economiza CPU)
     if (Math.abs(camera.fov - prevFov) > 0.01) camera.updateProjectionMatrix();
 
-    // viewmodel: bob + recuo + troca
+    // bob compartilhado (armas e faca)
     if (me.grounded && hv > 1 && !me.sliding) bobT += dt * hv * 1.4;
-    const vmY = -0.24 + Math.abs(Math.sin(bobT)) * 0.014 + (reloading > 0 ? -0.12 : 0) + (swapT > 0 ? -swapT * 0.6 : 0);
-    const vmX = 0.26 + Math.sin(bobT) * 0.008;
-    vmRoot.position.x += (vmX - vmRoot.position.x) * Math.min(1, 10 * dt);
-    vmRoot.position.y += (vmY - vmRoot.position.y) * Math.min(1, 10 * dt);
-    vmRoot.position.z += ((-0.5 + vmKick) - vmRoot.position.z) * Math.min(1, 14 * dt);
-    vmRoot.rotation.x = (reloading > 0 ? -0.5 : 0) + vmKick * 1.2;
+
+    // viewmodel: faca (própria animação) ou arma (bob + recuo + troca)
+    const knifeOut = curW === KNIFE || (melee.active && melee.quick);
+    if (knifeOut) {
+      updateKnifeViewmodel(dt);
+    } else {
+      const vmY = -0.24 + Math.abs(Math.sin(bobT)) * 0.014 + (reloading > 0 ? -0.12 : 0) + (swapT > 0 ? -swapT * 0.6 : 0);
+      const vmX = 0.26 + Math.sin(bobT) * 0.008;
+      vmRoot.position.x += (vmX - vmRoot.position.x) * Math.min(1, 10 * dt);
+      vmRoot.position.y += (vmY - vmRoot.position.y) * Math.min(1, 10 * dt);
+      vmRoot.position.z += ((-0.5 + vmKick) - vmRoot.position.z) * Math.min(1, 14 * dt);
+      vmRoot.rotation.x = (reloading > 0 ? -0.5 : 0) + vmKick * 1.2;
+      // zera resíduo de rotação da faca ao voltar para a arma
+      vmRoot.rotation.y += (0 - vmRoot.rotation.y) * Math.min(1, 10 * dt);
+      vmRoot.rotation.z += (0 - vmRoot.rotation.z) * Math.min(1, 10 * dt);
+    }
     vmKick *= Math.exp(-10 * dt);
   } else if (playing && me.dead) {
     camera.position.set(me.pos.x, me.pos.y + 0.6, me.pos.z);

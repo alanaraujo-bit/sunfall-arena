@@ -14,7 +14,10 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
   '.png': 'image/png',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
+  '.m4a': 'audio/mp4',
+  '.mp4': 'audio/mp4',
+  '.mp3': 'audio/mpeg'
 };
 
 export function staticMiddleware(req, res, next) {

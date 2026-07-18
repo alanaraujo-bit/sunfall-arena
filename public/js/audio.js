@@ -4,6 +4,9 @@
 let AC = null, master = null, noiseBuf = null;
 let volume = 0.5;
 
+// Exporta o AudioContext para o player de música (compartilha o mesmo contexto)
+export function getAudioContext() { return AC; }
+
 function ensure() {
   if (!AC) {
     AC = new (window.AudioContext || window.webkitAudioContext)();
@@ -65,6 +68,31 @@ export const SFX = {
       tone(150, 0.09, 0.3 * vol, 'square', 70);
     }
   },
+
+  // ---- Faca ----
+  // corte no ar: sopro curto e agudo varrendo grave
+  knifeSwing() {
+    ensure();
+    noise(0.16, 0.28, 5200, 700, 'bandpass');
+    tone(520, 0.1, 0.08, 'sine', 180);
+  },
+  // acerto na carne: impacto abafado + toque metálico
+  knifeHit() {
+    ensure();
+    noise(0.09, 0.32, 1400, 220);
+    tone(150, 0.12, 0.32, 'sawtooth', 60);
+    tone(1900, 0.05, 0.12, 'triangle', 2600, 0.01);
+  },
+  // backstab: golpe seco + brilho metálico marcante (recompensa)
+  backstab() {
+    ensure();
+    noise(0.12, 0.4, 1200, 160);
+    tone(120, 0.16, 0.4, 'sawtooth', 48);
+    tone(1500, 0.09, 0.22, 'triangle', 2400);
+    tone(2200, 0.12, 0.16, 'sine', 3000, 0.05);
+  },
+  // sacar a faca: aço deslizando
+  knifeEquip() { ensure(); noise(0.14, 0.16, 3200, 6000, 'highpass'); tone(760, 0.07, 0.09, 'triangle', 1300); },
 
   hit() { ensure(); tone(880, 0.06, 0.25, 'sine', 1200); },
   headshot() { ensure(); tone(1100, 0.05, 0.28, 'sine', 1600); tone(1500, 0.07, 0.2, 'sine', 2000, 0.04); },
