@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "build": "node scripts/copy-shared.js"
+    "build": "node scripts/copy-shared.js",
+    "deploy": "flyctl deploy -a sunfall-arena --remote-only && vercel deploy --prod"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
