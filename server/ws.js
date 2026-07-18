@@ -25,6 +25,8 @@ const KIT_STREAK = 3;     // kills seguidas (sem morrer) para ganhar 1 kit
 const KIT_MAX = 2;        // cargas de kit acumuláveis
 const KIT_HEAL = 50;      // vida restaurada por uso
 const KIT_USE_MS = 1000;  // tempo de canalização
+const RESPAWN_MIN_MS = 500;       // tempo mínimo morto antes de poder renascer (evita abuso)
+const RESPAWN_FAILSAFE_MS = 5000; // renascimento automático caso o cliente nunca peça (saiu/ocioso)
 
 // posição do jogador rebobinada para o instante `sv` (lag compensation)
 function rewindPos(p, sv) {
@@ -39,6 +41,19 @@ function rewindPos(p, sv) {
     }
   }
   return h[0];
+}
+
+// Renasce o jogador na hora (chamado pelo pedido do cliente ou pelo failsafe).
+// Autoritativo: o servidor decide a posição e só renasce quem está de fato morto.
+function respawnPlayer(room, victim) {
+  clearTimeout(victim.respawnTimer);
+  victim.respawnTimer = null;
+  if (!rooms.has(room.code) || room.state !== 'playing') return;
+  if (!room.players.has(victim.id) || victim.alive) return;
+  victim.pos = spawnPos(room);
+  victim.hp = 100;
+  victim.alive = true;
+  broadcastRoom(room, { t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z] });
 }
 
 function damage(room, attacker, victim, dmg, head = false, wi = 0) {
@@ -90,14 +105,11 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0) {
     }
   }
 
-  setTimeout(() => {
-    if (!rooms.has(room.code) || room.state !== 'playing') return;
-    if (!room.players.has(victim.id)) return;
-    victim.pos = spawnPos(room);
-    victim.hp = 100;
-    victim.alive = true;
-    broadcastRoom(room, { t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z] });
-  }, 2600);
+  // Renascimento sob demanda: o cliente controla o momento (após o killcam ou
+  // ao apertar F). O servidor só mantém um failsafe caso o pedido nunca chegue.
+  victim.deadAt = Date.now();
+  clearTimeout(victim.respawnTimer);
+  victim.respawnTimer = setTimeout(() => respawnPlayer(room, victim), RESPAWN_FAILSAFE_MS);
 }
 
 async function isFriendAccepted(a, b) {
@@ -264,6 +276,19 @@ export function attachWs(server) {
       if (!self || !room) return;
 
       switch (msg.t) {
+        case 'respawn': {
+          // Pedido de renascimento (fim do killcam ou tecla F). Só vale se está
+          // morto; respeita o tempo mínimo para não virar teleporte instantâneo.
+          if (self.alive || room.state !== 'playing') break;
+          const waited = Date.now() - (self.deadAt || 0);
+          if (waited >= RESPAWN_MIN_MS) {
+            respawnPlayer(room, self);
+          } else {
+            clearTimeout(self.respawnTimer);
+            self.respawnTimer = setTimeout(() => respawnPlayer(room, self), RESPAWN_MIN_MS - waited);
+          }
+          break;
+        }
         case 's': {
           if (!self.alive || !Array.isArray(msg.p)) break;
           const nx = +msg.p[0] || 0, ny = +msg.p[1] || 0, nz = +msg.p[2] || 0;

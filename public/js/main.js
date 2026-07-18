@@ -137,6 +137,8 @@ const hud = {
   ammo: $('ammo'), wname: $('weapon-name'), feed: $('feed'), board: $('board'),
   boardRows: $('board-rows'), hitmarker: $('hitmarker'), dmgFlash: $('dmg-flash'),
   death: $('death'), deathBy: $('death-by'), scope: $('scope'), game: $('hud'),
+  killcam: $('killcam'), killcamBy: $('killcam-by'), killcamProgress: $('killcam-progress'),
+  fade: $('fade'),
   killPop: $('kill-pop'), multiKill: $('multi-kill'),
   stamBox: $('stam-box'), stamFill: $('stam-fill'),
   kitBox: $('kit-box'), kitCount: $('kit-count'), kitBar: $('kit-bar'),
@@ -894,6 +896,8 @@ addEventListener('keydown', e => {
   if (playing && e.code === binds.board) { e.preventDefault(); hud.board.classList.add('show'); rebuildBoard(); }
   if (e.repeat) return;
   keys[e.code] = true;
+  // F durante a morte: pula o killcam e volta direto pro jogo
+  if (playing && me.dead && e.code === 'KeyF') { requestRespawn(); return; }
   if (!playing || me.dead) return;
   if (e.code === binds.jump) wantJump = true;
   if (e.code === binds.reload) startReload();
@@ -1354,11 +1358,13 @@ net.on('l', msg => removeRemote(msg.id));
 // renderizamos os remotos ~100ms no passado, interpolando entre dois
 // estados conhecidos — movimento liso mesmo com ping alto/oscilante.
 const SNAP_INTERP_MS = 100;
-const snapBuf = []; // { t: performance.now() na chegada, p: estados }
+// cap alto o bastante para o killcam rebobinar ~4s (30 Hz → ~120 snapshots)
+const SNAP_BUF_MAX = 140;
+const snapBuf = []; // { t: performance.now() na chegada, sv: tempo do servidor, p: estados }
 
 net.on('s', msg => {
   snapBuf.push({ t: performance.now(), sv: msg.sv, p: msg.p });
-  while (snapBuf.length > 60) snapBuf.shift();
+  while (snapBuf.length > SNAP_BUF_MAX) snapBuf.shift();
   for (const [id, a] of Object.entries(msg.p)) {
     const r = remotes.get(+id);
     if (!r) continue;
@@ -1383,6 +1389,231 @@ function sampleSnapshots() {
     }
   }
   return { a: snapBuf[0], b: null, alpha: 0, sv: snapBuf[0].sv };
+}
+
+// ============================================================
+// KILLCAM — replay dos últimos segundos pela visão de quem te matou.
+// Tudo client-side: o servidor já nos manda posição + mira de todos a
+// 30 Hz (guardado em snapBuf), então reconstruímos a cena e colocamos a
+// câmera nos olhos do assassino. Estilo Black Ops 2.
+// ============================================================
+const KILLCAM_MS = 2500;        // quanto do passado reproduzir
+const KILLCAM_HOLD_MS = 900;    // pausa no instante da morte (queda da vítima)
+const DEATH_FALLBACK_MS = 2200; // morte sem killcam: tempo até pedir respawn sozinho
+
+const killcam = {
+  active: false,
+  frames: null,          // [{ sv, p }] copiados no instante da morte
+  startSv: 0, endSv: 0,
+  t0: 0,                 // performance.now() do início do replay
+  killerId: null,
+  killerHidden: false,   // escondemos o modelo do assassino (câmera fica dentro dele)
+  victim: null,          // modelo temporário do seu corpo
+  fallT: 0,              // progresso da queda da vítima (0..1)
+  respawnSent: false
+};
+let deathTimer = null;   // failsafe client-side para morte sem killcam
+
+// interpola a entidade `id` entre dois frames do histórico
+function kcLerp(a, b, alpha, id) {
+  const p0 = a && a.p[id], p1 = b && b.p[id];
+  if (p0 && p1) {
+    let dyw = p1[3] - p0[3];
+    while (dyw > Math.PI) dyw -= Math.PI * 2;
+    while (dyw < -Math.PI) dyw += Math.PI * 2;
+    return {
+      x: p0[0] + (p1[0] - p0[0]) * alpha,
+      y: p0[1] + (p1[1] - p0[1]) * alpha,
+      z: p0[2] + (p1[2] - p0[2]) * alpha,
+      yaw: p0[3] + dyw * alpha,
+      pitch: p0[4] + (p1[4] - p0[4]) * alpha,
+      anim: (alpha < 0.5 ? p0[5] : p1[5]) | 0
+    };
+  }
+  const p = p0 || p1;
+  if (!p) return null;
+  return { x: p[0], y: p[1], z: p[2], yaw: p[3], pitch: p[4], anim: p[5] | 0 };
+}
+
+// par de frames que envolve o tempo de servidor `sv`
+function kcSample(frames, sv) {
+  const last = frames[frames.length - 1];
+  if (sv >= last.sv) return { a: last, b: null, alpha: 0 };
+  if (sv <= frames[0].sv) return { a: frames[0], b: frames[1] || null, alpha: 0 };
+  for (let i = frames.length - 1; i >= 0; i--) {
+    if (frames[i].sv <= sv) {
+      const a = frames[i], b = frames[i + 1];
+      const alpha = b ? Math.min(1, (sv - a.sv) / ((b.sv - a.sv) || 1)) : 0;
+      return { a, b, alpha };
+    }
+  }
+  return { a: frames[0], b: frames[1] || null, alpha: 0 };
+}
+
+// Decide entre killcam (assassino válido + histórico) ou morte simples.
+function startDeathSequence(killerId) {
+  clearTimeout(deathTimer); deathTimer = null;
+  killcam.respawnSent = false;
+
+  if (collectKillcamFrames(killerId)) {
+    enterKillcam(killerId);
+  } else {
+    // sem killcam: card de morte + renasce sozinho (F também funciona)
+    hud.death.classList.add('show');
+    deathTimer = setTimeout(requestRespawn, DEATH_FALLBACK_MS);
+  }
+}
+
+function collectKillcamFrames(killerId) {
+  if (killerId == null || killerId === me.id) return false;   // suicídio/queda
+  if (snapBuf.length < 4) return false;
+  const endSv = snapBuf[snapBuf.length - 1].sv;
+  if (!endSv) return false;
+  const startSv = endSv - KILLCAM_MS;
+  const frames = [];
+  let killerSeen = 0;
+  for (const s of snapBuf) {
+    if (s.sv == null || s.sv < startSv - 200) continue; // margem p/ um frame antes do início
+    frames.push({ sv: s.sv, p: s.p });
+    if (s.p[killerId]) killerSeen++;
+  }
+  if (frames.length < 3 || killerSeen < 3) return false;
+  killcam.startSv = startSv;
+  killcam.endSv = endSv;
+  killcam.frames = frames;
+  return true;
+}
+
+function enterKillcam(killerId) {
+  killcam.active = true;
+  killcam.killerId = killerId;
+  killcam.t0 = performance.now();
+  killcam.fallT = 0;
+
+  // corpo temporário da vítima — para você se ver levando o tiro
+  const vm = makeCharacter(teamOf(me.team, me.color));
+  scene.add(vm);
+  killcam.victim = vm;
+
+  // esconde o modelo do assassino (a câmera fica dentro da cabeça dele)
+  const kr = remotes.get(killerId);
+  if (kr && kr.model) { kr.model.visible = false; killcam.killerHidden = true; }
+  else killcam.killerHidden = false;
+
+  vmRoot.visible = false;   // some com seus braços/arma (câmera não é mais sua)
+
+  hud.death.classList.remove('show');
+  const killer = meta.get(killerId);
+  hud.killcamBy.textContent = killer ? killer.name : '???';
+  hud.killcamProgress.style.width = '0%';
+  hud.killcam.classList.add('show');
+
+  fadeCut();   // corte preto rápido de entrada
+}
+
+// preto instantâneo que desvanece → dá um "corte" limpo pra dentro do killcam
+function fadeCut() {
+  const f = hud.fade;
+  f.style.transition = 'none';
+  f.classList.add('on');
+  void f.offsetWidth;      // força reflow
+  f.style.transition = '';
+  f.classList.remove('on');
+}
+
+// Pede o respawn ao servidor (fim do killcam ou tecla F). Só uma vez.
+function requestRespawn() {
+  if (!me.dead || killcam.respawnSent) return;
+  killcam.respawnSent = true;
+  clearTimeout(deathTimer); deathTimer = null;
+  net.send({ t: 'respawn' });
+  hud.killcam.classList.remove('show');
+  hud.death.classList.remove('show');
+  hud.fade.classList.add('on');   // fade pra preto enquanto o servidor confirma
+}
+
+// Desmonta o killcam (chamado no spawn / fim de partida).
+function endKillcam() {
+  if (killcam.victim) { scene.remove(killcam.victim); killcam.victim = null; }
+  // restaura a visibilidade de todos os vivos (posicionamos modelos no histórico
+  // durante o replay; quem não aparecia num frame ficou oculto)
+  for (const r of remotes.values()) {
+    if (r.alive && r.model) r.model.visible = true;
+  }
+  killcam.killerHidden = false;
+  killcam.active = false;
+  killcam.frames = null;
+  killcam.killerId = null;
+  vmRoot.visible = true;
+  hud.killcam.classList.remove('show');
+}
+
+// posiciona um personagem no transform histórico com pose básica
+function poseKillcamEntity(model, e, dt, fallT) {
+  if (!model) return;
+  if (!e) { model.visible = false; return; }
+  model.visible = true;
+  model.position.set(e.x, e.y, e.z);
+  model.rotation.y = e.yaw;
+  if (fallT > 0) {
+    model.rotation.x = -Math.min(fallT * 1.3, 1) * Math.PI / 2 * 0.9;
+    model.position.y = e.y - Math.min(fallT, 1) * 0.35;
+  } else {
+    model.rotation.x = 0;
+  }
+  const u = model.userData;
+  if (!u || !u.arms) return;
+  u.arms.rotation.x = -e.pitch * 0.7;
+  u.head.rotation.x = -e.pitch * 0.4;
+  const moving = e.anim & 1, sliding = e.anim & 2;
+  if (sliding) {
+    u.legL.rotation.x = u.legR.rotation.x = 1.2;
+  } else if (moving) {
+    model._kcWalk = (model._kcWalk || 0) + dt * 11;
+    u.legL.rotation.x = Math.sin(model._kcWalk) * 0.7;
+    u.legR.rotation.x = -Math.sin(model._kcWalk) * 0.7;
+  } else {
+    u.legL.rotation.x *= 0.8; u.legR.rotation.x *= 0.8;
+  }
+}
+
+// chamada todo frame enquanto o killcam roda
+function updateKillcam(dt) {
+  const frames = killcam.frames;
+  const elapsed = performance.now() - killcam.t0;
+  const replayMs = Math.max(1, killcam.endSv - killcam.startSv);
+
+  let sv;
+  if (elapsed <= replayMs) {
+    sv = killcam.startSv + elapsed;               // fase 1: replay em tempo real
+  } else {
+    sv = killcam.endSv;                            // fase 2: segura no tiro + queda
+    killcam.fallT = Math.min(1, (elapsed - replayMs) / KILLCAM_HOLD_MS);
+  }
+
+  hud.killcamProgress.style.width =
+    (Math.min(1, elapsed / (replayMs + KILLCAM_HOLD_MS)) * 100).toFixed(1) + '%';
+
+  const smp = kcSample(frames, sv);
+
+  // câmera nos olhos do assassino
+  const k = kcLerp(smp.a, smp.b, smp.alpha, killcam.killerId);
+  if (k) {
+    camera.position.set(k.x, k.y + PLAYER.EYE, k.z);
+    camera.rotation.set(k.pitch, k.yaw, 0);
+    if (Math.abs(camera.fov - BASE_FOV) > 0.01) { camera.fov = BASE_FOV; camera.updateProjectionMatrix(); }
+  }
+
+  // corpo da vítima (você) — cai no fim
+  poseKillcamEntity(killcam.victim, kcLerp(smp.a, smp.b, smp.alpha, me.id), dt, killcam.fallT);
+  // demais jogadores (o assassino fica escondido)
+  for (const [id, r] of remotes) {
+    if (id === killcam.killerId) continue;
+    poseKillcamEntity(r.model, kcLerp(smp.a, smp.b, smp.alpha, id), dt, 0);
+  }
+
+  // acabou → pede respawn (fade + servidor confirma)
+  if (killcam.fallT >= 1 && !killcam.respawnSent) requestRespawn();
 }
 
 function computeTeamScores() {
@@ -1481,8 +1712,8 @@ net.on('die', msg => {
     mouseDown = false;
     const killer = meta.get(msg.by);
     hud.deathBy.textContent = killer ? killer.name : '???';
-    hud.death.classList.add('show');
     SFX.die();
+    startDeathSequence(msg.by);
   } else {
     const r = remotes.get(msg.id);
     if (r) { r.alive = false; r.deadT = 0; }
@@ -1506,6 +1737,10 @@ net.on('spawn', msg => {
     ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
     reloading = 0;
     hud.death.classList.remove('show');
+    endKillcam();
+    clearTimeout(deathTimer); deathTimer = null;
+    killcam.respawnSent = false;
+    hud.fade.classList.remove('on');   // fade suave de volta ao jogo
     updateHpHUD(); updateAmmoHUD();
     SFX.spawn();
   } else {
@@ -1527,6 +1762,10 @@ net.on('end', msg => {
   mouseDown = false;
   setZoom(false);
   hud.death.classList.remove('show');
+  endKillcam();
+  clearTimeout(deathTimer); deathTimer = null;
+  killcam.respawnSent = false;
+  hud.fade.classList.remove('on');
 
   let won = false;
   if (msg.gm === 'tdm') {
@@ -1572,6 +1811,11 @@ net.on('teamchg', msg => {
   if (msg.id === me.id) {
     me.team = msg.team;
     me.dead = true;   // servidor respawna em ~600ms
+    endKillcam();
+    clearTimeout(deathTimer); deathTimer = null;
+    killcam.respawnSent = false;
+    hud.death.classList.remove('show');
+    hud.fade.classList.remove('on');
     setZoom(false);
     mouseDown = false;
     updateTeamButtons();
@@ -1609,6 +1853,10 @@ net.on('restart', msg => {
     }
   }
   hud.death.classList.remove('show');
+  endKillcam();
+  clearTimeout(deathTimer); deathTimer = null;
+  killcam.respawnSent = false;
+  hud.fade.classList.remove('on');
   SFX.spawn();
 });
 
@@ -2019,9 +2267,11 @@ function frame() {
   updatePerf(dt);
   world.update(t);
   updateEffects(dt);
-  updateRemotes(dt, t);
+  if (!killcam.active) updateRemotes(dt, t);   // durante o killcam quem posiciona é updateKillcam
 
-  if (playing && !me.dead) {
+  if (playing && killcam.active) {
+    updateKillcam(dt);
+  } else if (playing && !me.dead) {
     updateMovement(dt);
 
     // recarga

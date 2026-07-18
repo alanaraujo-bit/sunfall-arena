@@ -238,6 +238,86 @@ body {
 @keyframes pulse { 50% { opacity: .3; } }
 
 /* ============================================================
+   KILLCAM — replay pela visão de quem te matou (estilo BO2)
+   ============================================================ */
+#killcam {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  opacity: 0; visibility: hidden; transition: opacity .45s ease, visibility .45s;
+}
+#killcam.show { opacity: 1; visibility: visible; }
+
+/* vinheta cinematográfica (fica atrás do texto/barras) */
+#killcam::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 200px 30px rgba(0,0,0,.55);
+}
+
+/* letterbox — barras pretas que deslizam pra dentro */
+#killcam .kc-bars::before,
+#killcam .kc-bars::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 7vh;
+  background: #000; transition: transform .45s ease; z-index: 2;
+}
+#killcam .kc-bars::before { top: 0; transform: translateY(-101%); }
+#killcam .kc-bars::after { bottom: 0; transform: translateY(101%); }
+#killcam.show .kc-bars::before,
+#killcam.show .kc-bars::after { transform: translateY(0); }
+
+/* faixa superior: KILLCAM · morto por X */
+#killcam-top {
+  position: absolute; top: calc(7vh + 18px); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; white-space: nowrap; z-index: 3;
+  text-shadow: 0 2px 8px rgba(0,0,0,.9);
+}
+.kc-tag {
+  font-weight: bold; letter-spacing: 6px; font-size: 19px; color: #e0554e;
+  border: 2px solid #e0554e; border-radius: 6px; padding: 3px 13px;
+  background: rgba(30,6,4,.45); animation: kcTagPulse 1.6s ease-in-out infinite;
+}
+@keyframes kcTagPulse { 50% { border-color: #f08060; color: #f08060; box-shadow: 0 0 14px rgba(224,85,78,.5); } }
+.kc-by { font-size: 15px; letter-spacing: 2px; opacity: .92; }
+.kc-by b { color: #f0b34c; }
+
+/* dica de pular */
+#killcam-skip {
+  position: absolute; bottom: calc(7vh + 22px); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; z-index: 3;
+  font-size: 14px; letter-spacing: 3px; opacity: .88;
+  text-shadow: 0 2px 6px rgba(0,0,0,.9); animation: pulse 1.4s ease-in-out infinite;
+}
+#killcam-skip kbd {
+  font-family: inherit; font-weight: bold; font-size: 13px; letter-spacing: 0;
+  border: 2px solid rgba(242,227,200,.7); border-radius: 6px;
+  padding: 2px 10px; background: rgba(0,0,0,.35);
+}
+
+/* barra de progresso do replay */
+#killcam-track {
+  position: absolute; bottom: 7vh; left: 0; right: 0; height: 3px; z-index: 3;
+  background: rgba(242,227,200,.12);
+}
+#killcam-progress {
+  height: 100%; width: 0%; background: linear-gradient(90deg, #e0554e, #f0b34c);
+  box-shadow: 0 0 8px rgba(224,85,78,.6);
+}
+
+/* durante o killcam, esconde o HUD de jogo (visual limpo/cinematográfico) */
+#hud:has(#killcam.show) #cross,
+#hud:has(#killcam.show) #hitmarker,
+#hud:has(#killcam.show) #hp-box,
+#hud:has(#killcam.show) #ammo-box,
+#hud:has(#killcam.show) #stam-box,
+#hud:has(#killcam.show) #kit-box,
+#hud:has(#killcam.show) #match-bar { opacity: 0; transition: opacity .3s ease; }
+
+/* fade preto de transição (morte → killcam → renascimento) */
+#fade {
+  position: absolute; inset: 0; background: #000; opacity: 0;
+  pointer-events: none; z-index: 6; transition: opacity .26s ease;
+}
+#fade.on { opacity: 1; }
+
+/* ============================================================
    LOBBY (tela cheia sobre o mundo 3D)
    ============================================================ */
 #menu { position: fixed; inset: 0; z-index: 10; transition: opacity .35s; }
