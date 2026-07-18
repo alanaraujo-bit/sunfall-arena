@@ -454,7 +454,11 @@ export function initArmory() {
       loadout = loadLoadout();
       viewer.resize();
       updateBadges();
-      select(loadout.primary && byId(loadout.primary) ? loadout.primary : 'falcao');
+      // ?armory=<id> abre direto numa arma; senão, na primária equipada
+      const deep = new URLSearchParams(location.search).get('armory');
+      const startId = deep && byId(deep) ? deep
+        : (loadout.primary && byId(loadout.primary) ? loadout.primary : 'falcao');
+      select(startId);
       if (!ro && 'ResizeObserver' in window) {
         ro = new ResizeObserver(() => { if (open && viewer) viewer.resize(); });
         ro.observe(canvas);
