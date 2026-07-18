@@ -273,33 +273,33 @@ export function getShuffle() { return isShuffled; }
 export function getRepeatMode() { return repeatMode; }
 
 export function startLobbyMusic() {
-  if (isPlaying) { notifyState(); return; }
   if (AC && AC.state === 'suspended') AC.resume();
-  if (!playerA.src) {
-    playTrack(currentIndex);
-  } else {
-    play();
-  }
-  // Se o play() falhou por autoplay (browser bloqueou),
-    // agenda para tentar de novo no primeiro clique/tecla/touch do usuário
-  const retryOnInteraction = () => {
-    document.removeEventListener('click', retryOnInteraction);
-    document.removeEventListener('keydown', retryOnInteraction);
-    document.removeEventListener('touchstart', retryOnInteraction);
-    if (!isPlaying) {
-      if (AC && AC.state === 'suspended') AC.resume();
-      // Toca depois de um breve delay para dar tempo do AudioContext ativar
-      setTimeout(() => {
-        if (!isPlaying) {
-          if (!playerA.src) playTrack(currentIndex);
-          else play();
-        }
-      }, 300);
+  if (!playerA.src && !playerB.src) playTrack(currentIndex);
+  else play();
+
+  // O navegador bloqueia autoplay até um gesto do usuário. IMPORTANTE:
+  // `isPlaying` é otimista (vira true mesmo se o .play() foi bloqueado), então
+  // NÃO dá pra confiar nele aqui — checamos `player.paused` de verdade. Insiste
+  // a cada gesto (pointerdown/keydown/touch) até o áudio realmente tocar; só
+  // então remove os listeners. É por isso que antes a música só "acordava" ao
+  // entrar no jogo (primeiro gesto que escapava do guard quebrado).
+  const kick = () => {
+    if (AC && AC.state === 'suspended') AC.resume();
+    const p = getActivePlayer();
+    if (!p || !p.src) { playTrack(currentIndex); }
+    else if (p.paused) { isPlaying = true; p.play().then(() => fadeTo(p, volume, FADE_IN_DURATION)).catch(() => {}); }
+    // se realmente começou a tocar, encerra os listeners
+    const ap = getActivePlayer();
+    if (ap && !ap.paused) {
+      document.removeEventListener('pointerdown', kick, true);
+      document.removeEventListener('keydown', kick, true);
+      document.removeEventListener('touchstart', kick, true);
     }
+    notifyState();
   };
-  document.addEventListener('click', retryOnInteraction);
-  document.addEventListener('keydown', retryOnInteraction);
-  document.addEventListener('touchstart', retryOnInteraction);
+  document.addEventListener('pointerdown', kick, true);
+  document.addEventListener('keydown', kick, true);
+  document.addEventListener('touchstart', kick, true);
   notifyState();
 }
 

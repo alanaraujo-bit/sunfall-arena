@@ -1,9 +1,30 @@
 // ============================================================
 // SUNFALL ARENA — bots: patrulha, mira e tiro (por sala)
 // ============================================================
-import { PATROL, raycastSolids, pushOut } from '../../shared/mapdata.js';
+import { PATROL, BOUNDS, PLAYER, raycastSolids, pushOut } from '../../shared/mapdata.js';
 import { nextPlayerId, nextColor, spawnPos, broadcastRoom, assignTeam } from './rooms.js';
 import { sightBlockedBySmoke } from './grenades.js';
+
+// Um obstáculo bloqueia o bot se a caixa cruza a altura do corpo dele (pés a
+// ~1.4m). Ignora coisas no chão (degraus baixos) e o que está acima da cabeça
+// (telhados, parapeitos elevados) — o bot anda por baixo desses.
+function botBlocked(x, z) {
+  const r = PLAYER.R;
+  for (const b of BOUNDS) {
+    if (b.maxy < 0.15 || b.miny > 1.4) continue;
+    if (x + r > b.minx && x - r < b.maxx && z + r > b.minz && z - r < b.maxz) return true;
+  }
+  return false;
+}
+
+// Move o bot com colisão separada por eixo (desliza rente à parede em vez de
+// enfiar nela e ser "teleportado" pra fora pelo pushOut). Retorna se andou.
+function moveBot(bot, dx, dz) {
+  let moved = false;
+  if (dx && !botBlocked(bot.pos.x + dx, bot.pos.z)) { bot.pos.x += dx; moved = true; }
+  if (dz && !botBlocked(bot.pos.x, bot.pos.z + dz)) { bot.pos.z += dz; moved = true; }
+  return moved;
+}
 
 const BOT_NAMES = [
   'Tuca', 'Zumbi-77', 'Nina.exe', 'Kadu', 'Foguete', 'Piolho',
@@ -21,7 +42,7 @@ export function makeBot(room) {
     pos: spawnPos(room), yaw: 0, pitch: 0, anim: 1,
     hp: 100, kills: 0, deaths: 0, alive: true, bot: true, ws: null,
     wp: (Math.random() * PATROL.length) | 0,
-    fireT: 1 + Math.random() * 2, burst: 0, strafe: 0
+    fireT: 1 + Math.random() * 2, burst: 0, strafe: 0, stuckT: 0
   };
 }
 
@@ -54,13 +75,13 @@ export function updateBot(room, bot, dt, damage) {
   }
 
   if (target) {
-    // encarar o alvo + strafe lateral
+    // encarar o alvo + strafe lateral (com colisão: inverte o lado se travar)
     bot.yaw = Math.atan2(-(target.pos.x - bot.pos.x), -(target.pos.z - bot.pos.z));
     bot.strafe += dt;
     const side = Math.sin(bot.strafe * 1.7) > 0 ? 1 : -1;
     const px = Math.cos(bot.yaw) * side, pz = -Math.sin(bot.yaw) * side;
-    bot.pos.x += px * 2.6 * dt;
-    bot.pos.z += pz * 2.6 * dt;
+    const moved = moveBot(bot, px * 2.6 * dt, pz * 2.6 * dt);
+    if (!moved) bot.strafe += 1.2;   // encostou na parede → troca de direção
     bot.anim = 1;
 
     bot.fireT -= dt;
@@ -80,19 +101,25 @@ export function updateBot(room, bot, dt, damage) {
       if (Math.random() < chance) damage(room, bot, target, 8 + (Math.random() * 5 | 0), false, 0);
     }
   } else {
-    // patrulha
+    // patrulha (com colisão: se travar no caminho, pula pro próximo waypoint
+    // em vez de moer contra o obstáculo)
     const [wx, wz] = PATROL[bot.wp];
     const dx = wx - bot.pos.x, dz = wz - bot.pos.z;
     const d = Math.hypot(dx, dz);
     if (d < 1.6) {
       bot.wp = (bot.wp + 1 + (Math.random() * 3 | 0)) % PATROL.length;
+      bot.stuckT = 0;
     } else {
-      bot.pos.x += (dx / d) * 4.2 * dt;
-      bot.pos.z += (dz / d) * 4.2 * dt;
+      const moved = moveBot(bot, (dx / d) * 4.2 * dt, (dz / d) * 4.2 * dt);
       bot.yaw = Math.atan2(-dx, -dz);
       bot.anim = 1;
+      bot.stuckT = moved ? 0 : (bot.stuckT || 0) + dt;
+      if (bot.stuckT > 0.4) {   // preso num obstáculo → escolhe outro destino
+        bot.wp = (bot.wp + 1 + (Math.random() * 3 | 0)) % PATROL.length;
+        bot.stuckT = 0;
+      }
     }
   }
-  pushOut(bot.pos);
+  pushOut(bot.pos);   // rede de segurança (canyon bounds + casos extremos)
   bot.pos.y = 0;
 }

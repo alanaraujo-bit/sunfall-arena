@@ -1018,6 +1018,16 @@ const keys = {};
 let mouseDown = false, wantJump = false;
 const canvas = renderer.domElement;
 
+// Zera TODO o input preso. Sem isto, perder o foco (alt-tab, notificação,
+// clicar fora) com uma tecla apertada nunca dispara o keyup → a tecla fica
+// "presa" e o personagem anda sozinho pro lado. Chamado ao perder foco e ao
+// sair do pointer lock.
+function clearInput() {
+  for (const k in keys) keys[k] = false;
+  wantJump = false;
+  mouseDown = false;
+}
+
 addEventListener('keydown', e => {
   if (playing && e.code === binds.board) { e.preventDefault(); hud.board.classList.add('show'); rebuildBoard(); }
   if (e.repeat) return;
@@ -1060,9 +1070,8 @@ addEventListener('mouseup', e => {
   if (e.button === 2) setZoom(false);
 });
 addEventListener('contextmenu', e => e.preventDefault());
-// perder o foco com a granada "puxada" nunca pode travar as outras ações —
-// se o keyup nunca chegar (alt-tab), cancela o cook defensivamente
-addEventListener('blur', () => cancelNadeCook());
+// perder o foco: zera teclas presas (senão anda sozinho) e cancela o cook
+addEventListener('blur', () => { clearInput(); cancelNadeCook(); });
 addEventListener('mousemove', e => {
   if (document.pointerLockElement !== canvas || !playing || me.dead) return;
   const s = (+hud.sens.value) * (zoomed ? 0.35 : 1) * 0.0022;
@@ -1075,7 +1084,7 @@ document.addEventListener('pointerlockchange', () => {
     hud.menu.classList.remove('hidden');
     closeScreen();
     setMenuMode(true);
-    mouseDown = false;
+    clearInput();   // ao pausar/soltar o mouse, nenhuma tecla pode ficar presa
   } else if (playing) {
     hud.menu.classList.add('hidden');
   }
@@ -2907,6 +2916,13 @@ function renderAccountPanel() {
     hud.accPass.classList.remove('hidden');
     hud.accountInfo.classList.add('hidden');
   }
+  // Logado → deixa a aba CONTA ativa. Sem isto, o padrão é a aba CONVIDADO e o
+  // jogador logado entra na partida com nome de convidado ("Recruta"), porque
+  // playName() só usa o username quando a aba CONTA está ativa.
+  hud.tabAccount.classList.toggle('active', !!auth);
+  hud.tabGuest.classList.toggle('active', !auth);
+  hud.accountPanel.classList.toggle('hidden', !auth);
+  hud.guestPanel.classList.toggle('hidden', !!auth);
   updateIdChip();
   renderFriendsScreen();
   if (currentScreen === 'profile') loadProfile();
