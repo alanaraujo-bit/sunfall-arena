@@ -169,6 +169,29 @@ body {
 #nade-count { font-size: 15px; font-weight: bold; color: #ffb347; min-width: 12px; }
 #nade-box.using #nade-count { display: none; }
 
+/* granada de fumaça */
+#smoke-box {
+  position: absolute; left: 410px; bottom: 24px;
+  display: flex; align-items: center; gap: 6px;
+  opacity: 0; transform: scale(.85); transition: opacity .25s, transform .25s;
+}
+#smoke-box.show { opacity: 1; transform: scale(1); }
+#smoke-icon {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(16,34,32,.7); border: 2px solid #6ee0c8;
+  color: #6ee0c8; display: flex; align-items: center; justify-content: center;
+  font-size: 15px; text-shadow: 0 0 6px rgba(110,224,200,.8);
+}
+#smoke-box.using #smoke-icon { animation: nadePulse .5s infinite; }
+#smoke-bar-track {
+  width: 46px; height: 5px; border-radius: 3px; overflow: hidden;
+  background: rgba(20,14,8,.6); display: none;
+}
+#smoke-box.using #smoke-bar-track { display: block; }
+#smoke-bar { height: 100%; width: 0%; background: linear-gradient(90deg,#9fe8dc,#3fc8b4); transition: width .05s linear; }
+#smoke-count { font-size: 15px; font-weight: bold; color: #6ee0c8; min-width: 12px; }
+#smoke-box.using #smoke-count { display: none; }
+
 /* munição */
 #ammo-box { position: absolute; right: 30px; bottom: 22px; text-align: right; }
 #weapon-name {
@@ -334,6 +357,7 @@ body {
 #hud:has(#killcam.show) #stam-box,
 #hud:has(#killcam.show) #kit-box,
 #hud:has(#killcam.show) #nade-box,
+#hud:has(#killcam.show) #smoke-box,
 #hud:has(#killcam.show) #match-bar { opacity: 0; transition: opacity .3s ease; }
 
 /* fade preto de transição (morte → killcam → renascimento) */

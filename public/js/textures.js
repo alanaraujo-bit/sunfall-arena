@@ -539,6 +539,40 @@ export function spriteTex(inner = '#fff8e0', outer = '#ffb040') {
   return t;
 }
 
+// Puff de fumaça: alfa branco suave e IRREGULAR (vários blobs sobrepostos +
+// núcleo denso). O material tinge a cor e controla a opacidade — muitos
+// destes sobrepostos formam a nuvem volumétrica. Alfa premultiplicado no
+// branco para os puffs somarem densidade sem "quadrado" visível.
+export function smokeTex() {
+  if (cache.has('smoke')) return cache.get('smoke');
+  const s = 128;
+  const [c, ctx] = canvas(s);
+  ctx.clearRect(0, 0, s, s);
+  // borda irregular: blobs suaves deslocados
+  for (let i = 0; i < 6; i++) {
+    const bx = s * 0.5 + (R() - 0.5) * s * 0.3;
+    const by = s * 0.5 + (R() - 0.5) * s * 0.3;
+    const br = s * rr(0.26, 0.42);
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    g.addColorStop(0, 'rgba(255,255,255,0.42)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.16)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+  }
+  // núcleo denso central
+  const g2 = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s * 0.5);
+  g2.addColorStop(0, 'rgba(255,255,255,0.72)');
+  g2.addColorStop(0.5, 'rgba(255,255,255,0.32)');
+  g2.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g2;
+  ctx.fillRect(0, 0, s, s);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set('smoke', t);
+  return t;
+}
+
 // Céu de fim de tarde pintado (gradiente + sol + nuvens)
 export function skyTex() {
   if (cache.has('sky')) return cache.get('sky');

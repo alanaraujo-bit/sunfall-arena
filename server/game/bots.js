@@ -3,6 +3,7 @@
 // ============================================================
 import { PATROL, raycastSolids, pushOut } from '../../shared/mapdata.js';
 import { nextPlayerId, nextColor, spawnPos, broadcastRoom, assignTeam } from './rooms.js';
+import { sightBlockedBySmoke } from './grenades.js';
 
 const BOT_NAMES = [
   'Tuca', 'Zumbi-77', 'Nina.exe', 'Kadu', 'Foguete', 'Piolho',
@@ -24,14 +25,16 @@ export function makeBot(room) {
   };
 }
 
-function hasLOS(a, b) {
+function hasLOS(room, a, b) {
   const ax = a.pos.x, ay = a.pos.y + 1.55, az = a.pos.z;
   const bx = b.pos.x, by = b.pos.y + 1.3, bz = b.pos.z;
   let dx = bx - ax, dy = by - ay, dz = bz - az;
   const dist = Math.hypot(dx, dy, dz);
   if (dist < 0.001) return true;
-  dx /= dist; dy /= dist; dz /= dist;
-  return raycastSolids(ax, ay, az, dx, dy, dz) > dist - 0.6;
+  const ux = dx / dist, uy = dy / dist, uz = dz / dist;
+  if (raycastSolids(ax, ay, az, ux, uy, uz) <= dist - 0.6) return false;       // parede
+  if (sightBlockedBySmoke(room, ax, ay, az, bx, by, bz)) return false;         // fumaça cega o bot
+  return true;
 }
 
 export function updateBot(room, bot, dt, damage) {
@@ -45,7 +48,7 @@ export function updateBot(room, bot, dt, damage) {
       if (p === bot || !p.alive || p.bot !== pass) continue;
       if (tdm && p.team === bot.team) continue;
       const d = Math.hypot(p.pos.x - bot.pos.x, p.pos.z - bot.pos.z);
-      if (d < tDist && hasLOS(bot, p)) { target = p; tDist = d; }
+      if (d < tDist && hasLOS(room, bot, p)) { target = p; tDist = d; }
     }
     if (target) break;
   }

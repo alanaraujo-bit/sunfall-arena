@@ -665,6 +665,30 @@ export function makeGrenadeMesh() {
   return grp;
 }
 
+// Canister de fumaça em voo/rolando (mundo) — cilíndrico, cinza com faixa teal.
+export function makeSmokeCanisterMesh() {
+  const grp = new THREE.Group();
+  const bodyM = new THREE.MeshStandardMaterial({ color: 0x9aa0a2, roughness: 0.45, metalness: 0.7 });
+  const capM = new THREE.MeshStandardMaterial({ color: 0x50575a, roughness: 0.55, metalness: 0.6 });
+  const bandM = new THREE.MeshStandardMaterial({ color: TEAL, roughness: 0.5, emissive: 0x35e0c8, emissiveIntensity: 0.6 });
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.17, 14), bodyM);
+  body.castShadow = true;
+  grp.add(body);
+  for (const by of [0.04, -0.02]) {
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0455, 0.0455, 0.012, 14), bandM);
+    band.position.y = by;
+    grp.add(band);
+  }
+  for (const [cy, r1, r2] of [[0.093, 0.046, 0.046], [-0.093, 0.043, 0.046]]) {
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, 0.018, 14), capM);
+    cap.position.y = cy;
+    grp.add(cap);
+  }
+  grp.userData.accent = bandM;
+  return grp;
+}
+
 // ---------------- Armas em primeira pessoa ----------------
 
 export function makeViewmodel(kind) {
@@ -684,7 +708,65 @@ export function makeViewmodel(kind) {
   };
 
   let muzzle;
-  if (kind === 'nade') {
+  if (kind === 'smoke') {
+    // ---------------- Granada de fumaça "VÉU-3" ----------------
+    // Cilindro de aço com tampa perfurada (por onde a fumaça sai), corpo
+    // liso, faixa de identificação teal, alavanca e pino. Silhueta
+    // deliberadamente diferente da fragmentação (cilíndrica vs ovoide).
+    const bodyM = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x9aa0a2, roughness: 0.45, metalness: 0.7 });
+    const capM = new THREE.MeshStandardMaterial({ color: 0x50575a, roughness: 0.55, metalness: 0.6 });
+    const holeM = new THREE.MeshStandardMaterial({ color: 0x14181a, roughness: 0.9 });
+    const leverM = new THREE.MeshStandardMaterial({ color: 0xb8bcb6, roughness: 0.35, metalness: 0.85 });
+    const pinM = new THREE.MeshStandardMaterial({ color: 0xe0c060, roughness: 0.3, metalness: 0.7 });
+    const bandM = new THREE.MeshStandardMaterial({ color: TEAL, roughness: 0.5, emissive: 0x0e4a42, emissiveIntensity: 0.55 });
+
+    const holder = new THREE.Group();
+    holder.rotation.set(0.12, 0.2, -0.08);
+    holder.position.set(0, 0, 0.05);
+
+    // corpo cilíndrico
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.17, 16), bodyM);
+    holder.add(body);
+    // faixas teal de identificação
+    for (const by of [0.04, -0.02]) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0455, 0.0455, 0.012, 16), bandM);
+      band.position.y = by;
+      holder.add(band);
+    }
+    // tampa perfurada (topo)
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.02, 16), capM);
+    top.position.y = 0.095;
+    holder.add(top);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.022, 8), holeM);
+      hole.position.set(Math.cos(a) * 0.022, 0.096, Math.sin(a) * 0.022);
+      holder.add(hole);
+    }
+    const centerHole = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.022, 8), holeM);
+    centerHole.position.y = 0.096;
+    holder.add(centerHole);
+    // fundo
+    const bottom = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.043, 0.016, 16), capM);
+    bottom.position.y = -0.093;
+    holder.add(bottom);
+    // alavanca de segurança (some ao lançar) + pino
+    const lever = new THREE.Mesh(new RoundedBoxGeometry(0.013, 0.11, 0.02, 2, 0.006), leverM);
+    lever.position.set(0.05, 0.02, 0);
+    lever.rotation.z = -0.06;
+    holder.add(lever);
+    const pinRing = new THREE.Mesh(new THREE.TorusGeometry(0.013, 0.0035, 6, 14), pinM);
+    pinRing.position.set(0.062, 0.085, 0);
+    pinRing.rotation.y = Math.PI / 2;
+    holder.add(pinRing);
+
+    grp.add(holder);
+    grp.userData.lever = lever;
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.06, -0.15);
+    grp.add(muzzle);
+    return { group: grp, muzzle };
+  } else if (kind === 'nade') {
     // ---------------- Granada de fragmentação "ROSCA-4" ----------------
     // Corpo ovoide com sulcos de fragmentação, capuz da espoleta,
     // alavanca de segurança e anel do pino — segurada na mão, pronta

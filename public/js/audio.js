@@ -112,6 +112,13 @@ export const SFX = {
   },
   // confirmação de dano em área (hitmarker de granada)
   nadeHit() { ensure(); tone(600, 0.08, 0.28, 'sawtooth', 1000); tone(300, 0.06, 0.2, 'sine', 700, 0.02); },
+  // deploy da fumaça: chiado pressurizado (ruído sustentado que abre e fecha)
+  smokeDeploy(vol = 1) {
+    ensure();
+    noise(1.3, 0.34 * vol, 900, 5200, 'bandpass');   // jato pressurizado subindo
+    noise(1.6, 0.2 * vol, 600, 200, 'lowpass');       // corpo grave da nuvem
+    tone(220, 0.5, 0.05 * vol, 'sine', 120);
+  },
 
   hit() { ensure(); tone(880, 0.06, 0.25, 'sine', 1200); },
   headshot() { ensure(); tone(1100, 0.05, 0.28, 'sine', 1600); tone(1500, 0.07, 0.2, 'sine', 2000, 0.04); },

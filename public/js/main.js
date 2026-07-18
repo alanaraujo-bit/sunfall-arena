@@ -5,9 +5,9 @@
 // ============================================================
 import * as THREE from 'three';
 import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
-import { buildWorld, makeCharacter, makeViewmodel, makeGrenadeMesh } from './world.js';
-import { NADE, advanceGrenade, launchGrenade } from '/shared/nadephysics.js';
-import { tex, spriteTex, setTexQuality } from './textures.js';
+import { buildWorld, makeCharacter, makeViewmodel, makeGrenadeMesh, makeSmokeCanisterMesh } from './world.js';
+import { NADE, SMOKE, SMOKE_LIFE_MS, advanceGrenade, launchGrenade } from '/shared/nadephysics.js';
+import { tex, spriteTex, setTexQuality, smokeTex } from './textures.js';
 import { Net, api, apiAuth, apiPublicGet } from './net.js';
 import { SFX, getAudioContext } from './audio.js';
 import * as Music from './music.js';
@@ -21,12 +21,12 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', melee: 'KeyV', nade: 'KeyG', board: 'Tab'
+  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', melee: 'KeyV', nade: 'KeyG', smoke: 'KeyC', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', melee: 'Golpe rápido', nade: 'Granada', board: 'Placar'
+  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', melee: 'Golpe rápido', nade: 'Granada', smoke: 'Fumaça', board: 'Placar'
 };
 
 // Presets de qualidade — cada um define as opções individuais.
@@ -146,6 +146,7 @@ const hud = {
   stamBox: $('stam-box'), stamFill: $('stam-fill'),
   kitBox: $('kit-box'), kitCount: $('kit-count'), kitBar: $('kit-bar'),
   nadeBox: $('nade-box'), nadeCount: $('nade-count'), nadeBar: $('nade-bar'),
+  smokeBox: $('smoke-box'), smokeCount: $('smoke-count'), smokeBar: $('smoke-bar'),
   tabGuest: $('tab-guest'), tabAccount: $('tab-account'),
   guestPanel: $('guest-panel'), accountPanel: $('account-panel'),
   accUser: $('acc-user'), accPass: $('acc-pass'), accountStatus: $('account-status'),
@@ -694,7 +695,7 @@ const me = {
   slideEnergy: 100, slideCooldownT: 0,
   eyeH: PLAYER.EYE, stepT: 0,
   kits: 0, usingKit: 0,
-  nades: NADE.COUNT_START
+  nades: NADE.COUNT_START, smokes: SMOKE.COUNT_START
 };
 const SLIDE_MAX_ENERGY = 100, SLIDE_COST = 40, SLIDE_REGEN_DELAY = 1, SLIDE_REGEN_RATE = 30;
 const KIT_USE_TIME = 1, KIT_HEAL = 50;
@@ -733,7 +734,8 @@ function faceCenter() {
 // ---------------- Armas ----------------
 // Índice da faca no arsenal (slot de corpo a corpo)
 const KNIFE = 2;
-const GRENADE = 3;   // não é um "slot" de switchWeapon — ação overlay, como o golpe rápido
+const GRENADE = 3;   // viewmodel da granada de frag — ação overlay, não um "slot"
+const SMOKE_VM = 4;  // viewmodel da granada de fumaça
 const WEAPONS = [
   { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false },
   { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true },
@@ -750,16 +752,18 @@ const vmAR = makeViewmodel('ar');
 const vmSR = makeViewmodel('sr');
 const vmKnife = makeViewmodel('knife');
 const vmNade = makeViewmodel('nade');
+const vmSmoke = makeViewmodel('smoke');
 const vmRoot = new THREE.Group();
 vmRoot.position.set(0.26, -0.24, -0.5);
-vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group);
+vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group, vmSmoke.group);
 vmSR.group.visible = false;
 vmKnife.group.visible = false;
 vmNade.group.visible = false;
+vmSmoke.group.visible = false;
 vmRoot.visible = false; // oculto até entrar na partida
 camera.add(vmRoot);
 scene.add(camera);
-const viewmodels = [vmAR, vmSR, vmKnife, vmNade];
+const viewmodels = [vmAR, vmSR, vmKnife, vmNade, vmSmoke];
 
 // mostra só a viewmodel do índice `i` (guns e faca)
 function showViewmodel(i) {
@@ -1026,13 +1030,14 @@ addEventListener('keydown', e => {
   if (e.code === binds.w2) switchWeapon(1);
   if (e.code === binds.w3) switchWeapon(KNIFE);
   if (e.code === binds.melee) quickMelee();
-  if (e.code === binds.nade) startNadeCook();
+  if (e.code === binds.nade) startNadeCook('frag');
+  if (e.code === binds.smoke) startNadeCook('smoke');
   if (e.code === 'KeyF' && curW === KNIFE) startInspect();
 });
 addEventListener('keyup', e => {
   keys[e.code] = false;
   if (e.code === binds.board) hud.board.classList.remove('show');
-  if (e.code === binds.nade) releaseNadeThrow();
+  if (e.code === binds.nade || e.code === binds.smoke) releaseNadeThrow();
 });
 addEventListener('wheel', () => { if (playing && !me.dead) switchWeapon(1 - curW); });
 canvas.addEventListener('mousedown', e => {
@@ -1602,12 +1607,15 @@ const NADE_MAX_CHARGE_MS = 900;   // tempo até atingir força máxima
 const NADE_MIN_POWER = 0.35;      // toque rápido ainda lança longe o bastante
 const NADE_THROW_ANIM_MS = 0.3;   // duração da animação de arremesso (s)
 
-const nadeState = { cooking: false, chargeT: 0, throwing: false, throwT: 0 };
+const nadeState = { cooking: false, chargeT: 0, throwing: false, throwT: 0, kind: 'frag' };
 // minha própria granada, ainda sem confirmação do servidor (previsão local)
-let myNade = null;   // { mesh, phys:{pos,vel,grounded}, thrownAt, confirmedId }
+let myNade = null;   // { mesh, phys, thrownAt, confirmedId, kind }
 // granadas de todo mundo (a minha entra aqui assim que o servidor confirma
 // o id) — posicionadas via o mesmo buffer de interpolação dos jogadores
 const remoteNades = new Map();
+// tipo de cada granada em voo (id -> 'frag'|'smoke') para desenhar o modelo
+// certo mesmo para lançamentos de outros jogadores
+const nadeKinds = new Map();
 
 // pontinhos do arco previsto durante a carga (materiais individuais —
 // cada um precisa da própria opacidade, por isso não usam o cache global)
@@ -1656,19 +1664,22 @@ function updateNadeArc(power) {
   for (let i = shown; i < NADE_ARC_DOTS; i++) nadeArcDots[i].visible = false;
 }
 
-function canStartNade() {
+function nadeCountOf(kind) { return kind === 'smoke' ? me.smokes : me.nades; }
+
+function canStartNade(kind) {
   return playing && !matchEnded && !me.dead && me.usingKit <= 0 &&
-    me.nades > 0 && reloading <= 0 && swapT <= 0 &&
+    nadeCountOf(kind) > 0 && reloading <= 0 && swapT <= 0 &&
     !melee.active && !nadeState.cooking && !nadeState.throwing && !zoomed;
 }
 
-function startNadeCook() {
-  if (!canStartNade()) return;
+function startNadeCook(kind) {
+  if (!canStartNade(kind)) return;
   nadeState.cooking = true;
+  nadeState.kind = kind;
   nadeState.chargeT = 0;
   setZoom(false);
-  showViewmodel(GRENADE);
-  updateNadeHUD();
+  showViewmodel(kind === 'smoke' ? SMOKE_VM : GRENADE);
+  refreshNadeHUD();
   SFX.nadePin();
 }
 
@@ -1676,19 +1687,20 @@ function releaseNadeThrow() {
   if (!nadeState.cooking) return;
   nadeState.cooking = false;
   hideNadeArc();
+  const kind = nadeState.kind;
   const power = Math.max(NADE_MIN_POWER, Math.min(1, nadeState.chargeT / NADE_MAX_CHARGE_MS));
   const { origin, dir } = nadeThrowVector();
 
   // previsão local: a granada já sai voando antes do servidor confirmar
   const phys = launchGrenade(origin, dir, power);
-  const mesh = makeGrenadeMesh();
+  const mesh = kind === 'smoke' ? makeSmokeCanisterMesh() : makeGrenadeMesh();
   mesh.position.set(phys.pos.x, phys.pos.y, phys.pos.z);
   scene.add(mesh);
-  myNade = { mesh, phys, thrownAt: performance.now(), confirmedId: null };
+  myNade = { mesh, phys, thrownAt: performance.now(), confirmedId: null, kind };
 
-  me.nades--;
-  updateNadeHUD();
-  net.send({ t: 'nade', o: [origin.x, origin.y, origin.z], d: [dir.x, dir.y, dir.z], pw: power });
+  if (kind === 'smoke') me.smokes--; else me.nades--;
+  refreshNadeHUD();
+  net.send({ t: 'nade', kind, o: [origin.x, origin.y, origin.z], d: [dir.x, dir.y, dir.z], pw: power });
 
   nadeState.throwing = true;
   nadeState.throwT = 0;
@@ -1704,14 +1716,14 @@ function cancelNadeCook() {
   hideNadeArc();
   showViewmodel(curW);
   vmRoot.rotation.set(0, 0, 0);
-  updateNadeHUD();
+  refreshNadeHUD();
 }
 
 function updateNadeState(dt) {
   if (nadeState.cooking) {
     nadeState.chargeT = Math.min(NADE_MAX_CHARGE_MS, nadeState.chargeT + dt * 1000);
     updateNadeArc(Math.max(NADE_MIN_POWER, Math.min(1, nadeState.chargeT / NADE_MAX_CHARGE_MS)));
-    updateNadeHUD();
+    refreshNadeHUD();
   }
   if (nadeState.throwing) {
     nadeState.throwT += dt;
@@ -1730,19 +1742,25 @@ function updateNadeState(dt) {
     if (bounced) {
       SFX.nadeBounce(Math.max(0.05, 1 / (1 + me.pos.distanceTo(myNade.mesh.position) * 0.12)));
     }
-    // salvaguarda: se o servidor nunca confirmar, explode localmente mesmo
+    // salvaguarda: se o servidor nunca confirmar, resolve localmente mesmo
     // assim — nunca fica uma granada fantasma presa na cena
-    if (performance.now() - myNade.thrownAt > NADE.FUSE_MS + 500) {
-      spawnNadeExplosionFX(myNade.mesh.position);
+    const fuse = myNade.kind === 'smoke' ? SMOKE.FUSE_MS : NADE.FUSE_MS;
+    if (performance.now() - myNade.thrownAt > fuse + 800) {
+      if (myNade.kind === 'smoke') {
+        const c = myNade.mesh.position;
+        spawnSmokeCloud('local' + Math.random(), new THREE.Vector3(c.x, c.y + SMOKE.CENTER_UP, c.z), SMOKE_LIFE_MS);
+      } else spawnNadeExplosionFX(myNade.mesh.position);
       scene.remove(myNade.mesh);
       myNade = null;
     }
   }
 
-  // pulso do acento teal — acelera perto da explosão ("vai estourar já")
+  // pulso do acento teal do FRAG — acelera perto da explosão ("vai estourar já")
   const now = performance.now();
-  if (myNade) pulseNadeMesh(myNade.mesh, now - myNade.thrownAt);
-  for (const r of remoteNades.values()) pulseNadeMesh(r.mesh, now - r.spawnedAt);
+  if (myNade && myNade.kind !== 'smoke') pulseNadeMesh(myNade.mesh, now - myNade.thrownAt);
+  for (const [id, r] of remoteNades) {
+    if (nadeKinds.get(id) !== 'smoke') pulseNadeMesh(r.mesh, now - r.spawnedAt);
+  }
 }
 
 function pulseNadeMesh(mesh, elapsedMs) {
@@ -1779,7 +1797,7 @@ function updateRemoteNades(dt) {
     if (myNade && myNade.confirmedId === id) continue;   // já é o mesmo mesh, tratado acima
     let r = remoteNades.get(id);
     if (!r) {
-      const mesh = makeGrenadeMesh();
+      const mesh = nadeKinds.get(id) === 'smoke' ? makeSmokeCanisterMesh() : makeGrenadeMesh();
       scene.add(mesh);
       r = { mesh, spawnedAt: performance.now() };
       remoteNades.set(id, r);
@@ -1788,7 +1806,7 @@ function updateRemoteNades(dt) {
     r.mesh.rotation.x += dt * 7; r.mesh.rotation.z += dt * 5;
   }
   for (const [id, r] of remoteNades) {
-    if (!seen.has(id)) { scene.remove(r.mesh); remoteNades.delete(id); }   // limpeza defensiva
+    if (!seen.has(id)) { scene.remove(r.mesh); remoteNades.delete(id); nadeKinds.delete(id); }   // limpeza defensiva
   }
 }
 
@@ -1796,7 +1814,106 @@ function clearAllNadeMeshes() {
   if (myNade) { scene.remove(myNade.mesh); myNade = null; }
   for (const r of remoteNades.values()) scene.remove(r.mesh);
   remoteNades.clear();
+  nadeKinds.clear();
+  clearAllSmokeClouds();
   hideNadeArc();
+}
+
+// ============================================================
+// GRANADA DE FUMAÇA — Módulo 03
+// A nuvem é um aglomerado de sprites billboard (puffs) que expande do
+// ponto de deploy, ganha densidade, respira (churn) e dissipa. Os puffs
+// são "encostados" nas paredes por raycast (não atravessam). Posição e
+// tempo de vida vêm do servidor (smokestart) — a geometria é determinística,
+// então todos veem a MESMA nuvem no mesmo lugar (oclusão simétrica). O
+// servidor também cega os bots que tentam mirar através dela.
+// ============================================================
+const smokeClouds = new Map();   // id -> { group, puffs, deployAt, dur }
+const smokePuffTex = smokeTex();
+
+function smokePuffCount() {
+  // nunca 0 mesmo com partículas off — negar visão é gameplay, não enfeite
+  return settings.particles === 'off' ? 15 : settings.particles === 'low' ? 22 : 32;
+}
+
+function spawnSmokeCloud(id, center, durMs) {
+  id = String(id);
+  if (smokeClouds.has(id)) return;
+  const group = new THREE.Group();
+  group.position.copy(center);
+  scene.add(group);
+
+  const n = smokePuffCount();
+  const puffs = [];
+  const WORLD_FLOOR = 0.18, WORLD_CEIL = 2.9;
+  for (let i = 0; i < n; i++) {
+    // direção num elipsoide achatado (espalha mais rente ao chão)
+    const theta = Math.random() * Math.PI * 2;
+    const u = Math.random() * 2 - 1;
+    let dx = Math.sqrt(1 - u * u) * Math.cos(theta);
+    let dz = Math.sqrt(1 - u * u) * Math.sin(theta);
+    let dy = u * 0.5;
+    const len = Math.hypot(dx, dy, dz) || 1; dx /= len; dy /= len; dz /= len;
+
+    let dist = SMOKE.RADIUS * (0.4 + Math.random() * 0.62);
+    const wall = raycastSolids(center.x, center.y, center.z, dx, dy, dz);
+    if (wall < dist) dist = Math.max(0.15, wall - 0.35);   // encosta na parede, não atravessa
+
+    let localY = dy * dist;
+    localY = Math.max(WORLD_FLOOR - center.y, Math.min(WORLD_CEIL - center.y, localY));
+
+    const mat = new THREE.SpriteMaterial({
+      map: smokePuffTex, transparent: true, depthWrite: false,
+      color: new THREE.Color().setHSL(0.09, 0.06, 0.66 + Math.random() * 0.14),
+      opacity: 0
+    });
+    mat.rotation = Math.random() * Math.PI * 2;
+    const spr = new THREE.Sprite(mat);
+    group.add(spr);
+    puffs.push({
+      spr, mat,
+      fx: dx * dist, fy: localY, fz: dz * dist,
+      size: SMOKE.RADIUS * (1.05 + Math.random() * 0.55),
+      baseOp: 0.52 + Math.random() * 0.22,
+      phase: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 0.5
+    });
+  }
+  smokeClouds.set(id, { group, puffs, deployAt: performance.now(), dur: durMs || SMOKE_LIFE_MS });
+  const dist = me.pos.distanceTo(center);
+  SFX.smokeDeploy(Math.max(0.12, 1 / (1 + dist * 0.06)));
+}
+
+function updateSmokeClouds(dt) {
+  if (smokeClouds.size === 0) return;
+  const now = performance.now();
+  for (const [id, cloud] of smokeClouds) {
+    const el = now - cloud.deployAt;
+    if (el >= cloud.dur) { removeSmokeCloud(id); continue; }
+    const expand = Math.min(1, el / SMOKE.DEPLOY_MS);
+    const eE = 1 - Math.pow(1 - expand, 3);                 // easeOutCubic
+    const dissStart = cloud.dur - SMOKE.DISSIPATE_MS;
+    const diss = el > dissStart ? Math.min(1, (el - dissStart) / SMOKE.DISSIPATE_MS) : 0;
+    for (const p of cloud.puffs) {
+      const churnX = Math.cos(el * 0.0009 + p.phase) * 0.1;
+      const churnY = Math.sin(el * 0.0011 + p.phase) * 0.12;
+      p.spr.position.set(p.fx * eE + churnX, p.fy * eE + churnY + diss * 1.3, p.fz * eE);
+      p.spr.scale.setScalar(p.size * (0.35 + 0.65 * eE) * (1 - diss * 0.35));
+      p.mat.opacity = p.baseOp * Math.min(1, eE * 1.4) * (1 - diss);
+      p.mat.rotation += p.spin * dt;
+    }
+  }
+}
+
+function removeSmokeCloud(id) {
+  const c = smokeClouds.get(String(id));
+  if (!c) return;
+  for (const p of c.puffs) p.mat.dispose();
+  scene.remove(c.group);
+  smokeClouds.delete(String(id));
+}
+function clearAllSmokeClouds() {
+  for (const id of [...smokeClouds.keys()]) removeSmokeCloud(id);
 }
 
 // ---- explosão: flash, onda de choque, fragmentos, poeira, câmera ----
@@ -1865,13 +1982,21 @@ function updateKitHUD() {
   hud.kitBox.classList.toggle('using', me.usingKit > 0);
 }
 
-function updateNadeHUD() {
+// atualiza os dois contadores (frag e fumaça); a barra de carga só aparece
+// na caixa do tipo que está sendo carregado
+function refreshNadeHUD() {
+  const chargePct = (Math.max(NADE_MIN_POWER, Math.min(1, nadeState.chargeT / NADE_MAX_CHARGE_MS)) * 100) + '%';
+  const fragCook = nadeState.cooking && nadeState.kind === 'frag';
   hud.nadeCount.textContent = me.nades;
-  hud.nadeBox.classList.toggle('show', me.nades > 0 || nadeState.cooking);
-  hud.nadeBox.classList.toggle('using', nadeState.cooking);
-  hud.nadeBar.style.width = nadeState.cooking
-    ? (Math.max(NADE_MIN_POWER, Math.min(1, nadeState.chargeT / NADE_MAX_CHARGE_MS)) * 100) + '%'
-    : '0%';
+  hud.nadeBox.classList.toggle('show', me.nades > 0 || fragCook);
+  hud.nadeBox.classList.toggle('using', fragCook);
+  hud.nadeBar.style.width = fragCook ? chargePct : '0%';
+
+  const smokeCook = nadeState.cooking && nadeState.kind === 'smoke';
+  hud.smokeCount.textContent = me.smokes;
+  hud.smokeBox.classList.toggle('show', me.smokes > 0 || smokeCook);
+  hud.smokeBox.classList.toggle('using', smokeCook);
+  hud.smokeBar.style.width = smokeCook ? chargePct : '0%';
 }
 
 let multiKillT = null;
@@ -1964,9 +2089,10 @@ function clearRoomState() {
   multiKillCount = 0; lastKillTime = 0;
   cancelMelee(); melee.cd = 0; knifeEquipT = 0; knifeInspectT = 0;
   curW = 0; showViewmodel(0); camShake = 0;
-  cancelNadeCook(); nadeState.throwing = false; me.nades = NADE.COUNT_START;
+  cancelNadeCook(); nadeState.throwing = false;
+  me.nades = NADE.COUNT_START; me.smokes = SMOKE.COUNT_START;
   clearAllNadeMeshes();
-  updateSlideHUD(); updateKitHUD(); updateNadeHUD();
+  updateSlideHUD(); updateKitHUD(); refreshNadeHUD();
 }
 
 net.on('init', msg => {
@@ -1981,10 +2107,11 @@ net.on('init', msg => {
       me.color = p.color;
       me.hp = p.hp; me.k = 0; me.d = 0;
       me.nades = p.nades ?? NADE.COUNT_START;
+      me.smokes = p.smokes ?? SMOKE.COUNT_START;
       faceCenter();
     } else addRemote(p);
   }
-  updateNadeHUD();
+  refreshNadeHUD();
   startPlaying();
 });
 net.on('j', msg => addRemote(msg.p));
@@ -2013,14 +2140,20 @@ net.on('s', msg => {
 // previsto sob o id real do servidor — dali em diante a posição vem do
 // buffer de snapshots, igual a qualquer outra granada
 net.on('nc', msg => {
-  me.nades = msg.n;
-  updateNadeHUD();
+  if (msg.kind === 'smoke') me.smokes = msg.n; else me.nades = msg.n;
+  refreshNadeHUD();
   if (msg.id != null && myNade && myNade.confirmedId === null) {
-    myNade.confirmedId = String(msg.id);
-    remoteNades.set(myNade.confirmedId, { mesh: myNade.mesh, spawnedAt: myNade.thrownAt });
+    const id = String(msg.id);
+    myNade.confirmedId = id;
+    nadeKinds.set(id, myNade.kind);
+    remoteNades.set(id, { mesh: myNade.mesh, spawnedAt: myNade.thrownAt });
     myNade = null;
   }
 });
+
+// aviso de que uma granada de outro jogador nasceu (id + tipo) — para
+// desenharmos o modelo certo (frag vs canister de fumaça) já em voo
+net.on('ng', msg => { nadeKinds.set(String(msg.id), msg.kind === 'smoke' ? 'smoke' : 'frag'); });
 
 // quique de uma granada (minha ou de outro jogador) — som posicional
 net.on('nb', msg => {
@@ -2036,9 +2169,20 @@ net.on('nadeboom', msg => {
   const id = String(msg.id);
   const r = remoteNades.get(id);
   const pos = r ? r.mesh.position.clone() : new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]);
-  if (r) { scene.remove(r.mesh); remoteNades.delete(id); }
+  if (r) { scene.remove(r.mesh); remoteNades.delete(id); nadeKinds.delete(id); }
   spawnNadeExplosionFX(pos);
 });
+
+// deploy da fumaça: remove o canister em voo e materializa a nuvem no lugar
+net.on('smokestart', msg => {
+  const id = String(msg.id);
+  const r = remoteNades.get(id);
+  if (r) { scene.remove(r.mesh); remoteNades.delete(id); }
+  if (myNade && myNade.confirmedId === id) { scene.remove(myNade.mesh); myNade = null; }
+  nadeKinds.delete(id);
+  spawnSmokeCloud(id, new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]), msg.dur || SMOKE_LIFE_MS);
+});
+net.on('smokeend', msg => removeSmokeCloud(String(msg.id)));
 
 // Acha o par de snapshots que envolve o tempo de render (agora - atraso).
 // `sv` = instante do SERVIDOR que está sendo renderizado — enviado junto com o
@@ -2514,13 +2658,14 @@ net.on('spawn', msg => {
     ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
     reloading = 0;
     me.nades = msg.nades ?? NADE.COUNT_START;
+    me.smokes = msg.smokes ?? SMOKE.COUNT_START;
     cancelNadeCook(); nadeState.throwing = false;
     hud.death.classList.remove('show');
     endKillcam();
     clearTimeout(deathTimer); deathTimer = null;
     killcam.respawnSent = false;
     hud.fade.classList.remove('on');   // fade suave de volta ao jogo
-    updateHpHUD(); updateAmmoHUD(); updateNadeHUD();
+    updateHpHUD(); updateAmmoHUD(); refreshNadeHUD();
     SFX.spawn();
   } else {
     const r = remotes.get(msg.id);
@@ -2620,8 +2765,9 @@ net.on('restart', msg => {
       ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
       reloading = 0;
       me.nades = p.nades ?? NADE.COUNT_START;
+      me.smokes = p.smokes ?? SMOKE.COUNT_START;
       cancelNadeCook(); nadeState.throwing = false;
-      updateHpHUD(); updateAmmoHUD(); updateNadeHUD();
+      updateHpHUD(); updateAmmoHUD(); refreshNadeHUD();
     } else {
       const r = remotes.get(p.id);
       if (r) {
@@ -3056,6 +3202,7 @@ function frame() {
   updatePerf(dt);
   world.update(t);
   updateEffects(dt);
+  updateSmokeClouds(dt);   // nuvens evoluem sempre (mesmo morto/killcam)
   if (!killcam.active) { updateRemotes(dt, t); updateRemoteNades(dt); }   // durante o killcam quem posiciona é updateKillcam
 
   if (playing && killcam.active) {

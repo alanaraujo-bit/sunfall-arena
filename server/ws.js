@@ -11,8 +11,8 @@ import {
 } from './game/rooms.js';
 import { updateBot } from './game/bots.js';
 import {
-  NADE_COUNT_START, NADE_THROW_COOLDOWN_MS,
-  throwGrenade, updateGrenades, explodeGrenade
+  NADE_COUNT_START, SMOKE_COUNT_START, NADE_THROW_COOLDOWN_MS, SMOKE_LIFE_MS,
+  throwGrenade, updateGrenades, explodeGrenade, deploySmoke, updateSmokes
 } from './game/grenades.js';
 import { awardXpAndPersist, persistDeath, loadProfileForJoin } from './game/stats.js';
 import { verifyToken } from './auth.js';
@@ -66,8 +66,10 @@ function respawnPlayer(room, victim) {
   victim.hp = 100;
   victim.alive = true;
   victim.nades = NADE_COUNT_START;
+  victim.smokes = SMOKE_COUNT_START;
   broadcastRoom(room, {
-    t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z], nades: victim.nades
+    t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z],
+    nades: victim.nades, smokes: victim.smokes
   });
 }
 
@@ -183,7 +185,7 @@ export function attachWs(server) {
         team: target.settings.gm === 'tdm' ? assignTeam(target) : null,
         pos: spawnPos(target), yaw: 0, pitch: 0, anim: 0,
         hp: 100, kills: 0, deaths: 0, streak: 0, kits: 0, healingKit: false,
-        nades: NADE_COUNT_START,
+        nades: NADE_COUNT_START, smokes: SMOKE_COUNT_START,
         alive: true, bot: false, ws
       };
       room = target;
@@ -270,8 +272,10 @@ export function attachWs(server) {
             self.hp = 100;
             self.alive = true;
             self.nades = NADE_COUNT_START;
+            self.smokes = SMOKE_COUNT_START;
             broadcastRoom(room, {
-              t: 'spawn', id: self.id, pos: [self.pos.x, self.pos.y, self.pos.z], nades: self.nades
+              t: 'spawn', id: self.id, pos: [self.pos.x, self.pos.y, self.pos.z],
+              nades: self.nades, smokes: self.smokes
             });
           }, 600);
           return;
@@ -436,12 +440,14 @@ export function attachWs(server) {
           break;
         }
         case 'nade': {
-          // Lançamento de granada: física e explosão são 100% do servidor
-          // (ver server/game/grenades.js); o cliente só prevê o arco/efeito.
+          // Lançamento de granada (frag ou fumaça): física e efeito são 100%
+          // do servidor (ver server/game/grenades.js); o cliente só prevê.
           if (!self.alive || room.state !== 'playing') break;
-          if (!self.nades || self.nades <= 0) break;
+          const kind = msg.kind === 'smoke' ? 'smoke' : 'frag';
+          const field = kind === 'smoke' ? 'smokes' : 'nades';
+          if (!self[field] || self[field] <= 0) break;
           const now = Date.now();
-          if (now - (self.lastNade || 0) < NADE_THROW_COOLDOWN_MS) break;
+          if (now - (self.lastThrow || 0) < NADE_THROW_COOLDOWN_MS) break;   // cadência única p/ os dois tipos
 
           if (!Array.isArray(msg.o) || !Array.isArray(msg.d)) break;
           const ox = +msg.o[0], oy = +msg.o[1], oz = +msg.o[2];
@@ -453,12 +459,13 @@ export function attachWs(server) {
               Math.abs(oy - (self.pos.y + PLAYER.EYE)) > 2) break;
           const pw = Math.max(0, Math.min(1, +msg.pw || 0));
 
-          self.lastNade = now;
-          self.nades--;
-          const nade = throwGrenade(room, self, { x: ox, y: oy, z: oz }, { x: dx, y: dy, z: dz }, pw);
-          // id incluído: o cliente "adota" o mesh previsto localmente sob
-          // este id real, em vez de renderizar a granada duas vezes
-          send({ t: 'nc', n: self.nades, id: nade.id });
+          self.lastThrow = now;
+          self[field]--;
+          const nade = throwGrenade(room, self, { x: ox, y: oy, z: oz }, { x: dx, y: dy, z: dz }, pw, kind);
+          // id + kind: o cliente "adota" o mesh previsto sob este id real; os
+          // outros clientes aprendem o tipo para desenhar o modelo certo em voo
+          send({ t: 'nc', kind, n: self[field], id: nade.id });
+          broadcastRoom(room, { t: 'ng', id: nade.id, kind }, self.id);
           break;
         }
       }
@@ -493,7 +500,7 @@ export function startGameLoop() {
 
       // física das granadas continua mesmo pós-fim de partida (uma granada já
       // no ar não "congela" no ar); damage() se auto-bloqueia fora de 'playing'
-      const { bounces, explosions } = updateGrenades(room, TICK_DT, now);
+      const { bounces, explosions, smokeDeploys } = updateGrenades(room, TICK_DT, now);
       for (const nade of bounces) {
         broadcastRoom(room, {
           t: 'nb', id: nade.id, o: [+nade.pos.x.toFixed(2), +nade.pos.y.toFixed(2), +nade.pos.z.toFixed(2)]
@@ -505,6 +512,14 @@ export function startGameLoop() {
         });
         explodeGrenade(room, nade, room.players, damage);
       }
+      for (const nade of smokeDeploys) {
+        const s = deploySmoke(room, nade, now);
+        broadcastRoom(room, {
+          t: 'smokestart', id: s.id, o: [+s.pos.x.toFixed(2), +s.pos.y.toFixed(2), +s.pos.z.toFixed(2)], dur: SMOKE_LIFE_MS
+        });
+      }
+      const expiredSmokes = updateSmokes(room, now);
+      if (expiredSmokes) for (const id of expiredSmokes) broadcastRoom(room, { t: 'smokeend', id });
 
       const state = {};
       for (const p of room.players.values()) {

@@ -21,6 +21,19 @@ export const NADE = {
   DMG_RADIUS: 5.5
 };
 
+// Granada de FUMAÇA (Módulo 03) — mesma física da explosiva; ao final do fuse,
+// em vez de explodir, deposita uma nuvem que nega visão por um tempo.
+export const SMOKE = {
+  FUSE_MS: 1400,        // tempo até depositar a fumaça (deploy onde parou)
+  RADIUS: 2.5,          // raio tático: núcleo opaco + bloqueio de visão dos bots
+  CENTER_UP: 1.1,       // altura do centro da nuvem acima do ponto de deploy
+  DEPLOY_MS: 1100,      // expansão inicial (billowing)
+  HOLD_MS: 13000,       // tempo denso
+  DISSIPATE_MS: 2800,   // dissipação lenta
+  COUNT_START: 1
+};
+export const SMOKE_LIFE_MS = SMOKE.DEPLOY_MS + SMOKE.HOLD_MS + SMOKE.DISSIPATE_MS;
+
 function blocked(x, y, z, r) {
   for (const b of BOUNDS) {
     if (x + r > b.minx && x - r < b.maxx &&
