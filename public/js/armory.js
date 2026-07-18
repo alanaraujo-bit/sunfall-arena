@@ -11,12 +11,12 @@ import { tex } from './textures.js';
 import { ARSENAL, ATTACH_SLOTS, byId } from './arsenal-data.js';
 
 // ------------------------------------------------------------
-// Modelo 3D detalhado — CORVO-A4 (fuzil de assalto, arma-herói)
+// Modelo 3D detalhado — FALCÃO-9 (fuzil de assalto real do jogo)
 // Comprimento no eixo X (cano p/ -X, coronha p/ +X). Estilizado
 // e legível, com receiver, trilho, luneta ponto-vermelho, cano
 // com quebra-chamas, carregador curvo, punho, coronha e acentos.
 // ------------------------------------------------------------
-function buildCorvoA4() {
+function buildFalcao9() {
   const g = new THREE.Group();
 
   const gun = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x8b9299, roughness: 0.42, metalness: 0.9 });
@@ -120,7 +120,92 @@ function buildCorvoA4() {
   return g;
 }
 
-const MODEL_BUILDERS = { corvo: buildCorvoA4 };
+// ------------------------------------------------------------
+// Modelo 3D detalhado — FERRÃO-SR (fuzil de precisão real do jogo)
+// Cano longo, luneta grande com sino de objetiva, ferrolho lateral,
+// coronha com apoio de face, bipé recolhido e acentos âmbar.
+// ------------------------------------------------------------
+function buildFerraoSR() {
+  const g = new THREE.Group();
+
+  const gun = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x7f868c, roughness: 0.4, metalness: 0.92 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc2cace, roughness: 0.24, metalness: 0.96 });
+  const poly = new THREE.MeshStandardMaterial({ color: 0x1e2226, roughness: 0.74, metalness: 0.12 });
+  const poly2 = new THREE.MeshStandardMaterial({ color: 0x2c3238, roughness: 0.6, metalness: 0.2 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x101317, roughness: 0.85, metalness: 0.1 });
+  const amber = new THREE.MeshStandardMaterial({ color: 0xf0b34c, roughness: 0.4, metalness: 0.55, emissive: 0x3a2606, emissiveIntensity: 0.6 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x101c22, roughness: 0.08, metalness: 0.5, transparent: true, opacity: 0.5 });
+
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    g.add(m);
+    return m;
+  };
+  const cyl = (r1, r2, h, seg = 16) => new THREE.CylinderGeometry(r1, r2, h, seg);
+  const rbox = (w, h, d, r = 0.012) => new RoundedBoxGeometry(w, h, d, 2, r);
+
+  // ---- receiver comprido ----
+  add(rbox(0.66, 0.12, 0.1), gun, 0.02, 0, 0);
+  add(rbox(0.4, 0.06, 0.092), poly2, 0.2, 0.085, 0);           // trilho traseiro elevado
+  add(rbox(0.5, 0.05, 0.05), dark, -0.02, 0.12, 0);            // base da luneta
+  add(new THREE.BoxGeometry(0.3, 0.02, 0.004), amber, 0.04, -0.028, 0.051);
+  add(new THREE.BoxGeometry(0.3, 0.02, 0.004), amber, 0.04, -0.028, -0.051);
+
+  // ---- cano longo + freio de boca ----
+  add(cyl(0.024, 0.024, 0.66, 18), steel, -0.62, 0.01, 0, 0, 0, Math.PI / 2);
+  add(cyl(0.03, 0.03, 0.03, 16), poly2, -0.42, 0.01, 0, 0, 0, Math.PI / 2);   // bloco de gás
+  add(cyl(0.036, 0.032, 0.12, 18), dark, -0.98, 0.01, 0, 0, 0, Math.PI / 2);  // freio de boca
+  for (let i = 0; i < 3; i++) add(new THREE.BoxGeometry(0.08, 0.008, 0.05), gun, -0.96 + i * 0.03, 0.03, 0);
+
+  // ---- luneta grande ----
+  const sc = new THREE.Group(); sc.position.set(0.06, 0.2, 0); g.add(sc);
+  const sadd = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); sc.add(m); return m;
+  };
+  sadd(rbox(0.024, 0.07, 0.05), dark, -0.12, -0.04, 0);        // anel dianteiro
+  sadd(rbox(0.024, 0.07, 0.05), dark, 0.12, -0.04, 0);         // anel traseiro
+  sadd(cyl(0.05, 0.05, 0.28, 22), poly, 0, 0.01, 0, 0, 0, Math.PI / 2);       // tubo principal
+  sadd(cyl(0.066, 0.055, 0.1, 22), poly2, -0.2, 0.01, 0, 0, 0, Math.PI / 2);  // sino da objetiva
+  sadd(cyl(0.06, 0.06, 0.008, 22), glass, -0.253, 0.01, 0, 0, 0, Math.PI / 2); // lente objetiva
+  sadd(cyl(0.046, 0.046, 0.05, 20), dark, 0.17, 0.01, 0, 0, 0, Math.PI / 2);   // ocular
+  sadd(cyl(0.048, 0.048, 0.006, 20), glass, 0.197, 0.01, 0, 0, 0, Math.PI / 2);
+  sadd(cyl(0.02, 0.02, 0.05, 12), amber, 0, 0.06, 0);                          // torre de elevação
+  sadd(cyl(0.02, 0.02, 0.05, 12), poly2, 0, 0.01, 0.06, Math.PI / 2, 0, 0);    // torre lateral
+
+  // ---- ferrolho lateral ----
+  add(cyl(0.014, 0.014, 0.07, 10), steel, 0.24, 0.03, 0.07, 0, 0, Math.PI / 2.4);
+  add(new THREE.SphereGeometry(0.022, 12, 10), steel, 0.285, 0.055, 0.09);
+
+  // ---- carregador curto ----
+  add(rbox(0.09, 0.13, 0.07), poly, -0.06, -0.13, 0, 0, 0, 0.06);
+  add(new THREE.BoxGeometry(0.008, 0.12, 0.05), amber, -0.1, -0.13, 0);
+
+  // ---- punho + guarda-gatilho ----
+  add(rbox(0.08, 0.16, 0.075), poly, 0.16, -0.13, 0, 0, 0, -0.28);
+  add(new THREE.TorusGeometry(0.05, 0.011, 8, 16, Math.PI), dark, 0.06, -0.11, 0, Math.PI, 0, 0);
+  add(new THREE.BoxGeometry(0.014, 0.04, 0.02), steel, 0.06, -0.1, 0);
+
+  // ---- coronha com apoio de face ----
+  add(rbox(0.28, 0.09, 0.08), poly, 0.42, -0.01, 0);          // corpo
+  add(rbox(0.16, 0.05, 0.075), poly2, 0.42, 0.075, 0);        // apoio de face
+  add(rbox(0.04, 0.19, 0.09), dark, 0.57, -0.02, 0);          // apoio de ombro
+  add(rbox(0.12, 0.05, 0.075), poly2, 0.44, -0.09, 0, 0, 0, 0.35); // apoio inferior
+  add(new THREE.BoxGeometry(0.02, 0.02, 0.004), amber, 0.42, 0.05, 0.041);
+
+  // ---- bipé recolhido sob o cano ----
+  for (const sgn of [1, -1]) {
+    add(cyl(0.008, 0.008, 0.22, 8), dark, -0.6, -0.06, sgn * 0.03, 0.5, 0, 0);
+  }
+
+  // centraliza e ajusta o tamanho na cena (arma mais longa)
+  g.position.x = 0.08;
+  g.scale.setScalar(1.02);
+  return g;
+}
+
+const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR };
 
 // ------------------------------------------------------------
 // Visualizador 3D
@@ -139,10 +224,11 @@ function makeViewer(canvas) {
   camera.position.set(0.15, 0.35, 3.0);
 
   // luzes de estúdio (quente/fria/contorno)
-  const key = new THREE.DirectionalLight(0xfff0d8, 2.6); key.position.set(2, 3, 2.5); scene.add(key);
-  const fill = new THREE.DirectionalLight(0x6fe6d4, 1.1); fill.position.set(-3, 0.5, 1.5); scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xbfe0ff, 2.2); rim.position.set(-1.5, 2, -3); scene.add(rim);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+  // luzes quentes (pôr do sol) com um contorno teal — identidade do jogo
+  const key = new THREE.DirectionalLight(0xffe6bf, 2.7); key.position.set(2, 3, 2.5); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffd9a8, 0.9); fill.position.set(-3, 0.5, 1.5); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0x6fe6d4, 2.0); rim.position.set(-1.5, 2, -3); scene.add(rim);
+  scene.add(new THREE.AmbientLight(0xffe8cf, 0.28));
 
   // pedestal: brilho suave sob a arma
   const glowTex = (() => {
@@ -172,7 +258,8 @@ function makeViewer(canvas) {
     if (state.model) { pivot.remove(state.model); state.model = null; }
     const build = key && MODEL_BUILDERS[key];
     if (build) { state.model = build(); pivot.add(state.model); }
-    state.yaw = -0.5; state.pitch = 0.12; state.dist = 3.0; state.idle = 0;
+    state.baseDist = key === 'ferrao' ? 3.45 : 3.0;   // sniper é mais longa
+    state.yaw = -0.5; state.pitch = 0.12; state.dist = state.baseDist; state.idle = 0;
   }
 
   function resize() {
@@ -201,8 +288,8 @@ function makeViewer(canvas) {
 // ------------------------------------------------------------
 const LOADOUT_KEY = 'sf_loadout';
 function loadLoadout() {
-  try { return { primary: 'corvo', secondary: null, ...JSON.parse(localStorage.getItem(LOADOUT_KEY) || '{}') }; }
-  catch { return { primary: 'corvo', secondary: null }; }
+  try { return { primary: 'falcao', secondary: null, ...JSON.parse(localStorage.getItem(LOADOUT_KEY) || '{}') }; }
+  catch { return { primary: 'falcao', secondary: null }; }
 }
 
 export function initArmory() {
@@ -217,7 +304,7 @@ export function initArmory() {
   if (!listEl || !canvas) return { open() {}, close() {} };
 
   let viewer = null;
-  let selectedId = 'corvo';
+  let selectedId = 'falcao';
   let loadout = loadLoadout();
   let raf = 0, lastT = 0, open = false, ro = null;
 
@@ -346,7 +433,8 @@ export function initArmory() {
     }, { passive: false });
     $('arm-reset').onclick = () => {
       if (!viewer) return;
-      viewer.state.yaw = -0.5; viewer.state.pitch = 0.12; viewer.state.dist = 3.0; viewer.state.idle = 0;
+      viewer.state.yaw = -0.5; viewer.state.pitch = 0.12;
+      viewer.state.dist = viewer.state.baseDist || 3.0; viewer.state.idle = 0;
     };
   }
   wireCanvas();
@@ -366,7 +454,7 @@ export function initArmory() {
       loadout = loadLoadout();
       viewer.resize();
       updateBadges();
-      select(loadout.primary && byId(loadout.primary) ? loadout.primary : 'corvo');
+      select(loadout.primary && byId(loadout.primary) ? loadout.primary : 'falcao');
       if (!ro && 'ResizeObserver' in window) {
         ro = new ResizeObserver(() => { if (open && viewer) viewer.resize(); });
         ro.observe(canvas);

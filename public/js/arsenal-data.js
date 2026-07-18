@@ -1,51 +1,89 @@
 // ============================================================
 // SUNFALL ARENA — Catálogo do Arsenal
 // Identidade e ficha técnica das armas. Fonte única de verdade
-// para a tela do Arsenal (vitrine). O combate ainda usa a tabela
-// própria em main.js/ws.js — a integração de loadout virá depois.
+// para a tela do Arsenal (vitrine).
+//
+// COERÊNCIA: FALCÃO-9 e FERRÃO-SR são as armas REAIS já jogáveis —
+// seus números batem com a tabela de combate (main.js / server/ws.js):
+//   FALCÃO-9 : dano 16 (x1.75 cabeça), ~520 disp/min, carregador 26,
+//              recarga 1.35 s, automático, hitscan.
+//   FERRÃO-SR: dano 92 (x2 cabeça = 184), ~57 disp/min, carregador 5,
+//              recarga 1.8 s, ferrolho, luneta.
+// As outras 4 classes são projeções (bloqueadas / "em breve").
 // ============================================================
 
 // Cada arma:
-//   id, name (comercial), internal, maker, year, cls (classe), role,
-//   icon, accent (cor de destaque), model (chave do modelo 3D | null),
-//   locked (não equipável ainda),
-//   desc / philosophy / trivia[] (identidade),
-//   core[]  — 6 atributos com barra (v: 0..100),
-//   spec[]  — ficha técnica em texto (d: valor exibido)
+//   id, name, internal, maker, year, cls, role, icon, accent, model|null,
+//   locked, desc / philosophy / trivia[],
+//   core[] (6 atributos com barra v:0..100), spec[] (ficha técnica em texto)
 
 export const ARSENAL = [
   {
-    id: 'corvo',
-    name: 'CORVO-A4',
-    internal: 'AD-A4 “Corvo”',
+    id: 'falcao',
+    name: 'FALCÃO-9',
+    internal: 'AD-F9 “Falcão”',
     maker: 'Atlas Dynamics',
     year: 2231,
     cls: 'Fuzil de Assalto',
     role: 'Versátil · todas as distâncias',
     icon: '🦅',
     accent: '#3fc8b4',
-    model: 'corvo',
+    model: 'falcao',
     locked: false,
-    desc: 'Desenvolvido pela Atlas Dynamics para operações urbanas prolongadas, o CORVO-A4 virou referência entre as tropas da Orla Solar pelo equilíbrio quase perfeito entre controle, alcance e mobilidade. Não é o mais letal em nenhuma categoria — é o melhor em não ter fraqueza nenhuma.',
-    philosophy: 'Confiabilidade acima de espetáculo. Cada peça foi projetada para funcionar coberta de poeira, sob sol de 50°C, depois de mil disparos sem manutenção.',
+    desc: 'O fuzil padrão de Sunfall. A Atlas Dynamics projetou o FALCÃO-9 para não ter fraqueza: cadência alta, recuo baixíssimo e precisão confiável a qualquer distância. Não domina nenhuma especialidade — domina o campo inteiro.',
+    philosophy: 'Confiabilidade acima de espetáculo. Recuo previsível e controle absoluto: onde a mira aponta, o FALCÃO acerta — mesmo em rajadas longas.',
     trivia: [
-      'O nome vem do corvo-do-deserto, única ave que os engenheiros da Atlas viam sobreviver no campo de testes.',
-      'É a arma padrão de recrutas em Sunfall — dominar o CORVO é o primeiro passo de qualquer operador.',
-      'A tampa de ejeção fecha sozinha por mola: nenhum grão de areia entra com a arma guardada.'
+      'É a arma com que todo operador de Sunfall aprende a atirar.',
+      'O recuo quase nulo o torna letal mesmo segurando o gatilho.',
+      'Nome em homenagem ao falcão-peregrino: rápido, preciso, implacável.'
     ],
     core: [
-      { k: 'Dano', v: 58 }, { k: 'Cadência', v: 66 }, { k: 'Alcance', v: 64 },
-      { k: 'Precisão', v: 72 }, { k: 'Controle', v: 70 }, { k: 'Mobilidade', v: 60 }
+      { k: 'Dano', v: 40 }, { k: 'Cadência', v: 74 }, { k: 'Alcance', v: 62 },
+      { k: 'Precisão', v: 78 }, { k: 'Controle', v: 86 }, { k: 'Mobilidade', v: 66 }
     ],
     spec: [
-      { k: 'Tempo de recarga', d: '2.3 s' },
-      { k: 'Carregador', d: '30' },
-      { k: 'Vel. do projétil', d: '880 m/s' },
-      { k: 'Penetração', d: 'Média' },
-      { k: 'Tempo p/ sacar', d: '0.50 s' },
-      { k: 'Tempo p/ mirar (ADS)', d: '240 ms' },
-      { k: 'Precisão parado', d: 'Alta' },
-      { k: 'Precisão em movimento', d: 'Média' }
+      { k: 'Tempo de recarga', d: '1.35 s' },
+      { k: 'Carregador', d: '26' },
+      { k: 'Cadência', d: '~520 disp/min' },
+      { k: 'Dano por tiro', d: '16' },
+      { k: 'Dano na cabeça', d: '28' },
+      { k: 'Disparo', d: 'Automático' },
+      { k: 'Projétil', d: 'Hitscan (instantâneo)' },
+      { k: 'Tempo p/ sacar', d: '0.25 s' }
+    ]
+  },
+  {
+    id: 'ferrao',
+    name: 'FERRÃO-SR',
+    internal: 'MD-SR “Ferrão”',
+    maker: 'Meridian Defense',
+    year: 2229,
+    cls: 'Fuzil de Precisão',
+    role: 'Longa distância · um tiro',
+    icon: '🦂',
+    accent: '#f0b34c',
+    model: 'ferrao',
+    locked: false,
+    desc: 'Um tiro, uma sentença. O FERRÃO-SR derruba qualquer alvo com um acerto limpo no tronco — e é instantâneo na cabeça. O preço é a lentidão entre disparos e o carregador curto: errar custa caríssimo.',
+    philosophy: 'A Meridian construiu o FERRÃO em torno de um único disparo perfeito. Ferrolho pesado, luneta longa e um cano que não perdoa a menor hesitação — sua ou do alvo.',
+    trivia: [
+      'O dano de tronco é alto o bastante para eliminar com um só acerto.',
+      'Na luneta, a dispersão vai a zero: é mira ou nada.',
+      '“Ferrão” como o do escorpião — um golpe decide o duelo.'
+    ],
+    core: [
+      { k: 'Dano', v: 96 }, { k: 'Cadência', v: 12 }, { k: 'Alcance', v: 96 },
+      { k: 'Precisão', v: 94 }, { k: 'Controle', v: 40 }, { k: 'Mobilidade', v: 34 }
+    ],
+    spec: [
+      { k: 'Tempo de recarga', d: '1.8 s' },
+      { k: 'Carregador', d: '5' },
+      { k: 'Cadência', d: '~57 disp/min' },
+      { k: 'Dano por tiro', d: '92' },
+      { k: 'Dano na cabeça', d: '184' },
+      { k: 'Disparo', d: 'Ferrolho (semi)' },
+      { k: 'Mira', d: 'Luneta (zoom)' },
+      { k: 'Tempo p/ sacar', d: '0.25 s' }
     ]
   },
   {
@@ -57,61 +95,61 @@ export const ARSENAL = [
     cls: 'Submetralhadora',
     role: 'Curta distância · agressivo',
     icon: '🐝',
-    accent: '#f0c04c',
+    accent: '#f0844c',
     model: null,
     locked: true,
     desc: 'Leve, faminta e barulhenta. A VESPA despeja um enxame de projéteis a menos de dez metros — feita para quem entra na sala antes de pensar. Passou disso, cada disparo vira desperdício.',
-    philosophy: 'Velocidade é sobrevivência. A Kestrel abriu mão de alcance e dano por grama de peso: sacar, mirar e correr com a VESPA é mais rápido do que com qualquer outra arma do arsenal.',
+    philosophy: 'Velocidade é sobrevivência. A Kestrel abriu mão de alcance e dano por grama de peso: sacar, mirar e correr com a VESPA é mais rápido do que com qualquer outra arma.',
     trivia: [
-      'A cadência é tão alta que o carregador de 25 esvazia em pouco mais de um segundo.',
-      'Operadores apelidaram o som do disparo de "serra".'
+      'A cadência é tão alta que o carregador esvazia em pouco mais de um segundo.',
+      'Operadores apelidaram o som do disparo de “serra”.'
     ],
     core: [
-      { k: 'Dano', v: 40 }, { k: 'Cadência', v: 92 }, { k: 'Alcance', v: 34 },
-      { k: 'Precisão', v: 52 }, { k: 'Controle', v: 48 }, { k: 'Mobilidade', v: 90 }
+      { k: 'Dano', v: 34 }, { k: 'Cadência', v: 94 }, { k: 'Alcance', v: 32 },
+      { k: 'Precisão', v: 50 }, { k: 'Controle', v: 46 }, { k: 'Mobilidade', v: 92 }
     ],
     spec: [
       { k: 'Tempo de recarga', d: '1.9 s' },
       { k: 'Carregador', d: '25' },
-      { k: 'Vel. do projétil', d: '640 m/s' },
-      { k: 'Penetração', d: 'Baixa' },
-      { k: 'Tempo p/ sacar', d: '0.35 s' },
-      { k: 'Tempo p/ mirar (ADS)', d: '170 ms' },
+      { k: 'Cadência', d: '~820 disp/min' },
+      { k: 'Disparo', d: 'Automático' },
+      { k: 'Alcance efetivo', d: 'Curto' },
+      { k: 'Mobilidade', d: 'Altíssima' },
       { k: 'Precisão parado', d: 'Média' },
-      { k: 'Precisão em movimento', d: 'Alta' }
+      { k: 'Precisão em mov.', d: 'Alta' }
     ]
   },
   {
-    id: 'viuva',
-    name: 'VIÚVA-XR',
-    internal: 'MD-XR “Viúva”',
-    maker: 'Meridian Defense',
-    year: 2229,
-    cls: 'Fuzil de Precisão',
-    role: 'Longa distância · um tiro',
-    icon: '🕷️',
-    accent: '#b07ce0',
+    id: 'sentinela',
+    name: 'SENTINELA-DR',
+    internal: 'VA-DR “Sentinela”',
+    maker: 'Veyra Arms',
+    year: 2232,
+    cls: 'Fuzil Tático (DMR)',
+    role: 'Média-longa · precisão',
+    icon: '🎯',
+    accent: '#5c9ce8',
     model: null,
     locked: true,
-    desc: 'Um disparo, uma decisão. A VIÚVA-XR entrega dano letal a qualquer distância que o olho alcance, mas cobra caro: entre um tiro e o próximo, você está exposto e lento. É a arma do jogador que erra pouco.',
-    philosophy: 'A Meridian construiu a VIÚVA em torno do cano, não o contrário. Tudo — peso, ferrolho, luneta — existe para que o primeiro tiro seja o único necessário.',
+    desc: 'Meio-termo entre o fuzil e a sniper. A SENTINELA-DR premia quem mira na cabeça: cada disparo semiautomático castiga a média-longa distância com estabilidade rara. Lenta nas mãos erradas; implacável nas certas.',
+    philosophy: 'A Veyra acredita que precisão é escolha, não sorte. A SENTINELA foi calibrada para que dois toques limpos derrubem qualquer alvo — desde que você acerte.',
     trivia: [
-      'O ferrolho é polido à mão; cada VIÚVA leva o número de série gravado no interior da câmara.',
-      'Dizem que a mira tem alcance maior que a própria arena.'
+      'O gatilho tem curso ajustável de fábrica em três estágios.',
+      'Favorita de quem “segura” pontos-chave da arena.'
     ],
     core: [
-      { k: 'Dano', v: 98 }, { k: 'Cadência', v: 14 }, { k: 'Alcance', v: 96 },
-      { k: 'Precisão', v: 96 }, { k: 'Controle', v: 30 }, { k: 'Mobilidade', v: 26 }
+      { k: 'Dano', v: 80 }, { k: 'Cadência', v: 44 }, { k: 'Alcance', v: 82 },
+      { k: 'Precisão', v: 88 }, { k: 'Controle', v: 62 }, { k: 'Mobilidade', v: 48 }
     ],
     spec: [
-      { k: 'Tempo de recarga', d: '3.2 s' },
-      { k: 'Carregador', d: '5' },
-      { k: 'Vel. do projétil', d: '1120 m/s' },
-      { k: 'Penetração', d: 'Alta' },
-      { k: 'Tempo p/ sacar', d: '0.75 s' },
-      { k: 'Tempo p/ mirar (ADS)', d: '420 ms' },
-      { k: 'Precisão parado', d: 'Extrema' },
-      { k: 'Precisão em movimento', d: 'Baixa' }
+      { k: 'Tempo de recarga', d: '2.7 s' },
+      { k: 'Carregador', d: '12' },
+      { k: 'Cadência', d: '~300 disp/min' },
+      { k: 'Disparo', d: 'Semiautomático' },
+      { k: 'Alcance efetivo', d: 'Longo' },
+      { k: 'Mira', d: 'Luneta média' },
+      { k: 'Precisão parado', d: 'Muito alta' },
+      { k: 'Precisão em mov.', d: 'Média' }
     ]
   },
   {
@@ -123,14 +161,14 @@ export const ARSENAL = [
     cls: 'Escopeta',
     role: 'Curtíssima distância · demolidora',
     icon: '💥',
-    accent: '#f0844c',
+    accent: '#d95350',
     model: null,
     locked: true,
     desc: 'A resposta da Talon Works para portas trancadas e corredores estreitos. A BRECHA-12 apaga qualquer coisa a um braço de distância — e vira enfeite a partir de dez metros. Recarrega devagar: cada tiro precisa contar.',
     philosophy: 'Dano bruto, sem desculpas. A Talon nunca escondeu que a BRECHA é uma ferramenta de um único propósito: dominar o espaço fechado.',
     trivia: [
-      'O nome "Brecha" vem do uso original: abrir passagem em estruturas.',
-      'É a única arma do arsenal recarregada cartucho por cartucho.'
+      'O nome vem do uso original: abrir passagem em estruturas.',
+      'É recarregada cartucho por cartucho.'
     ],
     core: [
       { k: 'Dano', v: 96 }, { k: 'Cadência', v: 30 }, { k: 'Alcance', v: 16 },
@@ -139,12 +177,12 @@ export const ARSENAL = [
     spec: [
       { k: 'Tempo de recarga', d: '0.6 s / cartucho' },
       { k: 'Carregador', d: '6' },
-      { k: 'Vel. do projétil', d: '460 m/s' },
-      { k: 'Penetração', d: 'Baixa' },
-      { k: 'Tempo p/ sacar', d: '0.55 s' },
-      { k: 'Tempo p/ mirar (ADS)', d: '260 ms' },
-      { k: 'Precisão parado', d: 'Baixa (dispersão)' },
-      { k: 'Precisão em movimento', d: 'Baixa (dispersão)' }
+      { k: 'Disparo', d: 'Bomba (pump)' },
+      { k: 'Alcance efetivo', d: 'Curtíssimo' },
+      { k: 'Dispersão', d: 'Alta (bagos)' },
+      { k: 'Mobilidade', d: 'Média' },
+      { k: 'Precisão parado', d: 'Baixa' },
+      { k: 'Precisão em mov.', d: 'Baixa' }
     ]
   },
   {
@@ -160,7 +198,7 @@ export const ARSENAL = [
     model: null,
     locked: true,
     desc: 'Um muro de fogo portátil. A MURALHA-M carrega munição para durar e não para de cuspir — mas é pesada, sobe muito no recuo e transforma quem a segura em alvo lento. Domina corredores; sofre em duelos rápidos.',
-    philosophy: 'A Solmark projetou a MURALHA para negar terreno. Não se trata de acertar todo tiro — trata-se de fazer o inimigo não conseguir nem levantar a cabeça.',
+    philosophy: 'A Solmark projetou a MURALHA para negar terreno. Não é sobre acertar todo tiro — é sobre o inimigo não conseguir levantar a cabeça.',
     trivia: [
       'O cano aguenta 200 disparos contínuos antes de precisar esfriar.',
       'É a arma mais antiga do arsenal ainda em serviço ativo.'
@@ -172,45 +210,12 @@ export const ARSENAL = [
     spec: [
       { k: 'Tempo de recarga', d: '5.4 s' },
       { k: 'Carregador', d: '100' },
-      { k: 'Vel. do projétil', d: '840 m/s' },
-      { k: 'Penetração', d: 'Alta' },
-      { k: 'Tempo p/ sacar', d: '0.95 s' },
-      { k: 'Tempo p/ mirar (ADS)', d: '380 ms' },
+      { k: 'Cadência', d: '~640 disp/min' },
+      { k: 'Disparo', d: 'Automático' },
+      { k: 'Alcance efetivo', d: 'Médio-longo' },
+      { k: 'Mobilidade', d: 'Baixa' },
       { k: 'Precisão parado', d: 'Média (aquece)' },
-      { k: 'Precisão em movimento', d: 'Baixa' }
-    ]
-  },
-  {
-    id: 'sentinela',
-    name: 'SENTINELA-DR',
-    internal: 'VA-DR “Sentinela”',
-    maker: 'Veyra Arms',
-    year: 2232,
-    cls: 'Fuzil Tático (DMR)',
-    role: 'Média-longa · precisão',
-    icon: '🎯',
-    accent: '#5c9ce8',
-    model: null,
-    locked: true,
-    desc: 'Meio-termo entre o fuzil e a sniper. A SENTINELA-DR premia quem mira na cabeça: cada disparo semiautomático castiga a média-longa distância com estabilidade rara. Nas mãos erradas, é lenta demais; nas certas, implacável.',
-    philosophy: 'A Veyra acredita que precisão é uma escolha, não sorte. A SENTINELA foi calibrada para que dois toques limpos derrubem qualquer alvo — desde que você acerte.',
-    trivia: [
-      'O gatilho tem curso ajustável de fábrica em três estágios.',
-      'Favorita dos jogadores que "seguram" pontos-chave da arena.'
-    ],
-    core: [
-      { k: 'Dano', v: 80 }, { k: 'Cadência', v: 44 }, { k: 'Alcance', v: 82 },
-      { k: 'Precisão', v: 88 }, { k: 'Controle', v: 62 }, { k: 'Mobilidade', v: 48 }
-    ],
-    spec: [
-      { k: 'Tempo de recarga', d: '2.7 s' },
-      { k: 'Carregador', d: '12' },
-      { k: 'Vel. do projétil', d: '980 m/s' },
-      { k: 'Penetração', d: 'Alta' },
-      { k: 'Tempo p/ sacar', d: '0.6 s' },
-      { k: 'Tempo p/ mirar (ADS)', d: '320 ms' },
-      { k: 'Precisão parado', d: 'Muito alta' },
-      { k: 'Precisão em movimento', d: 'Média' }
+      { k: 'Precisão em mov.', d: 'Baixa' }
     ]
   }
 ];
