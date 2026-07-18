@@ -716,7 +716,9 @@ let endCountTimer = null;
 const remotes = new Map();   // id -> {model, meta, target, dead...}
 const meta = new Map();      // id -> {name,color,k,d,bot}
 const net = new Net();
-const TESTMODE = new URLSearchParams(location.search).has('test');
+const _qs = new URLSearchParams(location.search);
+const SMOKEDEMO = _qs.has('smokedemo');
+const TESTMODE = _qs.has('test') || SMOKEDEMO;   // smokedemo também ignora pointer lock
 
 // medição de ping (RTT real via ping/pong no WebSocket)
 net.on('pong', msg => {
@@ -3178,7 +3180,8 @@ function startPlaying() {
 connectPresence();
 
 // modo de teste automatizado (?test=1): entra direto no multiplayer
-if (TESTMODE) {
+// (smokedemo faz sua própria entrada numa sala limpa — ver abaixo)
+if (TESTMODE && !SMOKEDEMO) {
   addEventListener('load', () => {
     hud.nameInput.value = 'Tester';
     hud.startBtn.click();
@@ -3190,16 +3193,20 @@ if (new URLSearchParams(location.search).has('armory')) {
   addEventListener('load', () => showScreen('armory'));
 }
 
-// atalho de demonstração: ?test&smokedemo entra na partida e lança uma fumaça
-// pra frente automaticamente (útil pra ver/rever a nuvem)
-if (new URLSearchParams(location.search).has('smokedemo')) {
+// atalho de demonstração: ?smokedemo entra numa sala limpa (sem bots) e lança
+// uma fumaça longe pra frente (útil pra ver/rever a forma da nuvem)
+if (SMOKEDEMO) {
+  addEventListener('load', () => {
+    hud.nameInput.value = 'Demo';
+    sendPlay({ t: 'play', mode: 'create', gm: 'ffa', bots: 0, kl: 30, tl: 10 });
+  });
   let thrown = false;
   const iv = setInterval(() => {
     if (thrown || !playing || me.dead) return;
     thrown = true; clearInterval(iv);
-    me.pitch = 0.06;
+    me.pitch = -0.14;                 // mira levemente pra cima → arco mais longo
     startNadeCook('smoke');
-    setTimeout(() => releaseNadeThrow(), 60);
+    setTimeout(() => releaseNadeThrow(), 950);   // carrega força quase máxima
   }, 200);
 }
 
