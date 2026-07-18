@@ -902,146 +902,72 @@ body {
 #fps-hint.show { opacity: 1; }
 
 /* ============================================================
-   MUSIC PLAYER — Player de música do lobby
+   MUSIC CONFIG — Controles de música no painel de áudio
    ============================================================ */
-#music-player { position: fixed; bottom: 90px; left: 24px; z-index: 12; pointer-events: none; }
-
-/* Botão toggle (bolinha flutuante) */
-#mp-toggle {
-  width: 44px; height: 44px; border-radius: 50%; cursor: pointer; pointer-events: auto;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(22,15,9,.82); backdrop-filter: blur(8px);
-  border: 1px solid rgba(242,227,200,.18); color: #f2e3c8;
-  font-size: 18px; transition: border-color .15s, transform .12s, box-shadow .15s;
-  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+.cfg-divider {
+  border: none; border-top: 1px solid rgba(242,227,200,.1); margin: 12px 0 4px;
 }
-#mp-toggle:hover { border-color: rgba(63,200,180,.6); transform: scale(1.06); }
-#mp-toggle:active { transform: scale(.94); }
-#mp-toggle.active { border-color: #3fc8b4; color: #6ee0c8; }
-#mp-toggle-icon { transition: transform .2s; }
-#mp-toggle.active #mp-toggle-icon { animation: mpBounce 1.2s ease-in-out infinite; }
-@keyframes mpBounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
+.cfg-section-title {
+  font-size: 10px; letter-spacing: 3px; color: #6ee0c8; opacity: .7;
+  margin: 8px 0 10px; text-align: left;
 }
 
-/* Painel expansível */
-#mp-panel {
-  position: absolute; bottom: 52px; left: 0; pointer-events: auto;
-  width: 300px; max-height: 420px;
-  background: rgba(24,17,10,.96); backdrop-filter: blur(14px);
-  border: 1px solid rgba(242,227,200,.15); border-radius: 16px;
-  box-shadow: 0 16px 50px rgba(0,0,0,.6);
-  padding: 16px 18px 14px;
+#music-config {
   display: flex; flex-direction: column; gap: 10px;
-  animation: mpSlideIn .25s ease-out;
-}
-#mp-panel.hidden { display: none; }
-@keyframes mpSlideIn {
-  from { opacity: 0; transform: translateY(10px) scale(.96); }
-  to { opacity: 1; transform: none; }
 }
 
-#mp-header {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 10px; letter-spacing: 3px; color: #6ee0c8; opacity: .75;
-  border-bottom: 1px solid rgba(242,227,200,.08); padding-bottom: 8px;
+#mc-info {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px; background: rgba(14,10,6,.4); border-radius: 8px;
+  text-align: left; font-size: 12px;
 }
-#mp-icon { font-size: 16px; }
-#mp-title { font-weight: bold; }
-
-/* Info da faixa */
-#mp-track-info {
-  display: flex; align-items: center; justify-content: space-between;
-  margin: 2px 0;
+#mc-status {
+  flex: none; font-weight: bold; letter-spacing: 1px; color: #6ee0c8;
 }
-#mp-track-label {
-  font-size: 13px; font-weight: bold; color: #ffe9b8;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
-  letter-spacing: .3px;
-}
-#mp-track-counter {
-  font-size: 10px; letter-spacing: 1px; opacity: .5; flex: none;
+#mc-track-name {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #ffe9b8; font-weight: bold;
 }
 
-/* Progresso */
-#mp-progress { display: flex; flex-direction: column; gap: 2px; }
-#mp-seek {
-  width: 100%; height: 4px; cursor: pointer; accent-color: #3fc8b4;
-  background: rgba(242,227,200,.12); border-radius: 2px;
-  -webkit-appearance: none; appearance: none; outline: none;
-}
-#mp-seek::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
-  background: #6ee0c8; border: 2px solid rgba(24,17,10,.5); cursor: pointer;
-  box-shadow: 0 0 6px rgba(110,224,200,.4);
-}
-#mp-times {
-  display: flex; justify-content: space-between;
-  font-size: 10px; opacity: .5; letter-spacing: .5px;
-  font-family: "Consolas", "Courier New", monospace;
-}
-
-/* Controles */
-#mp-controls {
+#mc-controls {
   display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.mp-btn {
-  width: 34px; height: 34px; border-radius: 9px; border: none; cursor: pointer;
+.mc-btn {
+  width: 36px; height: 36px; border-radius: 9px; border: none; cursor: pointer;
   font-family: inherit; font-size: 14px; display: flex; align-items: center;
   justify-content: center; color: #f2e3c8;
   background: rgba(14,10,6,.6); border: 1px solid rgba(242,227,200,.12);
   transition: background .15s, border-color .15s, transform .08s;
 }
-.mp-btn:hover { background: rgba(30,21,12,.8); border-color: rgba(63,200,180,.4); }
-.mp-btn:active { transform: scale(.92); }
-.mp-btn-primary {
-  width: 38px; height: 38px; font-size: 16px;
+.mc-btn:hover { background: rgba(30,21,12,.8); border-color: rgba(63,200,180,.4); }
+.mc-btn:active { transform: scale(.92); }
+.mc-btn-play {
+  width: 40px; height: 40px; font-size: 16px;
   background: rgba(63,200,180,.2); border-color: rgba(63,200,180,.4); color: #6ee0c8;
 }
-.mp-btn-primary:hover { background: rgba(63,200,180,.35); }
-.mp-btn.active { color: #6ee0c8; border-color: #3fc8b4; background: rgba(63,200,180,.15); }
-
-/* Volume */
-#mp-volume-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 0;
-}
-#mp-vol-icon { font-size: 13px; min-width: 20px; text-align: center; }
-#mp-volume {
-  flex: 1; height: 4px; cursor: pointer; accent-color: #3fc8b4;
-  -webkit-appearance: none; appearance: none; outline: none;
-  background: rgba(242,227,200,.12); border-radius: 2px;
-}
-#mp-volume::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
-  background: #6ee0c8; border: 2px solid rgba(24,17,10,.5); cursor: pointer;
-}
-#mp-vol-val {
-  font-size: 11px; min-width: 22px; text-align: right; opacity: .6;
-  font-family: "Consolas", "Courier New", monospace;
-}
+.mc-btn-play:hover { background: rgba(63,200,180,.35); }
+.mc-btn.active { color: #6ee0c8; border-color: #3fc8b4; background: rgba(63,200,180,.15); }
 
 /* Lista de faixas */
-#mp-tracklist {
+#mc-tracklist {
   display: flex; flex-direction: column; gap: 2px;
-  max-height: 120px; overflow-y: auto;
-  border-top: 1px solid rgba(242,227,200,.08); padding-top: 8px;
+  max-height: 130px; overflow-y: auto;
+  text-align: left;
 }
-#mp-tracklist::-webkit-scrollbar { width: 4px; }
-#mp-tracklist::-webkit-scrollbar-thumb { background: rgba(242,227,200,.15); border-radius: 2px; }
-.mp-track-item {
+#mc-tracklist::-webkit-scrollbar { width: 4px; }
+#mc-tracklist::-webkit-scrollbar-thumb { background: rgba(242,227,200,.15); border-radius: 2px; }
+.mc-track-item {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 8px; border-radius: 7px; cursor: pointer;
   font-size: 12px; transition: background .1s;
 }
-.mp-track-item:hover { background: rgba(63,200,180,.1); }
-.mp-track-item.active {
+.mc-track-item:hover { background: rgba(63,200,180,.1); }
+.mc-track-item.active {
   background: rgba(63,200,180,.15); color: #6ee0c8;
 }
-.mp-ti-num {
+.mc-ti-num {
   width: 18px; text-align: right; font-size: 10px; opacity: .4;
   font-family: "Consolas", "Courier New", monospace;
 }
-.mp-track-item.active .mp-ti-num { opacity: .8; }
-.mp-ti-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-track-item.active .mc-ti-num { opacity: .8; }
+.mc-ti-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -401,8 +401,29 @@
               </div>
               <div class="cfg-row">
                 <label>Volume da música</label>
-                <input id="set-music-vol" type="range" min="0" max="100" step="5" value="35">
-                <b id="set-music-vol-val">35</b>
+                <input id="set-music-vol" type="range" min="0" max="100" step="5" value="50">
+                <b id="set-music-vol-val">50</b>
+              </div>
+              <hr class="cfg-divider">
+              <div class="cfg-section-title">PLAYER DE MÚSICA</div>
+              <div id="music-config">
+                <div id="mc-info">
+                  <span id="mc-status">—</span>
+                  <span id="mc-track-name">Nenhuma faixa</span>
+                </div>
+                <div id="mc-controls">
+                  <button type="button" id="mc-prev" class="mc-btn" title="Anterior">⏮</button>
+                  <button type="button" id="mc-play" class="mc-btn mc-btn-play" title="Tocar/Pausar">▶</button>
+                  <button type="button" id="mc-next" class="mc-btn" title="Próxima">⏭</button>
+                  <button type="button" id="mc-shuffle" class="mc-btn" title="Aleatório">🔀</button>
+                  <button type="button" id="mc-repeat" class="mc-btn" title="Repetir">🔁</button>
+                </div>
+                <div id="mc-tracklist">
+                  <div class="mc-track-item" data-index="0"><span class="mc-ti-num">1</span><span class="mc-ti-label">Finally Alive</span></div>
+                  <div class="mc-track-item" data-index="1"><span class="mc-ti-num">2</span><span class="mc-ti-label">Let It Breathe</span></div>
+                  <div class="mc-track-item" data-index="2"><span class="mc-ti-num">3</span><span class="mc-ti-label">THE FINALS</span></div>
+                  <div class="mc-track-item" data-index="3"><span class="mc-ti-num">4</span><span class="mc-ti-label">The World&#8217;s Greatest Game Show</span></div>
+                </div>
               </div>
               <div class="cfg-note">A música ambiente toca apenas no lobby. Durante a partida, ela pausa automaticamente.</div>
             </div>

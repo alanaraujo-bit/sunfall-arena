@@ -361,21 +361,71 @@ hud.setVol.oninput = () => {
 const musicVolSlider = $('set-music-vol');
 const musicVolVal = $('set-music-vol-val');
 if (musicVolSlider) {
-  // Carrega volume salvo
-  const savedMusicVol = settings.musicVolume !== undefined ? settings.musicVolume : 0.35;
-  musicVolSlider.value = Math.round(savedMusicVol * 100);
-  musicVolVal.textContent = musicVolSlider.value;
-  Music.setMusicVolume(savedMusicVol / 100);
+  // O volume já foi carregado pelo music.js do sf_settings
+  const volPct = Math.round(Music.getMusicVolume() * 100);
+  musicVolSlider.value = volPct;
+  musicVolVal.textContent = volPct;
   musicVolSlider.oninput = () => {
     const v = +musicVolSlider.value / 100;
     musicVolVal.textContent = musicVolSlider.value;
     Music.setMusicVolume(v);
-    settings.musicVolume = v;
-    saveSettings();
   };
-  // Atualiza label inicial
-  musicVolVal.textContent = musicVolSlider.value;
 }
+
+// ---- Controles do player de música no painel de áudio ----
+function setupMusicConfigUI() {
+  const playBtn = $('mc-play');
+  const prevBtn = $('mc-prev');
+  const nextBtn = $('mc-next');
+  const shuffleBtn = $('mc-shuffle');
+  const repeatBtn = $('mc-repeat');
+  const statusEl = $('mc-status');
+  const trackNameEl = $('mc-track-name');
+  const trackList = document.getElementById('mc-tracklist');
+
+  if (!playBtn) return;
+
+  function refreshMusicUI() {
+    const playing = Music.isMusicPlaying();
+    const track = Music.getCurrentTrack();
+    playBtn.textContent = playing ? '⏸' : '▶';
+    playBtn.title = playing ? 'Pausar' : 'Tocar';
+    if (statusEl) statusEl.textContent = playing ? '▶ Tocando' : '⏸ Pausado';
+    if (trackNameEl && track) trackNameEl.textContent = track.label;
+    shuffleBtn.classList.toggle('active', Music.getShuffle());
+    const rm = Music.getRepeatMode();
+    repeatBtn.classList.toggle('active', rm > 0);
+    repeatBtn.textContent = rm === 2 ? '🔂' : '🔁';
+    // destaque na tracklist
+    if (trackList) {
+      trackList.querySelectorAll('.mc-track-item').forEach(el => {
+        el.classList.toggle('active', parseInt(el.dataset.index) === Music.getCurrentIndex());
+      });
+    }
+  }
+
+  playBtn.onclick = () => { Music.togglePlayPause(); refreshMusicUI(); };
+  prevBtn.onclick = () => { Music.prevTrack(); refreshMusicUI(); };
+  nextBtn.onclick = () => { Music.nextTrack(); refreshMusicUI(); };
+  shuffleBtn.onclick = () => { Music.toggleShuffle(); refreshMusicUI(); };
+  repeatBtn.onclick = () => { Music.cycleRepeat(); refreshMusicUI(); };
+
+  // Clica na faixa da lista
+  if (trackList) {
+    trackList.querySelectorAll('.mc-track-item').forEach(el => {
+      el.onclick = () => {
+        Music.playTrackByIndex(parseInt(el.dataset.index));
+        refreshMusicUI();
+      };
+    });
+  }
+
+  // Callback quando o estado mudar (início automático, etc)
+  Music.setOnStateChange(refreshMusicUI);
+
+  refreshMusicUI();
+}
+
 function applyPerf() { hud.perf.classList.toggle('hidden', settings.perf !== 'on'); }
 hud.setPerf.value = settings.perf;
 hud.setPerf.onchange = () => { settings.perf = hud.setPerf.value; applyPerf(); saveSettings(); };
@@ -386,10 +436,11 @@ buildBindsUI();
 
 // Inicializa o player de música do lobby
 Music.init({
-  audioContext: getAudioContext(),
-  onTrackChange: (idx, label) => { /* música trocou, se quiser logar */ }
+  audioContext: getAudioContext()
 });
-// Inicia a música do lobby após a primeira interação do usuário
+setupMusicConfigUI();
+
+// Inicia a música do lobby na primeira interação do usuário
 const firstInteraction = () => {
   document.removeEventListener('click', firstInteraction);
   document.removeEventListener('keydown', firstInteraction);
