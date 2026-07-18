@@ -21,13 +21,17 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', melee: 'KeyV', nade: 'KeyG', smoke: 'KeyC', board: 'Tab'
+  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', lastw: 'KeyQ',
+  melee: 'KeyV', nade: 'KeyG', smoke: 'KeyC', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', melee: 'Golpe rápido', nade: 'Granada', smoke: 'Fumaça', board: 'Placar'
+  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', lastw: 'Troca rápida',
+  melee: 'Golpe rápido', nade: 'Granada', smoke: 'Fumaça', board: 'Placar'
 };
+// Códigos de mouse no mesmo formato dos binds (Mouse0 = esq., Mouse3/4 = laterais)
+function mouseButtonCode(button) { return 'Mouse' + button; }
 
 // Presets de qualidade — cada um define as opções individuais.
 // scale = % da resolução; shadows = tamanho do shadow map (0 = sem sombra)
@@ -221,14 +225,29 @@ function maybeRebuildWorld() {
 }
 
 function keyLabel(code) {
+  if (!code) return '—';
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
   const nice = {
     Space: 'ESPAÇO', ShiftLeft: 'SHIFT', ShiftRight: 'SHIFT D.',
     ControlLeft: 'CTRL', ControlRight: 'CTRL D.', AltLeft: 'ALT', Tab: 'TAB',
-    CapsLock: 'CAPS', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→'
+    CapsLock: 'CAPS', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+    // botões do mouse (0=esq, 1=meio, 2=dir, 3/4=laterais / M4-M5)
+    Mouse0: 'M1 ESQ', Mouse1: 'M3 MEIO', Mouse2: 'M2 DIR',
+    Mouse3: 'M4 LAT', Mouse4: 'M5 LAT'
   };
   return nice[code] || code.toUpperCase();
+}
+
+function finishListeningBind(code) {
+  if (!listeningBind) return;
+  if (code) {
+    binds[listeningBind.action] = code;
+    saveSettings();
+  }
+  listeningBind.btn.classList.remove('listening');
+  listeningBind.btn.textContent = keyLabel(binds[listeningBind.action]);
+  listeningBind = null;
 }
 
 let listeningBind = null; // {action, btn}
@@ -262,13 +281,15 @@ addEventListener('keydown', e => {
   if (!listeningBind) return;
   e.preventDefault();
   e.stopPropagation();
-  if (e.code !== 'Escape') {
-    binds[listeningBind.action] = e.code;
-    saveSettings();
-  }
-  listeningBind.btn.classList.remove('listening');
-  listeningBind.btn.textContent = keyLabel(binds[listeningBind.action]);
-  listeningBind = null;
+  finishListeningBind(e.code === 'Escape' ? null : e.code);
+}, true);
+
+// captura de botão do mouse nos binds (inclui laterais M4/M5)
+addEventListener('mousedown', e => {
+  if (!listeningBind) return;
+  e.preventDefault();
+  e.stopPropagation();
+  finishListeningBind(mouseButtonCode(e.button));
 }, true);
 
 hud.bindsReset.onclick = () => {
@@ -1029,7 +1050,9 @@ function updateRemotes(dt, t) {
 // ---------------- Input ----------------
 const keys = {};
 let mouseDown = false, wantJump = false;
+let lastW = 1; // arma anterior (troca rápida / Q)
 const canvas = renderer.domElement;
+const WEAPON_ORDER = [0, 1, KNIFE]; // ciclo do scroll
 
 // Zera TODO o input preso. Sem isto, perder o foco (alt-tab, notificação,
 // clicar fora) com uma tecla apertada nunca dispara o keyup → a tecla fica
@@ -1041,30 +1064,77 @@ function clearInput() {
   mouseDown = false;
 }
 
+// Ações disparadas no "pressionar" (tecla ou botão do mouse rebindável)
+function onBindPress(code) {
+  if (playing && code === binds.board) {
+    // preventDefault só faz sentido no keydown; placar com mouse não precisa
+    hud.board.classList.add('show');
+    rebuildBoard();
+  }
+  // F durante a morte: pula o killcam e volta direto pro jogo
+  if (playing && me.dead && code === 'KeyF') { requestRespawn(); return; }
+  if (!playing || me.dead) return;
+  if (code === binds.jump) wantJump = true;
+  if (code === binds.reload) startReload();
+  if (code === binds.kit) tryUseKit();
+  if (code === binds.w1) switchWeapon(0);
+  if (code === binds.w2) switchWeapon(1);
+  if (code === binds.w3) switchWeapon(KNIFE);
+  if (code === binds.lastw) quickSwitchWeapon();
+  if (code === binds.melee) quickMelee();
+  if (code === binds.nade) startNadeCook('frag');
+  if (code === binds.smoke) startNadeCook('smoke');
+  if (code === 'KeyF' && curW === KNIFE) startInspect();
+}
+
+function onBindRelease(code) {
+  if (code === binds.board) hud.board.classList.remove('show');
+  if (code === binds.nade || code === binds.smoke) releaseNadeThrow();
+}
+
 addEventListener('keydown', e => {
-  if (playing && e.code === binds.board) { e.preventDefault(); hud.board.classList.add('show'); rebuildBoard(); }
+  if (playing && e.code === binds.board) {
+    e.preventDefault();
+    // Tab com repeat: mantém placar atualizado enquanto segura
+    if (e.repeat) { hud.board.classList.add('show'); rebuildBoard(); return; }
+  }
   if (e.repeat) return;
   keys[e.code] = true;
-  // F durante a morte: pula o killcam e volta direto pro jogo
-  if (playing && me.dead && e.code === 'KeyF') { requestRespawn(); return; }
-  if (!playing || me.dead) return;
-  if (e.code === binds.jump) wantJump = true;
-  if (e.code === binds.reload) startReload();
-  if (e.code === binds.kit) tryUseKit();
-  if (e.code === binds.w1) switchWeapon(0);
-  if (e.code === binds.w2) switchWeapon(1);
-  if (e.code === binds.w3) switchWeapon(KNIFE);
-  if (e.code === binds.melee) quickMelee();
-  if (e.code === binds.nade) startNadeCook('frag');
-  if (e.code === binds.smoke) startNadeCook('smoke');
-  if (e.code === 'KeyF' && curW === KNIFE) startInspect();
+  onBindPress(e.code);
 });
 addEventListener('keyup', e => {
   keys[e.code] = false;
-  if (e.code === binds.board) hud.board.classList.remove('show');
-  if (e.code === binds.nade || e.code === binds.smoke) releaseNadeThrow();
+  onBindRelease(e.code);
 });
-addEventListener('wheel', () => { if (playing && !me.dead) switchWeapon(1 - curW); });
+
+// Botões do mouse rebindáveis (M4/M5 laterais, meio, etc.)
+// laterais (3/4) também bloqueiam histórico do navegador
+addEventListener('mousedown', e => {
+  if (e.button === 3 || e.button === 4) e.preventDefault();
+  if (listeningBind) return;
+  const code = mouseButtonCode(e.button);
+  keys[code] = true;
+  onBindPress(code);
+});
+addEventListener('mouseup', e => {
+  const code = mouseButtonCode(e.button);
+  keys[code] = false;
+  onBindRelease(code);
+  if (e.button === 0) mouseDown = false;
+  if (e.button === 2) setZoom(false);
+});
+// impede "voltar página" com botão lateral no Chrome/Edge
+addEventListener('mouseup', e => {
+  if (e.button === 3 || e.button === 4) e.preventDefault();
+}, true);
+addEventListener('auxclick', e => {
+  if (e.button === 1 || e.button === 3 || e.button === 4) e.preventDefault();
+});
+
+addEventListener('wheel', e => {
+  if (!playing || me.dead) return;
+  cycleWeapon(e.deltaY > 0 ? 1 : -1);
+});
 canvas.addEventListener('mousedown', e => {
   if (!playing) return;
   if (document.pointerLockElement !== canvas) { canvas.requestPointerLock(); return; }
@@ -1077,10 +1147,6 @@ canvas.addEventListener('mousedown', e => {
     if (curW === KNIFE) startMelee(true);
     else if (WEAPONS[curW].sniper && !reloading && !me.dead) setZoom(true);
   }
-});
-addEventListener('mouseup', e => {
-  if (e.button === 0) mouseDown = false;
-  if (e.button === 2) setZoom(false);
 });
 addEventListener('contextmenu', e => e.preventDefault());
 // perder o foco: zera teclas presas (senão anda sozinho) e cancela o cook
@@ -1113,6 +1179,8 @@ function switchWeapon(i) {
   if (i === curW || reloading || me.dead || me.usingKit > 0) return;
   if (melee.active && melee.quick) return;   // não interromper um golpe rápido em curso
   if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
+  if (i < 0 || i > KNIFE) return;
+  lastW = curW;
   curW = i;
   swapT = 0.25;
   setZoom(false);
@@ -1120,6 +1188,22 @@ function switchWeapon(i) {
   showViewmodel(i);
   if (i === KNIFE) { SFX.knifeEquip(); knifeEquipT = 0.32; } else SFX.swap();
   updateAmmoHUD();
+}
+
+// Alterna com a última arma usada (estilo CS: tecla Q por padrão)
+function quickSwitchWeapon() {
+  let target = lastW;
+  if (target === curW) target = curW === 0 ? 1 : 0;
+  switchWeapon(target);
+}
+
+// Scroll do mouse: cicla FALCÃO → FERRÃO → faca → …
+function cycleWeapon(dir) {
+  let idx = WEAPON_ORDER.indexOf(curW);
+  if (idx < 0) idx = 0;
+  const n = WEAPON_ORDER.length;
+  idx = (idx + (dir >= 0 ? 1 : -1) + n) % n;
+  switchWeapon(WEAPON_ORDER[idx]);
 }
 
 // ---------------- Movimentação ----------------
