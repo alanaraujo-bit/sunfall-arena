@@ -440,16 +440,9 @@ Music.init({
 });
 setupMusicConfigUI();
 
-// Inicia a música do lobby na primeira interação do usuário
-const firstInteraction = () => {
-  document.removeEventListener('click', firstInteraction);
-  document.removeEventListener('keydown', firstInteraction);
-  document.removeEventListener('touchstart', firstInteraction);
-  setTimeout(() => Music.startLobbyMusic(), 500);
-};
-document.addEventListener('click', firstInteraction);
-document.addEventListener('keydown', firstInteraction);
-document.addEventListener('touchstart', firstInteraction);
+// Inicia a música automaticamente — se o browser bloquear autoplay,
+// o music.js já trata de tentar de novo na primeira interação do usuário.
+setTimeout(() => Music.startLobbyMusic(), 1000);
 
 // ---------------- FPS / Ping ----------------
 let fpsAccum = 0, fpsFrames = 0, fpsShown = 0, ping = 0;

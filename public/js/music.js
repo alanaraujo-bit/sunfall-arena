@@ -273,12 +273,33 @@ export function getShuffle() { return isShuffled; }
 export function getRepeatMode() { return repeatMode; }
 
 export function startLobbyMusic() {
-  if (!isPlaying && !playerA.src) {
-    if (AC && AC.state === 'suspended') AC.resume();
+  if (isPlaying) { notifyState(); return; }
+  if (AC && AC.state === 'suspended') AC.resume();
+  if (!playerA.src) {
     playTrack(currentIndex);
-  } else if (!isPlaying && playerA.src) {
+  } else {
     play();
   }
+  // Se o play() falhou por autoplay (browser bloqueou),
+    // agenda para tentar de novo no primeiro clique/tecla/touch do usuário
+  const retryOnInteraction = () => {
+    document.removeEventListener('click', retryOnInteraction);
+    document.removeEventListener('keydown', retryOnInteraction);
+    document.removeEventListener('touchstart', retryOnInteraction);
+    if (!isPlaying) {
+      if (AC && AC.state === 'suspended') AC.resume();
+      // Toca depois de um breve delay para dar tempo do AudioContext ativar
+      setTimeout(() => {
+        if (!isPlaying) {
+          if (!playerA.src) playTrack(currentIndex);
+          else play();
+        }
+      }, 300);
+    }
+  };
+  document.addEventListener('click', retryOnInteraction);
+  document.addEventListener('keydown', retryOnInteraction);
+  document.addEventListener('touchstart', retryOnInteraction);
   notifyState();
 }
 
