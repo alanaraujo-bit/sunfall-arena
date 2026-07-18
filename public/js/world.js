@@ -609,9 +609,23 @@ export function makeCharacter(colorHex) {
     .rotation.x = Math.PI / 2;
   gun.position.set(0.3, -0.3, -0.42);
   arms.add(gun);
+
+  // faca na mão (oculta até o jogador sacá-la — alternada em updateRemotes)
+  const knife = new THREE.Group();
+  const kBladeM = new THREE.MeshStandardMaterial({ color: 0xccd2d8, roughness: 0.4, metalness: 0.8 });
+  const kGripM = new THREE.MeshStandardMaterial({ color: 0x181c20, roughness: 0.9 });
+  const kGrip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.15), kGripM);
+  knife.add(kGrip);
+  const kBlade = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.1, 0.36), kBladeM);
+  kBlade.position.z = -0.26;
+  knife.add(kBlade);
+  knife.position.set(0.33, -0.34, -0.42);
+  knife.rotation.set(0.3, 0, 0);
+  knife.visible = false;
+  arms.add(knife);
   grp.add(arms);
 
-  grp.userData = { legL, legR, head, arms };
+  grp.userData = { legL, legR, head, arms, gun, knife };
   return grp;
 }
 
@@ -634,7 +648,80 @@ export function makeViewmodel(kind) {
   };
 
   let muzzle;
-  if (kind === 'ar') {
+  if (kind === 'knife') {
+    // ---------------- Faca de combate "PRESA-7" ----------------
+    // Lâmina de aço com ponta clip-point (silhueta marcante), guarda,
+    // cabo emborrachado com sulcos de pegada, pomo e detalhe teal.
+    const steel = new THREE.MeshStandardMaterial({
+      map: tex('metal'), color: 0xd6dde3, roughness: 0.32, metalness: 0.9
+    });
+    const satin = new THREE.MeshStandardMaterial({ color: 0xaab4bd, roughness: 0.45, metalness: 0.8 });
+    const keen = new THREE.MeshStandardMaterial({ color: 0xf4f8fb, roughness: 0.18, metalness: 0.95 });
+    const gripM = new THREE.MeshStandardMaterial({ color: 0x14181c, roughness: 0.95 });
+    const guardM = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.45, metalness: 0.75 });
+
+    // segura a faca na diagonal, típica de porte em primeira pessoa
+    const holder = new THREE.Group();
+    holder.rotation.set(-0.12, 0.34, 0.16);
+    holder.position.set(-0.02, 0.01, 0.06);
+
+    // cabo emborrachado
+    const grip = new THREE.Mesh(new RoundedBoxGeometry(0.036, 0.044, 0.2, 3, 0.016), gripM);
+    grip.position.set(0, -0.004, 0.16);
+    holder.add(grip);
+    // sulcos de pegada (linhas teal discretas)
+    for (const gz of [0.1, 0.145, 0.19]) {
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.006, 0.014), accent);
+      ridge.position.set(0, 0.02, gz);
+      holder.add(ridge);
+    }
+    // pomo (contrapeso)
+    const pommel = new THREE.Mesh(new RoundedBoxGeometry(0.044, 0.05, 0.04, 2, 0.016), guardM);
+    pommel.position.set(0, -0.004, 0.27);
+    holder.add(pommel);
+    // guarda (crossguard)
+    const guard = new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.03, 0.032, 2, 0.012), guardM);
+    guard.position.set(0, 0.004, 0.045);
+    holder.add(guard);
+    // colar teal entre guarda e lâmina
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.016, 12), accent);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 0.008, 0.028);
+    holder.add(collar);
+
+    // lâmina com ponta clip-point via Shape extrudada (comprimento no -Z)
+    const bs = new THREE.Shape();
+    bs.moveTo(0.02, -0.048);
+    bs.lineTo(0.30, -0.056);
+    bs.lineTo(0.44, -0.004);   // ponta
+    bs.lineTo(0.30, 0.05);
+    bs.lineTo(0.02, 0.052);
+    bs.closePath();
+    const bladeGeo = new THREE.ExtrudeGeometry(bs, {
+      depth: 0.02, bevelEnabled: true, bevelThickness: 0.005, bevelSize: 0.004, bevelSegments: 1, steps: 1
+    });
+    bladeGeo.translate(0, 0, -0.01);   // centraliza a espessura
+    bladeGeo.rotateY(Math.PI / 2);     // comprimento (shape-x) → -Z
+    const blade = new THREE.Mesh(bladeGeo, steel);
+    blade.position.set(0, 0.006, 0.01);
+    holder.add(blade);
+    // fio afiado (quina inferior mais clara)
+    const edgeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.007, 0.02, 0.34), keen);
+    edgeMesh.position.set(0, -0.036, -0.15);
+    holder.add(edgeMesh);
+    // sulco/fuller escuro na face
+    for (const fx of [0.009, -0.009]) {
+      const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.016, 0.26), satin);
+      fuller.position.set(fx, 0.014, -0.14);
+      holder.add(fuller);
+    }
+
+    grp.add(holder);
+    muzzle = new THREE.Object3D();       // "ponta" da lâmina (usado por efeitos genéricos)
+    muzzle.position.set(0, 0.02, -0.42);
+    grp.add(muzzle);
+    return { group: grp, muzzle };
+  } else if (kind === 'ar') {
     add(new RoundedBoxGeometry(0.075, 0.11, 0.44, 2, 0.015), metal, 0, 0, 0);              // corpo
     const barrel = add(new THREE.CylinderGeometry(0.021, 0.021, 0.32, 10), metal, 0, 0.015, -0.36);
     barrel.rotation.x = Math.PI / 2;

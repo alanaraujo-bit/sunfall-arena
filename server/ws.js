@@ -20,6 +20,14 @@ const WEAPONS = [
   { dmg: 16, head: 1.75, int: 0.115 },   // FALCÃO-9
   { dmg: 92, head: 2, int: 1.05 }        // FERRÃO-SR
 ];
+// Faca (índice 2). Alcance/cone ligeiramente mais generosos que a previsão do
+// cliente para nunca rejeitar um golpe que o atirador viu conectar.
+// arc = cosseno do meio-ângulo do cone frontal aceito.
+const KNIFE = [
+  { dmg: 55, range: 2.7, arc: 0.5,  cd: 0.5 },   // leve (corte)
+  { dmg: 80, range: 3.1, arc: 0.45, cd: 0.85 }   // pesado (estocada)
+];
+const BACKSTAB_DMG = 200;   // pelas costas: eliminação garantida
 const REWIND_MAX_MS = 1000;
 const KIT_STREAK = 3;     // kills seguidas (sem morrer) para ganhar 1 kit
 const KIT_MAX = 2;        // cargas de kit acumuláveis
@@ -56,14 +64,14 @@ function respawnPlayer(room, victim) {
   broadcastRoom(room, { t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z] });
 }
 
-function damage(room, attacker, victim, dmg, head = false, wi = 0) {
+function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false) {
   if (room.state !== 'playing') return;
   if (!victim || !victim.alive || !attacker || !attacker.alive) return;
   // TDM: sem fogo amigo (aliados não se ferem)
   if (room.settings.gm === 'tdm' && attacker !== victim && attacker.team === victim.team) return;
   victim.hp -= dmg;
   if (victim.hp > 0) {
-    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id, h: head });
+    broadcastRoom(room, { t: 'dmg', id: victim.id, hp: victim.hp, by: attacker.id, h: head, bs });
     return;
   }
   victim.hp = 0;
@@ -80,8 +88,8 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0) {
       }
     }
   }
-  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head });
-  broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi });
+  broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head, bs });
+  broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi, bs });
 
   if (attacker !== victim && attacker.accountId) {
     awardXpAndPersist(attacker.accountId, { headshot: head })
@@ -368,6 +376,51 @@ export function attachWs(server) {
           }
           if (victim) {
             damage(room, self, victim, Math.round(w.dmg * (head ? w.head : 1)), head, wi);
+          }
+          break;
+        }
+        case 'melee': {
+          // Ataque corpo a corpo autoritativo: valida cadência e origem,
+          // rebobina o alvo, exige alcance curto + cone frontal + LOS livre.
+          if (!self.alive || room.state !== 'playing') break;
+          const heavy = msg.h ? 1 : 0;
+          const km = KNIFE[heavy];
+          const now = Date.now();
+          self.lastMelee = self.lastMelee || 0;
+          if (now - self.lastMelee < km.cd * 1000 * 0.85) break;   // cadência da faca
+          self.lastMelee = now;
+
+          if (!Array.isArray(msg.o) || !Array.isArray(msg.d)) break;
+          const ox = +msg.o[0], oy = +msg.o[1], oz = +msg.o[2];
+          let dx = +msg.d[0], dy = +msg.d[1], dz = +msg.d[2];
+          const dl = Math.hypot(dx, dy, dz);
+          if (!(dl > 0.5 && dl < 2)) break;
+          dx /= dl; dy /= dl; dz /= dl;
+          if (Math.hypot(ox - self.pos.x, oz - self.pos.z) > 3 ||
+              Math.abs(oy - (self.pos.y + PLAYER.EYE)) > 2) break;
+
+          broadcastRoom(room, { t: 'melee', id: self.id, o: [ox, oy, oz], d: [dx, dy, dz], h: heavy }, self.id);
+
+          const sv = Math.min(now, Math.max(now - REWIND_MAX_MS, +msg.sv || now));
+          let victim = null, bestD = km.range;
+          for (const p of room.players.values()) {
+            if (p === self || !p.alive) continue;
+            if (room.settings.gm === 'tdm' && p.team === self.team) continue;
+            const rp = rewindPos(p, sv);
+            const cx = rp.x - ox, cy = (rp.y + PLAYER.BODY_H * 0.5) - oy, cz = rp.z - oz;
+            const d = Math.hypot(cx, cy, cz);
+            if (d > km.range || d < 0.001) continue;
+            if ((cx * dx + cy * dy + cz * dz) / d < km.arc) continue;        // fora do cone
+            if (raycastSolids(ox, oy, oz, cx / d, cy / d, cz / d) < d - 0.4) continue; // parede no meio
+            if (d < bestD) { bestD = d; victim = p; }
+          }
+          if (victim) {
+            // backstab: vítima de costas para o atacante → letal
+            const fx = -Math.sin(victim.yaw), fz = -Math.cos(victim.yaw);
+            let ax = victim.pos.x - self.pos.x, az = victim.pos.z - self.pos.z;
+            const al = Math.hypot(ax, az) || 1;
+            const backstab = (fx * (ax / al) + fz * (az / al)) > 0.5;
+            damage(room, self, victim, backstab ? BACKSTAB_DMG : km.dmg, false, 2, backstab);
           }
           break;
         }
