@@ -121,6 +121,7 @@
 
     <!-- NAV LATERAL -->
     <nav id="lobby-nav">
+      <button type="button" class="nav-item nav-arsenal" id="nav-arsenal"><span class="ni-ico">▤</span><span class="ni-txt">ARSENAL</span></button>
       <button type="button" class="nav-item" id="nav-profile"><span class="ni-ico">◈</span><span class="ni-txt">PERFIL</span></button>
       <button type="button" class="nav-item" id="nav-friends"><span class="ni-ico">☍</span><span class="ni-txt">AMIGOS</span></button>
       <button type="button" class="nav-item" id="nav-rank"><span class="ni-ico">♛</span><span class="ni-txt">RANKING</span></button>
@@ -438,6 +439,51 @@
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ARSENAL -->
+    <section class="screen armory-screen" id="screen-armory">
+      <div class="armory">
+        <div class="arm-grain"></div>
+        <header class="arm-head">
+          <div class="arm-brand">
+            <span class="arm-kicker">SUNFALL // EQUIPAMENTO</span>
+            <h2 class="arm-title">ARSENAL</h2>
+          </div>
+          <button type="button" class="arm-close screen-close" id="arm-close" title="Fechar">✕</button>
+        </header>
+        <div class="arm-grid">
+          <aside class="arm-list-wrap">
+            <div class="arm-list-title">PRIMÁRIAS <span>6</span></div>
+            <div class="arm-list" id="arm-list"></div>
+          </aside>
+          <main class="arm-stage" id="arm-stage">
+            <canvas id="arm-canvas"></canvas>
+            <div class="arm-stage-name" id="arm-stage-name"></div>
+            <div class="arm-stage-hint">arraste para girar · role para aproximar</div>
+            <div class="arm-lock" id="arm-lock">
+              <div class="arm-lock-i">🔒</div>
+              <div class="arm-lock-t">MODELO 3D EM PRODUÇÃO</div>
+              <span>a ficha técnica completa está disponível ao lado</span>
+            </div>
+            <button type="button" class="arm-reset" id="arm-reset" title="Recentralizar">⟳</button>
+          </main>
+          <aside class="arm-info" id="arm-info"></aside>
+        </div>
+        <footer class="arm-loadout">
+          <div class="arm-lo-slots">
+            <div class="arm-slot" id="arm-slot-primary" data-slot="primary">
+              <span class="arm-slot-tag">PRIMÁRIA</span>
+              <span class="arm-slot-name">—</span>
+            </div>
+            <div class="arm-slot locked" id="arm-slot-secondary" data-slot="secondary">
+              <span class="arm-slot-tag">SECUNDÁRIA</span>
+              <span class="arm-slot-name">Em breve</span>
+            </div>
+          </div>
+          <button type="button" class="arm-equip" id="arm-equip">EQUIPAR</button>
+        </footer>
       </div>
     </section>
 

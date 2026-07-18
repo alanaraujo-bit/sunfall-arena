@@ -10,6 +10,7 @@ import { tex, spriteTex, setTexQuality } from './textures.js';
 import { Net, api, apiAuth, apiPublicGet } from './net.js';
 import { SFX, getAudioContext } from './audio.js';
 import * as Music from './music.js';
+import { initArmory } from './armory.js';
 
 // Log de erros visível no DOM (debug em headless)
 const errlog = document.getElementById('errlog');
@@ -475,18 +476,25 @@ function updatePerf(dt) {
 // ---------------- Telas do lobby (overlays) ----------------
 const screens = {
   account: $('screen-account'), profile: $('screen-profile'), friends: $('screen-friends'),
-  rank: $('screen-rank'), config: $('screen-config'), modes: $('screen-modes')
+  rank: $('screen-rank'), config: $('screen-config'), modes: $('screen-modes'),
+  armory: $('screen-armory')
 };
 let currentScreen = null;
 
+// Arsenal: inicializado sob demanda (o visualizador 3D só é criado ao abrir)
+let armory = null;
+
 function showScreen(name) {
+  if (armory && currentScreen === 'armory' && name !== 'armory') armory.close();
   for (const [k, el] of Object.entries(screens)) el.classList.toggle('show', k === name);
   currentScreen = name;
   if (name === 'profile') loadProfile();
   if (name === 'rank') loadLeaderboard();
   if (name === 'friends') { renderFriendsScreen(); refreshFriends(); }
+  if (name === 'armory') { if (!armory) armory = initArmory(); armory.open(); }
 }
 function closeScreen() {
+  if (armory && currentScreen === 'armory') armory.close();
   for (const el of Object.values(screens)) el.classList.remove('show');
   currentScreen = null;
 }
@@ -498,6 +506,7 @@ hud.navFriends.onclick = () => showScreen('friends');
 hud.navRank.onclick = () => showScreen('rank');
 hud.navConfig.onclick = () => showScreen('config');
 hud.modeChip.onclick = () => showScreen('modes');
+$('nav-arsenal').onclick = () => showScreen('armory');
 
 // fechar telas: botão ✕, clicar fora do painel, ou Esc
 for (const el of Object.values(screens)) {
@@ -2704,6 +2713,11 @@ if (TESTMODE) {
     hud.nameInput.value = 'Tester';
     hud.startBtn.click();
   });
+}
+
+// atalho: ?armory abre direto o Arsenal (útil pra demonstrar/testar a tela)
+if (new URLSearchParams(location.search).has('armory')) {
+  addEventListener('load', () => showScreen('armory'));
 }
 
 // ---------------- Loop ----------------
