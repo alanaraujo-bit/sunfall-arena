@@ -166,6 +166,7 @@ const hud = {
   boardRows: $('board-rows'), hitmarker: $('hitmarker'), dmgFlash: $('dmg-flash'),
   death: $('death'), deathBy: $('death-by'), scope: $('scope'), game: $('hud'),
   killcam: $('killcam'), killcamBy: $('killcam-by'), killcamProgress: $('killcam-progress'),
+  killcamTag: $('killcam-tag'), killcamByText: $('killcam-bytext'),
   fade: $('fade'),
   killPop: $('kill-pop'), multiKill: $('multi-kill'),
   stamBox: $('stam-box'), stamFill: $('stam-fill'),
@@ -1144,6 +1145,11 @@ function onBindPress(code) {
   }
   // F durante a morte: pula o killcam e volta direto pro jogo
   if (playing && me.dead && code === 'KeyF') { requestRespawn(); return; }
+  // F durante o replay do melhor momento: pula direto pra tela de fim de partida
+  if (playing && killcam.active && killcam.mode === 'moment' && code === 'KeyF') {
+    if (!killcam.momentDone) { killcam.momentDone = true; finishBestMomentReplay(); }
+    return;
+  }
   if (!playing || me.dead) return;
   if (code === binds.jump) wantJump = true;
   if (code === binds.reload) startReload();
@@ -2413,25 +2419,40 @@ function sampleSnapshots() {
 // câmera nos olhos do assassino. Estilo Black Ops 2.
 // ============================================================
 const KILLCAM_MS = 5000;        // quanto do passado reproduzir (~5s)
-const KILLCAM_HOLD_MS = 900;    // pausa no instante da morte (queda da vítima)
+const KILLCAM_HOLD_MS = 900;    // pausa no instante da morte/abate (queda da vítima)
 const KILLCAM_AIM_MS = 1500;    // rampa do "abrir a mira" (ADS) antes do tiro final
 const DEATH_FALLBACK_MS = 2200; // morte sem killcam: tempo até pedir respawn sozinho
+const MOMENT_HOLD_MS = 1400;    // "melhor momento": segura mais no final (todo mundo assiste)
 
+// killcam.mode:
+//   'death'  — sua morte, pela visão de quem te matou (fluxo original)
+//   'moment' — melhor momento da partida (qualquer multi-kill recorde),
+//              reproduzido pra TODO MUNDO no fim, servidor manda os dados
+//              (ver server/game/highlights.js). Reaproveita toda a máquina
+//              de replay abaixo; só diverge em como posiciona as vítimas
+//              (uma só, no fim, em 'death'; várias, cada uma no seu
+//              instante, em 'moment') e em como termina (pede respawn vs.
+//              libera a tela de fim de partida que ficou represada).
 const killcam = {
   active: false,
-  frames: null,          // [{ sv, p }] copiados no instante da morte
+  mode: 'death',
+  frames: null,          // [{ sv, p }] copiados no instante da morte/captura
   startSv: 0, endSv: 0,
   t0: 0,                 // performance.now() do início do replay
-  deathWall: 0,          // performance.now() da morte (âncora p/ replay dos tiros)
+  deathWall: 0,          // performance.now() da morte (âncora p/ replay dos tiros em modo 'death')
   killerId: null,
-  killerW: 0,            // arma que te matou (0 = SMG, 1 = sniper)
+  killerW: 0,            // arma que te matou / arma do último abate do momento
   killerHidden: false,   // escondemos o modelo do assassino (câmera fica dentro dele)
-  victim: null,          // modelo temporário do seu corpo
-  shots: null,           // disparos do assassino a reproduzir: [{ wall, o, d, w, played }]
-  fallT: 0,              // progresso da queda da vítima (0..1)
+  victim: null,          // modo 'death': modelo temporário do seu corpo
+  momentKills: null,     // modo 'moment': [{ victimId, atSv, head, w, bs }]
+  momentVictims: null,   // modo 'moment': Map<victimId, modelo temporário>
+  hiddenLiveIds: null,   // ids cujo modelo AO VIVO escondemos (restaura ao sair)
+  shots: null,           // disparos a reproduzir: [{ wall, o, d, w, played }]
+  fallT: 0,              // modo 'death': progresso da queda da vítima (0..1)
   aim: 0,                // ADS simulado (0..1) — "abrindo a mira"
   recoil: 0, vmKick: 0, bobT: 0,
-  respawnSent: false
+  respawnSent: false,
+  momentDone: false
 };
 let deathTimer = null;   // failsafe client-side para morte sem killcam
 // disparos remotos recentes (p/ reproduzir no killcam): { wall, id, o:[3], d:[3], w }
@@ -2513,6 +2534,7 @@ function collectKillcamFrames(killerId) {
 
 function enterKillcam(killerId, killerW) {
   killcam.active = true;
+  killcam.mode = 'death';
   killcam.killerId = killerId;
   killcam.killerW = (killerW === 1 || killerW === 2) ? killerW : 0;
   killcam.t0 = performance.now();
@@ -2544,11 +2566,76 @@ function enterKillcam(killerId, killerW) {
 
   hud.death.classList.remove('show');
   const killer = meta.get(killerId);
+  hud.killcamTag.textContent = 'KILLCAM';
+  hud.killcamByText.firstChild.textContent = 'morto por ';
   hud.killcamBy.textContent = killer ? killer.name : '???';
   hud.killcamProgress.style.width = '0%';
   hud.killcam.classList.add('show');
 
   fadeCut();   // corte preto rápido de entrada
+}
+
+// Resolve a cor de exibição de um jogador pelo id (time em TDM, cor própria em FFA).
+function resolvePlayerColor(id) {
+  if (id === me.id) return teamOf(me.team, me.color);
+  const m = meta.get(id);
+  return m ? teamOf(m.team, m.color) : '#fff';
+}
+
+// Entra no replay do "melhor momento" da partida — mesma máquina do killcam
+// pessoal, mas os dados vêm do servidor (qualquer jogador pode ser o astro) e
+// várias vítimas caem, cada uma no seu instante, em vez de uma só no final.
+function enterBestMomentReplay(bm) {
+  killcam.active = true;
+  killcam.mode = 'moment';
+  killcam.killerId = bm.killerId;
+  // arma do último abate como representativa (viewmodel/FOV do replay);
+  // dano de granada/barril (3/4) não tem viewmodel próprio — cai no FALCÃO
+  const lastW = bm.kills[bm.kills.length - 1].w;
+  killcam.killerW = (lastW === 1 || lastW === 2) ? lastW : 0;
+  killcam.frames = bm.frames;
+  killcam.startSv = bm.startSv;
+  killcam.endSv = bm.endSv;
+  killcam.momentKills = bm.kills;
+  killcam.momentDone = false;
+  killcam.t0 = performance.now();
+  killcam.fallT = 0;
+  killcam.aim = 0; killcam.recoil = 0; killcam.vmKick = 0; killcam.bobT = 0;
+
+  killcam.shots = bm.shots.map(f => ({ wall: f.wall, o: f.o, d: f.d, w: f.w, played: false }));
+
+  // um corpo temporário por vítima única (o mesmo jogador não pode morrer
+  // duas vezes na mesma janela sem respawnar entre uma e outra)
+  killcam.momentVictims = new Map();
+  for (const k of bm.kills) {
+    if (killcam.momentVictims.has(k.victimId)) continue;
+    const vm = makeCharacter(resolvePlayerColor(k.victimId));
+    scene.add(vm);
+    killcam.momentVictims.set(k.victimId, vm);
+  }
+
+  // esconde os modelos AO VIVO de quem participa (assassino + vítimas) —
+  // senão duplicaria corpo (um vivo na posição atual, um temporário no replay)
+  killcam.hiddenLiveIds = new Set([bm.killerId, ...killcam.momentVictims.keys()]);
+  for (const id of killcam.hiddenLiveIds) {
+    const r = remotes.get(id);
+    if (r && r.model) r.model.visible = false;
+  }
+
+  showViewmodel(killcam.killerW);
+  vmRoot.position.set(0.26, -0.24, -0.5);
+  vmRoot.rotation.set(0, 0, 0);
+  vmRoot.visible = true;
+
+  const killerMeta = bm.killerId === me.id ? me : meta.get(bm.killerId);
+  const label = MULTI_KILL_LABEL[bm.kills.length] || 'MULTI KILL';
+  hud.killcamTag.textContent = 'MELHOR MOMENTO';
+  hud.killcamByText.firstChild.textContent = '';
+  hud.killcamBy.textContent = `${killerMeta ? killerMeta.name : '???'} — ${label}`;
+  hud.killcamProgress.style.width = '0%';
+  hud.killcam.classList.add('show');
+
+  fadeCut();
 }
 
 // preto instantâneo que desvanece → dá um "corte" limpo pra dentro do killcam
@@ -2575,6 +2662,10 @@ function requestRespawn() {
 // Desmonta o killcam (chamado no spawn / fim de partida).
 function endKillcam() {
   if (killcam.victim) { scene.remove(killcam.victim); killcam.victim = null; }
+  if (killcam.momentVictims) {
+    for (const m of killcam.momentVictims.values()) scene.remove(m);
+    killcam.momentVictims = null;
+  }
   // restaura a visibilidade de todos os vivos (posicionamos modelos no histórico
   // durante o replay; quem não aparecia num frame ficou oculto)
   for (const r of remotes.values()) {
@@ -2582,9 +2673,12 @@ function endKillcam() {
   }
   killcam.killerHidden = false;
   killcam.active = false;
+  killcam.mode = 'death';
   killcam.frames = null;
   killcam.killerId = null;
   killcam.shots = null;
+  killcam.momentKills = null;
+  killcam.hiddenLiveIds = null;
 
   // devolve a viewmodel/FOV/scope pro estado do jogador local
   showViewmodel(curW);
@@ -2651,20 +2745,22 @@ function replayKillerShot(shot) {
 
 // chamada todo frame enquanto o killcam roda
 function updateKillcam(dt) {
+  const moment = killcam.mode === 'moment';
   const frames = killcam.frames;
   const elapsed = performance.now() - killcam.t0;
-  const replayMs = KILLCAM_MS;   // == endSv - startSv por construção
+  const replayMs = killcam.endSv - killcam.startSv;   // igual ao startSv..endSv da captura
+  const holdMs = moment ? MOMENT_HOLD_MS : KILLCAM_HOLD_MS;
 
   let sv;
   if (elapsed <= replayMs) {
     sv = killcam.startSv + elapsed;               // fase 1: replay em tempo real
   } else {
     sv = killcam.endSv;                            // fase 2: segura no tiro + queda
-    killcam.fallT = Math.min(1, (elapsed - replayMs) / KILLCAM_HOLD_MS);
+    if (!moment) killcam.fallT = Math.min(1, (elapsed - replayMs) / holdMs);
   }
 
   hud.killcamProgress.style.width =
-    (Math.min(1, elapsed / (replayMs + KILLCAM_HOLD_MS)) * 100).toFixed(1) + '%';
+    (Math.min(1, elapsed / (replayMs + holdMs)) * 100).toFixed(1) + '%';
 
   // "abrir a mira" (ADS): rampa nos instantes finais antes do tiro e segura no fim
   const aimTarget = elapsed >= replayMs
@@ -2704,24 +2800,51 @@ function updateKillcam(dt) {
   }
   killcam.vmKick *= Math.exp(-10 * dt);
 
-  // reproduz os tiros do assassino no momento certo do replay
-  const playbackWall = killcam.deathWall - KILLCAM_MS + Math.min(elapsed, replayMs);
+  // reproduz os tiros do assassino no momento certo do replay. Em 'death' os
+  // disparos vêm do fireLog local (relógio performance.now(), por isso a
+  // ponte via deathWall); em 'moment' vêm do servidor já no mesmo relógio
+  // dos frames (sv), então compara direto — sem precisar da ponte.
   if (killcam.shots) {
-    for (const s of killcam.shots) {
-      if (!s.played && s.wall <= playbackWall) { s.played = true; replayKillerShot(s); }
+    if (moment) {
+      for (const s of killcam.shots) {
+        if (!s.played && s.wall <= sv) { s.played = true; replayKillerShot(s); }
+      }
+    } else {
+      const playbackWall = killcam.deathWall - replayMs + Math.min(elapsed, replayMs);
+      for (const s of killcam.shots) {
+        if (!s.played && s.wall <= playbackWall) { s.played = true; replayKillerShot(s); }
+      }
     }
   }
 
-  // corpo da vítima (você) — cai no fim
-  poseKillcamEntity(killcam.victim, kcLerp(smp.a, smp.b, smp.alpha, me.id), dt, killcam.fallT);
-  // demais jogadores (o assassino fica escondido)
+  if (moment) {
+    // cada vítima cai no seu próprio instante (não todas juntas no final)
+    for (const kill of killcam.momentKills) {
+      const model = killcam.momentVictims.get(kill.victimId);
+      const fallT = Math.max(0, Math.min(1, (sv - kill.atSv) / KILLCAM_HOLD_MS));
+      poseKillcamEntity(model, kcLerp(smp.a, smp.b, smp.alpha, kill.victimId), dt, fallT);
+    }
+  } else {
+    // corpo da vítima (você) — cai no fim
+    poseKillcamEntity(killcam.victim, kcLerp(smp.a, smp.b, smp.alpha, me.id), dt, killcam.fallT);
+  }
+  // demais jogadores (assassino e, em 'moment', as vítimas — já posadas acima — ficam de fora)
   for (const [id, r] of remotes) {
     if (id === killcam.killerId) continue;
+    if (killcam.hiddenLiveIds && killcam.hiddenLiveIds.has(id)) continue;
     poseKillcamEntity(r.model, kcLerp(smp.a, smp.b, smp.alpha, id), dt, 0);
   }
 
-  // acabou → pede respawn (fade + servidor confirma)
-  if (killcam.fallT >= 1 && !killcam.respawnSent) requestRespawn();
+  if (moment) {
+    // acabou → libera a tela de fim de partida que ficou represada
+    if (elapsed >= replayMs + holdMs && !killcam.momentDone) {
+      killcam.momentDone = true;
+      finishBestMomentReplay();
+    }
+  } else if (killcam.fallT >= 1 && !killcam.respawnSent) {
+    // acabou → pede respawn (fade + servidor confirma)
+    requestRespawn();
+  }
 }
 
 function computeTeamScores() {
@@ -2894,16 +3017,37 @@ net.on('spawn', msg => {
 });
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+let pendingEndMsg = null;   // 'end' represado enquanto o replay do melhor momento roda
+
 net.on('end', msg => {
   matchEnded = true;
   mouseDown = false;
   setZoom(false);
   hud.death.classList.remove('show');
-  endKillcam();
+  endKillcam();   // corta uma killcam pessoal em andamento (mesmo comportamento de sempre)
   clearTimeout(deathTimer); deathTimer = null;
   killcam.respawnSent = false;
   hud.fade.classList.remove('on');
 
+  // se alguém fechou um multi-kill que virou recorde da partida, todo mundo
+  // assiste o replay primeiro (mesma máquina da killcam pessoal) — a tela de
+  // fim de partida só aparece quando o replay termina (ver finishBestMomentReplay)
+  if (msg.bestMoment) {
+    pendingEndMsg = msg;
+    enterBestMomentReplay(msg.bestMoment);
+    return;
+  }
+  showEndScreen(msg);
+});
+
+function finishBestMomentReplay() {
+  endKillcam();
+  const msg = pendingEndMsg;
+  pendingEndMsg = null;
+  if (msg) showEndScreen(msg);
+}
+
+function showEndScreen(msg) {
   let won = false;
   if (msg.gm === 'tdm') {
     const wt = msg.winTeam;
@@ -2942,7 +3086,7 @@ net.on('end', msg => {
     if (count <= 0) { clearInterval(endCountTimer); endCountTimer = null; }
   }, 1000);
   if (won) SFX.kill();
-});
+}
 
 net.on('teamchg', msg => {
   if (msg.id === me.id) {
@@ -2967,6 +3111,10 @@ net.on('restart', msg => {
   hud.endscreen.classList.remove('show');
   if (endCountTimer) { clearInterval(endCountTimer); endCountTimer = null; }
   if (roomInfo) roomInfo.end = msg.end;
+  // salvaguarda rara: se o replay do melhor momento ainda estivesse rodando
+  // quando a partida reiniciou, corta e descarta o 'end' represado
+  if (killcam.active) endKillcam();
+  pendingEndMsg = null;
   destroyedBarrels.clear();
   applyBarrelState();
   me.k = 0; me.d = 0;

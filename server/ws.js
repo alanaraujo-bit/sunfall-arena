@@ -15,6 +15,7 @@ import {
   throwGrenade, updateGrenades, explodeGrenade, deploySmoke, updateSmokes
 } from './game/grenades.js';
 import { barrelBounds, damageBarrel } from './game/barrels.js';
+import { recordFrame, recordFire, registerKill } from './game/highlights.js';
 import { awardXpAndPersist, persistDeath, loadProfileForJoin } from './game/stats.js';
 import { verifyToken } from './auth.js';
 import { setPresence, clearPresence, getPresence } from './presence.js';
@@ -97,6 +98,7 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false, r
         attacker.ws.send(JSON.stringify({ t: 'kit', n: attacker.kits }));
       }
     }
+    registerKill(room, attacker, victim, head, wi, bs);
   }
   broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head, bs, w: wi, dmg });
   broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi, bs });
@@ -364,6 +366,7 @@ export function attachWs(server) {
               Math.abs(oy - (self.pos.y + PLAYER.EYE)) > 2) break;
 
           broadcastRoom(room, { t: 'fire', id: self.id, o: [ox, oy, oz], d: [dx, dy, dz], w: wi }, self.id);
+          recordFire(room, now, self.id, [ox, oy, oz], [dx, dy, dz], wi);
 
           const sv = Math.min(now, Math.max(now - REWIND_MAX_MS, +msg.sv || now));
           const tMap = raycastSolids(ox, oy, oz, dx, dy, dz);
@@ -556,6 +559,7 @@ export function startGameLoop() {
           +p.yaw.toFixed(3), +p.pitch.toFixed(3), p.anim, p.hp
         ];
       }
+      recordFrame(room, now, state);
       const nstate = {};
       for (const nade of room.grenades.values()) {
         nstate[nade.id] = [+nade.pos.x.toFixed(2), +nade.pos.y.toFixed(2), +nade.pos.z.toFixed(2)];
