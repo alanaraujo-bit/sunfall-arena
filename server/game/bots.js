@@ -1,28 +1,35 @@
 // ============================================================
 // SUNFALL ARENA — bots: patrulha, mira e tiro (por sala)
 // ============================================================
-import { PLAYER, raycastSolids, pushOut } from '../../shared/mapdata.js';
+import { PLAYER, raycastSolids, pushOut, floorTopAt } from '../../shared/mapdata.js';
 import { nextPlayerId, nextColor, spawnPos, broadcastRoom, assignTeam } from './rooms.js';
 import { sightBlockedBySmoke } from './grenades.js';
 
-// Um obstáculo bloqueia o bot se a caixa cruza a altura do corpo dele (pés a
-// ~1.4m). Ignora coisas no chão (degraus baixos) e o que está acima da cabeça
-// (telhados, parapeitos elevados) — o bot anda por baixo desses.
-function botBlocked(bounds, x, z) {
+// Um obstáculo bloqueia o bot se a caixa cruza a altura do corpo dele,
+// RELATIVA ao chão em que ele está (y). Topo até 0.95 acima dos pés é degrau
+// (sobe); base 1.4 acima da cabeça é teto/telhado (passa por baixo).
+function botBlocked(bounds, x, z, y) {
   const r = PLAYER.R;
   for (const b of bounds) {
-    if (b.maxy < 0.15 || b.miny > 1.4) continue;
+    if (b.maxy - y <= 0.95) continue;
+    if (b.miny - y > 1.4) continue;
     if (x + r > b.minx && x - r < b.maxx && z + r > b.minz && z - r < b.maxz) return true;
   }
   return false;
 }
 
 // Move o bot com colisão separada por eixo (desliza rente à parede em vez de
-// enfiar nela e ser "teleportado" pra fora pelo pushOut). Retorna se andou.
+// enfiar nela e ser "teleportado" pra fora pelo pushOut), acompanhando a
+// altura do terreno (sobe degrau, cai de borda). Retorna se andou.
+// Deltas sub-milimétricos NÃO contam como movimento — sem isso, um bot
+// alinhado no eixo com o alvo "anda" 1e-17 por tick contra uma parede,
+// o stuckT nunca dispara e ele fica pregado na face do terraço pra sempre.
 function moveBot(bounds, bot, dx, dz) {
   let moved = false;
-  if (dx && !botBlocked(bounds, bot.pos.x + dx, bot.pos.z)) { bot.pos.x += dx; moved = true; }
-  if (dz && !botBlocked(bounds, bot.pos.x, bot.pos.z + dz)) { bot.pos.z += dz; moved = true; }
+  const y = bot.pos.y;
+  if (Math.abs(dx) > 1e-3 && !botBlocked(bounds, bot.pos.x + dx, bot.pos.z, y)) { bot.pos.x += dx; moved = true; }
+  if (Math.abs(dz) > 1e-3 && !botBlocked(bounds, bot.pos.x, bot.pos.z + dz, y)) { bot.pos.z += dz; moved = true; }
+  if (moved) bot.pos.y = floorTopAt(bounds, bot.pos.x, bot.pos.z, y);
   return moved;
 }
 
@@ -122,5 +129,5 @@ export function updateBot(room, bot, dt, damage) {
     }
   }
   pushOut(room.map.BOUNDS, room.map.LIM, bot.pos);   // rede de segurança
-  bot.pos.y = 0;   // bots ainda são rasteiros — altura de terreno chega na Fase 2
+  bot.pos.y = floorTopAt(room.map.BOUNDS, bot.pos.x, bot.pos.z, bot.pos.y);
 }

@@ -71,7 +71,7 @@ function makeCrate(s) {
   return m;
 }
 
-function makeBarrel(s) {
+export function makeBarrel(s) {
   const grp = new THREE.Group();
   const r = s.w / 2;
   const body = new THREE.Mesh(
@@ -98,7 +98,7 @@ function makeBarrel(s) {
 
 // Destroço do barril depois de explodir: casco baixo e chamuscado + estilhaços
 // espalhados. Fica escondido até o servidor confirmar o estouro (ver 'barrelboom').
-function makeBarrelWreck(s) {
+export function makeBarrelWreck(s) {
   const grp = new THREE.Group();
   const r = s.w / 2;
   const scorchMat = cmat('barrel-scorch', () =>
@@ -277,7 +277,8 @@ function decorateBuilding(staticRoot, s) {
 // IMPORTANTE: mergeGeometries exige geometrias todas indexed OU todas
 // non-indexed — RoundedBoxGeometry é non-indexed e Box/Cylinder/Plane são
 // indexed, então normalizamos tudo para non-indexed antes de fundir.
-function mergeStatics(srcRoot, dstRoot) {
+// (exportado: world-ocaso.js reusa — import circular seguro, só usa em runtime)
+export function mergeStatics(srcRoot, dstRoot) {
   srcRoot.updateMatrixWorld(true);
   const buckets = new Map(); // material -> { geos, cast, recv }
   srcRoot.traverse(o => {
@@ -436,8 +437,9 @@ export function buildWorld(scene, opts = {}) {
     wreck.visible = false;
     const grp = new THREE.Group();
     // sem levantar o grupo pra h/2, metade do barril intacto fica enterrada
-    // no chão (quase invisível, fácil de não notar — foi o bug reportado)
-    grp.position.set(b.x, BARREL_H / 2, b.z);
+    // no chão (quase invisível, fácil de não notar — foi o bug reportado).
+    // b.y = piso do terraço onde o barril está (0 = chão).
+    grp.position.set(b.x, (b.y || 0) + BARREL_H / 2, b.z);
     grp.add(intact, wreck);
     liveRoot.add(grp);
     return { id: b.id, group: grp, intact, wreck, alive: true };

@@ -7,13 +7,14 @@
 import { PLAYER, raycastSolids, BARREL_W, BARREL_H, BARREL_HP, BARREL_DMG_MAX, BARREL_DMG_RADIUS } from '../../shared/mapdata.js';
 
 export function initBarrels(map) {
-  return map.BARRELS.map(b => ({ id: b.id, x: b.x, z: b.z, hp: BARREL_HP, alive: true }));
+  return map.BARRELS.map(b => ({ id: b.id, x: b.x, y: b.y || 0, z: b.z, hp: BARREL_HP, alive: true }));
 }
 
-// AABB do barril (mesmo formato usado por rayBox) — barris ficam sempre no chão.
+// AABB do barril (mesmo formato usado por rayBox) — `y` é a base (piso do
+// terraço onde o barril está; 0 = chão).
 export function barrelBounds(b) {
-  const r = BARREL_W / 2;
-  return { minx: b.x - r, maxx: b.x + r, miny: 0, maxy: BARREL_H, minz: b.z - r, maxz: b.z + r };
+  const r = BARREL_W / 2, y = b.y || 0;
+  return { minx: b.x - r, maxx: b.x + r, miny: y, maxy: y + BARREL_H, minz: b.z - r, maxz: b.z + r };
 }
 
 // Aplica dano num barril vivo. Se estourar, aplica dano em área nos jogadores
@@ -25,7 +26,7 @@ export function damageBarrel(room, barrel, dmg, attacker, players, damageFn) {
   if (barrel.hp > 0) return null;
   barrel.alive = false;
   barrel.hp = 0;
-  const x = barrel.x, y = BARREL_H + 0.1, z = barrel.z;
+  const x = barrel.x, y = (barrel.y || 0) + BARREL_H + 0.1, z = barrel.z;
   for (const p of players.values()) {
     if (!p.alive) continue;
     const cx = p.pos.x - x, cy = (p.pos.y + PLAYER.BODY_H * 0.5) - y, cz = p.pos.z - z;

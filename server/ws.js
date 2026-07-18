@@ -3,7 +3,7 @@
 // convites e combate autoritativo com partidas que terminam.
 // ============================================================
 import { WebSocketServer } from 'ws';
-import { PLAYER, rayBox, raycastSolids, BARREL_DMG_RADIUS } from '../shared/mapdata.js';
+import { PLAYER, rayBox, raycastSolids, BARREL_DMG_RADIUS, BARREL_H } from '../shared/mapdata.js';
 import { MAPS } from '../shared/maps/index.js';
 import {
   rooms, findOrCreatePublic, createCustom, getByCode, realCount, MAX_REAL,
@@ -536,7 +536,9 @@ export function startGameLoop() {
         if (thrower) {
           for (const b of room.barrels) {
             if (!b.alive) continue;
-            const dist = Math.hypot(b.x - nade.pos.x, b.z - nade.pos.z);
+            // distância 3D até o centro do barril — granada num terraço abaixo
+            // não detona barril no terraço de cima através do piso
+            const dist = Math.hypot(b.x - nade.pos.x, ((b.y || 0) + BARREL_H / 2) - nade.pos.y, b.z - nade.pos.z);
             if (dist > BARREL_DMG_RADIUS) continue;
             const res = damageBarrel(room, b, 9999, thrower, room.players, damage);
             if (res) broadcastRoom(room, { t: 'barrelboom', id: res.id, x: res.x, y: res.y, z: res.z });

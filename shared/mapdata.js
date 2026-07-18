@@ -87,6 +87,18 @@ export function raycastSolids(bounds, ox, oy, oz, dx, dy, dz, maxT = Infinity, e
   return best === maxT ? (maxT === Infinity ? Infinity : maxT) : best;
 }
 
+// Altura de chão em (x, z) para quem está a `fromY`: o topo mais alto que
+// ainda é "subível" (≤ fromY + 0.95). Sem nada embaixo, devolve 0 (chão).
+// Usado pelos bots para acompanhar terraços, escadas e quedas.
+export function floorTopAt(bounds, x, z, fromY, r = PLAYER.R * 0.8) {
+  let top = 0;
+  for (const b of bounds) {
+    if (x + r > b.minx && x - r < b.maxx && z + r > b.minz && z - r < b.maxz &&
+        b.maxy <= fromY + 0.95 && b.maxy > top) top = b.maxy;
+  }
+  return top;
+}
+
 // Empurra uma posição para fora dos sólidos (horizontal) — usado pelos bots.
 // `lim` é o clamp do mapa (export LIM de cada shared/maps/*.js).
 export function pushOut(bounds, lim, p, r = PLAYER.R, h = PLAYER.H) {
