@@ -248,6 +248,9 @@ function decorateBuilding(staticRoot, s) {
 }
 
 // Funde toda a geometria de um grupo em 1 mesh por material.
+// IMPORTANTE: mergeGeometries exige geometrias todas indexed OU todas
+// non-indexed — RoundedBoxGeometry é non-indexed e Box/Cylinder/Plane são
+// indexed, então normalizamos tudo para non-indexed antes de fundir.
 function mergeStatics(srcRoot, dstRoot) {
   srcRoot.updateMatrixWorld(true);
   const buckets = new Map(); // material -> { geos, cast, recv }
@@ -255,22 +258,32 @@ function mergeStatics(srcRoot, dstRoot) {
     if (!o.isMesh) return;
     let b = buckets.get(o.material);
     if (!b) { b = { geos: [], cast: false, recv: false }; buckets.set(o.material, b); }
-    b.geos.push(o.geometry.clone().applyMatrix4(o.matrixWorld));
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    b.geos.push(g.applyMatrix4(o.matrixWorld));
     b.cast = b.cast || o.castShadow;
     b.recv = b.recv || o.receiveShadow;
     o.geometry.dispose();
   });
-  for (const [material, b] of buckets) {
-    const merged = b.geos.length === 1
-      ? b.geos[0]
-      : BufferGeometryUtils.mergeGeometries(b.geos, false);
-    if (!merged) continue;
-    if (b.geos.length > 1) for (const g of b.geos) g.dispose();
-    const m = new THREE.Mesh(merged, material);
+  const place = (geo, material, b) => {
+    const m = new THREE.Mesh(geo, material);
     m.castShadow = b.cast;
     m.receiveShadow = b.recv;
     m.matrixAutoUpdate = false; // estático: nunca recalcular matriz
     dstRoot.add(m);
+  };
+  for (const [material, b] of buckets) {
+    const merged = b.geos.length === 1
+      ? b.geos[0]
+      : BufferGeometryUtils.mergeGeometries(b.geos, false);
+    if (merged) {
+      if (b.geos.length > 1) for (const g of b.geos) g.dispose();
+      place(merged, material, b);
+    } else {
+      // fusão falhou (atributos incompatíveis): NUNCA descartar —
+      // adiciona os meshes individualmente para manter tudo visível
+      console.warn('[world] merge falhou para um material; usando meshes individuais');
+      for (const g of b.geos) place(g, material, b);
+    }
   }
 }
 

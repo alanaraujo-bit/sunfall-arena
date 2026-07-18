@@ -317,11 +317,26 @@ hud.setParticles.onchange = () => customize('particles', hud.setParticles.value)
 hud.setDecor.onchange = () => customize('decor', hud.setDecor.value);
 hud.setTex.onchange = () => customize('texq', hud.setTex.value);
 hud.aaReload.onclick = () => location.reload();
-hud.gpuLine.textContent = 'GPU em uso: ' + (gpuName || 'desconhecida');
+// O navegador MASCARA o modelo exato da GPU por privacidade (mostra um
+// modelo genérico "or similar") — só o fabricante é confiável. O que
+// importa: NVIDIA/AMD = placa dedicada em uso; SwiftShader = sem aceleração.
+function gpuLabel() {
+  if (SOFTWARE_GL) return 'renderização por software';
+  if (/nvidia|geforce|rtx\b|gtx\b/i.test(gpuName)) return 'NVIDIA — placa dedicada em uso ✓';
+  if (/\bamd\b|radeon/i.test(gpuName)) return 'AMD Radeon — placa dedicada em uso ✓';
+  if (/intel|\buhd\b|iris/i.test(gpuName)) return 'Intel (integrada) — se você tem placa dedicada, force-a nas config. de vídeo do Windows';
+  if (/apple/i.test(gpuName)) return 'Apple';
+  return gpuName || 'desconhecida';
+}
+hud.gpuLine.textContent = 'GPU em uso: ' + gpuLabel() +
+  ' · o navegador esconde o modelo exato por privacidade';
+hud.gpuLine.title = gpuName; // string bruta no tooltip p/ diagnóstico
 if (SOFTWARE_GL) {
   hud.gpuLine.classList.add('warn');
-  hud.gpuLine.textContent += ' — SEM aceleração de hardware!';
+  hud.gpuLine.textContent = 'GPU em uso: SEM aceleração de hardware (software)!';
   $('gl-warn').classList.remove('hidden');
+} else if (/intel|\buhd\b|iris/i.test(gpuName)) {
+  hud.gpuLine.classList.add('warn');
 }
 syncGfxControls();
 hud.setFov.value = settings.fov;
