@@ -21,18 +21,20 @@ function ensure() {
   if (AC.state === 'suspended') AC.resume();
 }
 
-function noise(dur, vol, fStart, fEnd, type = 'lowpass') {
+function noise(dur, vol, fStart, fEnd, type = 'lowpass', delay = 0) {
   const src = AC.createBufferSource();
   src.buffer = noiseBuf;
+  const t0 = AC.currentTime + delay;
   const f = AC.createBiquadFilter();
   f.type = type;
-  f.frequency.setValueAtTime(fStart, AC.currentTime);
-  f.frequency.exponentialRampToValueAtTime(Math.max(40, fEnd), AC.currentTime + dur);
+  f.frequency.setValueAtTime(fStart, t0);
+  f.frequency.exponentialRampToValueAtTime(Math.max(40, fEnd), t0 + dur);
   const g = AC.createGain();
-  g.gain.setValueAtTime(vol, AC.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
   src.connect(f); f.connect(g); g.connect(master);
-  src.start(); src.stop(AC.currentTime + dur);
+  src.start(t0); src.stop(t0 + dur);
 }
 
 function tone(freq, dur, vol, type = 'sine', slideTo = null, delay = 0) {
@@ -57,15 +59,27 @@ export const SFX = {
     if (master) master.gain.value = volume;
   },
 
+  // Tiros em camadas: transiente mecânico + corpo + soco grave (+ eco no sniper).
+  // `v` varia o timbre por disparo (rajada não soa metralhadora de brinquedo);
+  // `muf` abafa os agudos com a distância (vol < 1 = tiro de outro jogador longe).
   shot(sniper = false, vol = 1) {
     ensure();
+    const v = 0.94 + Math.random() * 0.12;
+    const muf = 0.45 + 0.55 * Math.min(1, vol);
     if (sniper) {
-      noise(0.3, 0.55 * vol, 3200, 220);
-      tone(130, 0.22, 0.4 * vol, 'square', 45);
-      tone(60, 0.3, 0.35 * vol, 'sine', 30);
+      // FERRÃO-SR: estalo seco de ferrolho + corpo grave longo + eco duplo
+      if (vol > 0.35) noise(0.035, 0.5 * vol, 6000, 2500, 'highpass');
+      noise(0.34, 0.55 * vol, 1500 * v * muf, 90);
+      tone(118 * v, 0.28, 0.42 * vol, 'square', 36);
+      tone(57, 0.42, 0.4 * vol, 'sine', 24);
+      noise(0.22, 0.16 * vol, 900 * muf, 140, 'lowpass', 0.1);
+      noise(0.3, 0.09 * vol, 600 * muf, 90, 'lowpass', 0.22);
     } else {
-      noise(0.13, 0.45 * vol, 2600, 350);
-      tone(150, 0.09, 0.3 * vol, 'square', 70);
+      // FALCÃO-9: clique do mecanismo + corpo médio + soco curto no grave
+      if (vol > 0.35) noise(0.018, 0.3 * vol, 5200, 3000, 'highpass');
+      noise(0.11, 0.44 * vol, 2800 * v * muf, 420);
+      tone(160 * v, 0.075, 0.3 * vol, 'square', 78);
+      tone(86 * v, 0.1, 0.26 * vol, 'sine', 46);
     }
   },
 
@@ -120,8 +134,21 @@ export const SFX = {
     tone(220, 0.5, 0.05 * vol, 'sine', 120);
   },
 
-  hit() { ensure(); tone(880, 0.06, 0.25, 'sine', 1200); },
-  headshot() { ensure(); tone(1100, 0.05, 0.28, 'sine', 1600); tone(1500, 0.07, 0.2, 'sine', 2000, 0.04); },
+  // acerto no corpo: "thock" de impacto na carne + blip de confirmação
+  hit() {
+    ensure();
+    noise(0.07, 0.28, 1100, 260);
+    tone(340, 0.06, 0.2, 'sawtooth', 190);
+    tone(880, 0.05, 0.22, 'sine', 1250);
+  },
+  // headshot: "ding" metálico inconfundível (sino com parciais) + crunch seco
+  headshot() {
+    ensure();
+    noise(0.045, 0.22, 1600, 500);
+    tone(1245, 0.14, 0.3, 'triangle', 1180);
+    tone(1867, 0.1, 0.16, 'sine', 1780, 0.012);
+    tone(2490, 0.16, 0.1, 'sine', 2350, 0.03);
+  },
   kill() { ensure(); tone(520, 0.09, 0.3, 'triangle'); tone(780, 0.12, 0.3, 'triangle', null, 0.09); tone(1040, 0.18, 0.28, 'triangle', null, 0.18); },
   hurt() { ensure(); tone(180, 0.14, 0.35, 'sawtooth', 90); noise(0.1, 0.15, 700, 200); },
   die() { ensure(); tone(300, 0.5, 0.3, 'sawtooth', 60); noise(0.4, 0.2, 900, 100); },

@@ -739,8 +739,19 @@ const KNIFE = 2;
 const GRENADE = 3;   // viewmodel da granada de frag — ação overlay, não um "slot"
 const SMOKE_VM = 4;  // viewmodel da granada de fumaça
 const WEAPONS = [
-  { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false },
-  { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true },
+  // rec = personalidade do recuo:
+  //   climb  sobe por tiro (pitch)      drift  deriva lateral na rajada (yaw)
+  //   jitter aleatório lateral          ramp   tiros até a rajada "assentar"
+  //   recov  velocidade de recuperação  bloom  dispersão extra por tiro de rajada (até bloomMax)
+  //   vmKick coice da viewmodel         shake  tremor de câmera por disparo
+  { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false,
+    // sobe firme e previsível nos primeiros tiros; na rajada longa assenta e
+    // deriva devagar pro lado — dá pra compensar puxando a mira (lore: controle 86)
+    rec: { climb: 0.013, drift: 0.0062, jitter: 0.0022, ramp: 4, recov: 13, bloom: 0.0009, bloomMax: 0.010, vmKick: 0.055 } },
+  { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true,
+    // coice pesado de ferrolho: um soco grande por tiro, recuperação lenta —
+    // cada disparo é um evento (ramp 0 = sem comportamento de rajada)
+    rec: { climb: 0.054, drift: 0, jitter: 0.007, ramp: 0, recov: 7, bloom: 0, bloomMax: 0, vmKick: 0.12, shake: 0.035 } },
   // Faca: arma de oportunidade. Curtíssimo alcance, alto risco/recompensa.
   { name: 'PRESA-7', melee: true, sniper: false, auto: false,
     light: { dmg: 55, range: 2.5, arc: 0.62, cd: 0.5,  wind: 0.1,  lunge: 3.6, kick: 0.05 },   // arc = cos do meio-ângulo do cone
@@ -749,6 +760,8 @@ const WEAPONS = [
 const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣'];
 const ammo = [WEAPONS[0].mag, WEAPONS[1].mag];
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
+let recoilY = 0;   // componente lateral do recuo (yaw)
+let sprayN = 0;    // tiros consecutivos na rajada atual (padrão de recuo + bloom)
 
 const vmAR = makeViewmodel('ar');
 const vmSR = makeViewmodel('sr');
@@ -1282,11 +1295,15 @@ function tryFire() {
   if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   if (now - lastShot < w.int) return;
   if (ammo[curW] <= 0) { SFX.empty(); startReload(); return; }
+  // rajada: pausa maior que ~2 cadências zera o padrão de recuo e o bloom
+  sprayN = now - lastShot > w.int * 2.2 + 0.08 ? 0 : sprayN + 1;
   lastShot = now;
   ammo[curW]--;
 
   camera.getWorldDirection(_dir);
-  const spread = w.sniper && zoomed ? 0 : w.spread;
+  const rc = w.rec;
+  const bloom = rc ? Math.min(rc.bloomMax, sprayN * rc.bloom) : 0;
+  const spread = (w.sniper && zoomed ? 0 : w.spread) + bloom;
   if (spread > 0) {
     _dir.x += (Math.random() - 0.5) * spread * 2;
     _dir.y += (Math.random() - 0.5) * spread * 2;
@@ -1335,8 +1352,15 @@ function tryFire() {
   } else {
     spawnTracer(_origin.clone().addScaledVector(_dir, 1.2), endPoint);
   }
-  recoil += w.kick;
-  vmKick = Math.min(vmKick + 0.06, 0.12);
+  // recuo com personalidade: sobe mais nos primeiros tiros; na rajada longa
+  // assenta na vertical e passa a derivar de leve pro lado (padrão + jitter)
+  const deep = rc && rc.ramp > 0 ? Math.min(1, sprayN / rc.ramp) : 0;
+  recoil += rc ? rc.climb * (1 - 0.35 * deep) : w.kick;
+  if (rc) {
+    recoilY += rc.drift * deep * Math.sin(sprayN * 0.65) + (Math.random() - 0.5) * rc.jitter;
+    if (rc.shake) camShake = Math.min(camShake + rc.shake, 0.09);
+  }
+  vmKick = rc ? Math.min(vmKick + rc.vmKick, rc.vmKick * 2.2) : Math.min(vmKick + 0.06, 0.12);
   SFX.shot(w.sniper);
 
   if (hitId !== null) {
@@ -2099,7 +2123,7 @@ function clearRoomState() {
   me.kits = 0; me.usingKit = 0;
   multiKillCount = 0; lastKillTime = 0;
   cancelMelee(); melee.cd = 0; knifeEquipT = 0; knifeInspectT = 0;
-  curW = 0; showViewmodel(0); camShake = 0;
+  curW = 0; showViewmodel(0); camShake = 0; recoil = 0; recoilY = 0; sprayN = 0;
   cancelNadeCook(); nadeState.throwing = false;
   me.nades = NADE.COUNT_START; me.smokes = SMOKE.COUNT_START;
   clearAllNadeMeshes();
@@ -3271,11 +3295,14 @@ function frame() {
 
     // câmera (+ tremor curto de impacto da faca)
     camera.position.set(me.pos.x, me.pos.y + me.eyeH, me.pos.z);
-    recoil *= Math.exp(-12 * dt);
+    // recuperação do recuo no ritmo da arma em mãos (FALCÃO volta rápido, FERRÃO demora)
+    const recov = WEAPONS[curW].rec ? WEAPONS[curW].rec.recov : 12;
+    recoil *= Math.exp(-recov * dt);
+    recoilY *= Math.exp(-recov * dt);
     camShake *= Math.exp(-16 * dt);
     const shX = camShake > 0.001 ? (Math.random() - 0.5) * camShake : 0;
     const shY = camShake > 0.001 ? (Math.random() - 0.5) * camShake : 0;
-    camera.rotation.y = me.yaw + shY;
+    camera.rotation.y = me.yaw + recoilY + shY;
     camera.rotation.x = me.pitch + recoil + shX;
     camera.rotation.z = me.sliding ? 0.05 : 0;
 
