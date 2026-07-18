@@ -4,10 +4,10 @@
 // ao estourar, aplicam dano em área igual à granada de frag (mesma
 // queda suave por distância + bloqueio por cobertura sólida).
 // ============================================================
-import { PLAYER, raycastSolids, BARRELS, BARREL_W, BARREL_H, BARREL_HP, BARREL_DMG_MAX, BARREL_DMG_RADIUS } from '../../shared/mapdata.js';
+import { PLAYER, raycastSolids, BARREL_W, BARREL_H, BARREL_HP, BARREL_DMG_MAX, BARREL_DMG_RADIUS } from '../../shared/mapdata.js';
 
-export function initBarrels() {
-  return BARRELS.map(b => ({ id: b.id, x: b.x, z: b.z, hp: BARREL_HP, alive: true }));
+export function initBarrels(map) {
+  return map.BARRELS.map(b => ({ id: b.id, x: b.x, z: b.z, hp: BARREL_HP, alive: true }));
 }
 
 // AABB do barril (mesmo formato usado por rayBox) — barris ficam sempre no chão.
@@ -34,7 +34,7 @@ export function damageBarrel(room, barrel, dmg, attacker, players, damageFn) {
     const dl = dist || 0.001;
     // exclui a própria caixa do barril (destroço, mas ainda sólido) do teste
     // de cobertura — senão o raio "raspa" nela mesma e bloqueia tudo
-    if (raycastSolids(x, y, z, cx / dl, cy / dl, cz / dl, Infinity, barrel.id) < dist - 0.4) continue;
+    if (raycastSolids(room.map.BOUNDS, x, y, z, cx / dl, cy / dl, cz / dl, Infinity, barrel.id) < dist - 0.4) continue;
     const t = Math.max(0, 1 - dist / BARREL_DMG_RADIUS);
     const dealt = Math.round(BARREL_DMG_MAX * Math.pow(t, 1.15));
     if (dealt > 0) damageFn(room, attacker, p, dealt, false, 4, false, false);

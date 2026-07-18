@@ -32,12 +32,17 @@ Abra **http://localhost:3000** no navegador (requer internet para o CDN do Three
 ## Arquitetura
 
 ```
-server.js            servidor HTTP + WebSocket, dano/kills autoritativos, bots
-shared/mapdata.js    colisores AABB, spawns, raycast — compartilhado cliente/servidor
+server/              servidor HTTP + WebSocket, dano/kills autoritativos, bots
+shared/mapdata.js    física genérica de mapa (AABB, raycast) — cliente/servidor
+shared/maps/         registry de mapas: canion (mapa 1) e ocaso (mapa 2, em obras)
 public/js/main.js    loop do jogo, movimentação, tiro, HUD, rede
-public/js/world.js   construção visual do mapa, personagens, armas
+public/js/world.js   construção visual do Cânion, personagens, armas
+public/js/world-ocaso.js construção visual do Ocaso (blockout em progresso)
 public/js/textures.js texturas hand-painted geradas via canvas
 public/js/audio.js   SFX procedural via WebAudio
+design/              documentos de level design (mapa-02-ocaso.md)
 ```
+
+Cada sala roda um mapa (`room.map`); salas personalizadas escolhem o mapa no lobby.
 
 Sem assets externos: todas as texturas e sons são gerados em tempo de execução.

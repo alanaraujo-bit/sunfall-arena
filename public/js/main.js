@@ -4,7 +4,8 @@
 // interpolação de jogadores remotos e HUD.
 // ============================================================
 import * as THREE from 'three';
-import { BOUNDS, PLAYER, raycastSolids } from '/shared/mapdata.js';
+import { PLAYER, raycastSolids } from '/shared/mapdata.js';
+import { getMap, DEFAULT_MAP } from '/shared/maps/index.js';
 import { buildWorld, makeCharacter, makeViewmodel, makeGrenadeMesh, makeSmokeCanisterMesh } from './world.js';
 import { NADE, SMOKE, SMOKE_LIFE_MS, advanceGrenade, launchGrenade } from '/shared/nadephysics.js';
 import { tex, spriteTex, setTexQuality, smokeTex } from './textures.js';
@@ -99,10 +100,14 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
+// Mapa atual (física + visual). O menu mostra o mapa padrão; ao entrar numa
+// sala, o servidor informa o mapa dela no 'init' e o mundo é reconstruído.
+let MAP = getMap(DEFAULT_MAP);
+
 // Constrói o mundo (texturas na qualidade configurada)
 setTexQuality(settings.texq);
-let world = buildWorld(scene, { decor: settings.decor !== 'off' });
-let worldDecor = settings.decor, worldTexq = settings.texq;
+let world = buildWorld(scene, { decor: settings.decor !== 'off', map: MAP });
+let worldDecor = settings.decor, worldTexq = settings.texq, worldMapKey = MAP.KEY;
 
 // ---------------- Barris explosivos ----------------
 // ids destruídos persistem à parte de `world` — um rebuild (troca de
@@ -144,7 +149,7 @@ const $ = id => document.getElementById(id);
 const hud = {
   menu: $('menu'), nameInput: $('name-input'),
   mpBtn: $('mp-btn'), customBtn: $('custom-btn'), customPanel: $('custom-panel'),
-  cfgGm: $('cfg-gm'), cfgBots: $('cfg-bots'), cfgKl: $('cfg-kl'), cfgTl: $('cfg-tl'),
+  cfgMap: $('cfg-map'), cfgGm: $('cfg-gm'), cfgBots: $('cfg-bots'), cfgKl: $('cfg-kl'), cfgTl: $('cfg-tl'),
   createBtn: $('create-btn'), codeInput: $('code-input'), joinBtn: $('join-btn'),
   idChip: $('id-chip'), idAvatar: $('id-avatar'), idName: $('id-name'),
   idLevel: $('id-level'), idXpFill: $('id-xpfill'), idXpText: $('id-xptext'),
@@ -234,17 +239,26 @@ function applyGraphics() {
   BASE_FOV = settings.fov;
 }
 
-// Reconstrói o mundo ao vivo quando decoração/texturas mudam
+// Reconstrói o mundo ao vivo quando decoração/texturas/mapa mudam
 function maybeRebuildWorld() {
-  if (worldDecor === settings.decor && worldTexq === settings.texq) return;
+  if (worldDecor === settings.decor && worldTexq === settings.texq && worldMapKey === MAP.KEY) return;
   worldDecor = settings.decor;
   worldTexq = settings.texq;
+  worldMapKey = MAP.KEY;
   scene.remove(world.group);
   world.dispose();
   setTexQuality(settings.texq);
-  world = buildWorld(scene, { decor: settings.decor !== 'off' });
+  world = buildWorld(scene, { decor: settings.decor !== 'off', map: MAP });
   applyGraphics(); // reaplica sombras/névoa no sol novo
   applyBarrelState(); // barris destruídos continuam destruídos após o rebuild
+}
+
+// Troca o mapa ativo (chamado no 'init' da sala) — física + visual juntos
+function setCurrentMap(key) {
+  const next = getMap(key);
+  if (next.KEY === MAP.KEY) return;
+  MAP = next;
+  maybeRebuildWorld();
 }
 
 function keyLabel(code) {
@@ -1288,7 +1302,7 @@ const R = PLAYER.R, H = PLAYER.H;
 
 function collidesAt(x, feetY, z) {
   if (feetY < -0.001) return true;
-  for (const b of BOUNDS) {
+  for (const b of MAP.BOUNDS) {
     if (x + R > b.minx && x - R < b.maxx &&
         z + R > b.minz && z - R < b.maxz &&
         feetY < b.maxy && feetY + H > b.miny) return true;
@@ -1298,7 +1312,7 @@ function collidesAt(x, feetY, z) {
 
 function stepTopAt(x, feetY, z) {
   let top = -1;
-  for (const b of BOUNDS) {
+  for (const b of MAP.BOUNDS) {
     if (x + R > b.minx && x - R < b.maxx &&
         z + R > b.minz && z - R < b.maxz &&
         feetY < b.maxy && feetY + H > b.miny) {
@@ -1409,7 +1423,7 @@ function updateMovement(dt) {
     if (ny <= 0) { ny = 0; landOn(wasAir); }
     else if (collidesAt(me.pos.x, ny, me.pos.z)) {
       let landY = 0;
-      for (const b of BOUNDS) {
+      for (const b of MAP.BOUNDS) {
         if (me.pos.x + R > b.minx && me.pos.x - R < b.maxx &&
             me.pos.z + R > b.minz && me.pos.z - R < b.maxz &&
             b.maxy <= oldY + 0.05 && b.maxy > landY) landY = b.maxy;
@@ -1474,7 +1488,7 @@ function tryFire() {
   _origin.copy(me.pos); _origin.y += me.eyeH;
 
   // raycast: mapa
-  const tMap = raycastSolids(_origin.x, _origin.y, _origin.z, _dir.x, _dir.y, _dir.z);
+  const tMap = raycastSolids(MAP.BOUNDS, _origin.x, _origin.y, _origin.z, _dir.x, _dir.y, _dir.z);
   // raycast: jogadores
   let hitId = null, hitT = tMap, headshot = false;
   const tdm = roomInfo && roomInfo.gm === 'tdm';
@@ -1656,7 +1670,7 @@ function meleeStrike() {
     spawnBurst(_mTmp, bloodTex, melee.heavy ? 9 : 6, 2.6, 0.16, 2);
   } else {
     // acertou parede/obstáculo dentro do alcance? faísca curta
-    const tMap = raycastSolids(_mOrigin.x, _mOrigin.y, _mOrigin.z, _mDir.x, _mDir.y, _mDir.z);
+    const tMap = raycastSolids(MAP.BOUNDS, _mOrigin.x, _mOrigin.y, _mOrigin.z, _mDir.x, _mDir.y, _mDir.z);
     if (tMap <= st.range) {
       _mTmp.copy(_mOrigin).addScaledVector(_mDir, tMap - 0.05);
       spawnBurst(_mTmp, dustTex, 4, 1.6, 0.1, 1);
@@ -1691,7 +1705,7 @@ function predictMeleeTarget(origin, dir, range, arc) {
     if (d > range || d < 0.001) continue;
     const dot = (cx * dir.x + cy * dir.y + cz * dir.z) / d;
     if (dot < arc) continue;                                   // fora do cone frontal
-    const tMap = raycastSolids(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z);
+    const tMap = raycastSolids(MAP.BOUNDS, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z);
     if (tMap < d - 0.4) continue;                              // parede no caminho
     if (d < bestD) { bestD = d; best = r; }
   }
@@ -1848,7 +1862,7 @@ function updateNadeArc(power) {
   const dt = 1 / 60;
   let shown = 0;
   for (let i = 0; i < 240 && shown < NADE_ARC_DOTS; i++) {
-    const bounced = advanceGrenade(phys, dt);
+    const bounced = advanceGrenade(phys, dt, MAP.BOUNDS);
     if (i % 4 === 3) {
       const dot = nadeArcDots[shown++];
       dot.position.set(phys.pos.x, phys.pos.y, phys.pos.z);
@@ -1932,7 +1946,7 @@ function updateNadeState(dt) {
 
   // previsão local do meu lançamento, até o servidor confirmar o id
   if (myNade && myNade.confirmedId === null) {
-    const bounced = advanceGrenade(myNade.phys, dt);
+    const bounced = advanceGrenade(myNade.phys, dt, MAP.BOUNDS);
     myNade.mesh.position.set(myNade.phys.pos.x, myNade.phys.pos.y, myNade.phys.pos.z);
     myNade.mesh.rotation.x += dt * 7; myNade.mesh.rotation.z += dt * 5;
     if (bounced) {
@@ -2052,7 +2066,7 @@ function spawnSmokeCloud(id, center, durMs) {
     const len = Math.hypot(dx, dy, dz) || 1; dx /= len; dy /= len; dz /= len;
 
     let dist = SMOKE.RADIUS * (0.4 + Math.random() * 0.62);
-    const wall = raycastSolids(center.x, center.y, center.z, dx, dy, dz);
+    const wall = raycastSolids(MAP.BOUNDS, center.x, center.y, center.z, dx, dy, dz);
     if (wall < dist) dist = Math.max(0.15, wall - 0.35);   // encosta na parede, não atravessa
 
     let localY = dy * dist;
@@ -2301,7 +2315,8 @@ net.on('init', msg => {
   me.id = msg.id;
   me.team = msg.team ?? null;
   inRoom = true;
-  roomInfo = { code: msg.code, mode: msg.mode, gm: msg.gm || 'ffa', kl: msg.kl, end: msg.end };
+  roomInfo = { code: msg.code, mode: msg.mode, gm: msg.gm || 'ffa', kl: msg.kl, end: msg.end, map: msg.map };
+  setCurrentMap(msg.map || DEFAULT_MAP);   // mundo/física do mapa da sala
   for (const p of msg.players) {
     if (p.id === msg.id) {
       me.pos.set(p.pos[0], p.pos[1], p.pos[2]);
@@ -2729,7 +2744,7 @@ const _kcMuzzle = new THREE.Vector3();
 function replayKillerShot(shot) {
   const W = WEAPONS[shot.w] || WEAPONS[0];
   const [ox, oy, oz] = shot.o, [dx, dy, dz] = shot.d;
-  const dist = Math.min(raycastSolids(ox, oy, oz, dx, dy, dz), 150);
+  const dist = Math.min(raycastSolids(MAP.BOUNDS, ox, oy, oz, dx, dy, dz), 150);
   const end = new THREE.Vector3(ox + dx * dist, oy + dy * dist, oz + dz * dist);
   let start;
   if (vmRoot.visible) {
@@ -2899,7 +2914,7 @@ net.on('fire', msg => {
   if (msg.id === me.id) return;
   const o = new THREE.Vector3(msg.o[0], msg.o[1], msg.o[2]);
   const d = new THREE.Vector3(msg.d[0], msg.d[1], msg.d[2]);
-  const tHit = raycastSolids(o.x, o.y, o.z, d.x, d.y, d.z);
+  const tHit = raycastSolids(MAP.BOUNDS, o.x, o.y, o.z, d.x, d.y, d.z);
   spawnTracer(o.clone().addScaledVector(d, 0.5), o.clone().addScaledVector(d, Math.min(tHit, 150)), 0xffc080);
   spawnFlash(o);
   const dist = o.distanceTo(me.pos);
@@ -3470,7 +3485,7 @@ function sendPlay(msg) {
 hud.startBtn.addEventListener('click', () => { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); });
 hud.mpBtn.addEventListener('click', () => { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); });
 hud.createBtn.addEventListener('click', () => { closeScreen(); sendPlay({
-  t: 'play', mode: 'create', gm: hud.cfgGm.value,
+  t: 'play', mode: 'create', gm: hud.cfgGm.value, map: hud.cfgMap.value,
   bots: +hud.cfgBots.value, kl: +hud.cfgKl.value, tl: +hud.cfgTl.value
 }); });
 hud.joinBtn.addEventListener('click', () => {

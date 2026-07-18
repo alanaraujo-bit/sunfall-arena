@@ -3,7 +3,7 @@
 // e personalizadas com código. Cada sala tem jogadores, bots,
 // placar e cronômetro de partida próprios.
 // ============================================================
-import { SPAWNS } from '../../shared/mapdata.js';
+import { getMap, DEFAULT_MAP } from '../../shared/maps/index.js';
 import { makeBot } from './bots.js';
 import { awardWin, persistMatchPlayed } from './stats.js';
 import { NADE_COUNT_START, SMOKE_COUNT_START } from './grenades.js';
@@ -34,21 +34,25 @@ function makeCode() {
 }
 
 function makeRoom(mode, settings, hostAccountId = null) {
+  const mapKey = settings.map && getMap(settings.map).KEY === settings.map ? settings.map : DEFAULT_MAP;
   const room = {
     code: makeCode(),
     mode,                        // 'public' | 'custom'
-    settings,                    // { gm, bots, kl, tl }  (gm: 'ffa'|'tdm')
+    settings,                    // { gm, bots, kl, tl, map }  (gm: 'ffa'|'tdm')
+    mapKey,
+    map: getMap(mapKey),         // dados do mapa da sala (BOUNDS/SPAWNS/PATROL/…)
     hostAccountId,
     players: new Map(),
     grenades: new Map(),
     smokes: new Map(),
-    barrels: initBarrels(),
+    barrels: null,               // preenchido abaixo (precisa do map)
     ...initHighlights(),
     colorIdx: 0,
     state: 'playing',
     endsAt: Date.now() + settings.tl,
     resetTimer: null
   };
+  room.barrels = initBarrels(room.map);
   rooms.set(room.code, room);
   return room;
 }
@@ -60,9 +64,9 @@ export function findOrCreatePublic() {
   return makeRoom('public', { gm: 'ffa', bots: PUBLIC_BOT_TARGET, kl: PUBLIC_KL, tl: PUBLIC_TL });
 }
 
-export function createCustom({ gm, bots, kl, tl }, hostAccountId) {
+export function createCustom({ gm, bots, kl, tl, map }, hostAccountId) {
   const mode = GAME_MODES.includes(gm) ? gm : 'ffa';
-  return makeRoom('custom', { gm: mode, bots, kl, tl }, hostAccountId);
+  return makeRoom('custom', { gm: mode, bots, kl, tl, map }, hostAccountId);
 }
 
 // menor equipe (empate -> 0). Considera todos (reais + bots).
@@ -97,18 +101,19 @@ export function nextColor(room) {
 }
 
 export function spawnPos(room) {
-  // spawn mais distante dos inimigos vivos da sala
-  let best = SPAWNS[0], bestD = -1;
-  for (const [sx, sz] of SPAWNS) {
+  // spawn mais distante dos inimigos vivos da sala — formato [x, z, y?]
+  const spawns = room.map.SPAWNS;
+  let best = spawns[0], bestD = -1;
+  for (const s of spawns) {
     let minD = Infinity;
     for (const p of room.players.values()) {
       if (!p.alive) continue;
-      const d = (p.pos.x - sx) ** 2 + (p.pos.z - sz) ** 2;
+      const d = (p.pos.x - s[0]) ** 2 + (p.pos.z - s[1]) ** 2;
       if (d < minD) minD = d;
     }
-    if (minD > bestD) { bestD = minD; best = [sx, sz]; }
+    if (minD > bestD) { bestD = minD; best = s; }
   }
-  return { x: best[0], y: 0, z: best[1] };
+  return { x: best[0], y: best[2] || 0, z: best[1] };
 }
 
 export function snapshot(p) {
@@ -216,7 +221,7 @@ export function resetMatch(room) {
   room.endsAt = Date.now() + room.settings.tl;
   room.grenades.clear();
   room.smokes.clear();
-  room.barrels = initBarrels();
+  room.barrels = initBarrels(room.map);
   Object.assign(room, initHighlights());
   for (const p of room.players.values()) {
     p.kills = 0; p.deaths = 0;

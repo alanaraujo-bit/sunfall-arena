@@ -4,8 +4,6 @@
 // (previsão local do próprio lançamento + arco de mira) — evita
 // divergência entre o que o jogador vê e o que o servidor decide.
 // ============================================================
-import { BOUNDS } from './mapdata.js';
-
 export const NADE = {
   RADIUS: 0.09,
   GRAVITY: 24,          // m/s² — igual ao jogador, mundo consistente
@@ -34,8 +32,8 @@ export const SMOKE = {
 };
 export const SMOKE_LIFE_MS = SMOKE.DEPLOY_MS + SMOKE.HOLD_MS + SMOKE.DISSIPATE_MS;
 
-function blocked(x, y, z, r) {
-  for (const b of BOUNDS) {
+function blocked(bounds, x, y, z, r) {
+  for (const b of bounds) {
     if (x + r > b.minx && x - r < b.maxx &&
         z + r > b.minz && z - r < b.maxz &&
         y + r > b.miny && y - r < b.maxy) return true;
@@ -43,11 +41,11 @@ function blocked(x, y, z, r) {
   return false;
 }
 
-function moveAxis(nade, axis, delta) {
+function moveAxis(nade, axis, delta, bounds) {
   if (!delta) return false;
   const nx = axis === 'x' ? nade.pos.x + delta : nade.pos.x;
   const nz = axis === 'z' ? nade.pos.z + delta : nade.pos.z;
-  if (!blocked(nx, nade.pos.y, nz, NADE.RADIUS)) {
+  if (!blocked(bounds, nx, nade.pos.y, nz, NADE.RADIUS)) {
     nade.pos[axis] += delta;
     return false;
   }
@@ -58,14 +56,14 @@ function moveAxis(nade, axis, delta) {
   return Math.abs(incoming) > 0.6;   // só conta como "quique audível" acima do limiar
 }
 
-function moveY(nade, delta) {
+function moveY(nade, delta, bounds) {
   const ny = nade.pos.y + delta;
   nade.grounded = false;
   if (nade.vel.y <= 0) {
-    const hitBelow = blocked(nade.pos.x, ny, nade.pos.z, NADE.RADIUS) || ny - NADE.RADIUS <= 0;
+    const hitBelow = blocked(bounds, nade.pos.x, ny, nade.pos.z, NADE.RADIUS) || ny - NADE.RADIUS <= 0;
     if (hitBelow) {
       let floor = NADE.RADIUS;
-      for (const b of BOUNDS) {
+      for (const b of bounds) {
         if (nade.pos.x + NADE.RADIUS > b.minx && nade.pos.x - NADE.RADIUS < b.maxx &&
             nade.pos.z + NADE.RADIUS > b.minz && nade.pos.z - NADE.RADIUS < b.maxz &&
             b.maxy <= nade.pos.y + 0.05 && b.maxy + NADE.RADIUS > floor) floor = b.maxy + NADE.RADIUS;
@@ -78,7 +76,7 @@ function moveY(nade, delta) {
     nade.pos.y = ny;
     return false;
   }
-  if (blocked(nade.pos.x, ny, nade.pos.z, NADE.RADIUS)) {
+  if (blocked(bounds, nade.pos.x, ny, nade.pos.z, NADE.RADIUS)) {
     nade.vel.y = -nade.vel.y * NADE.RESTITUTION * 0.6;
     return true;
   }
@@ -86,18 +84,18 @@ function moveY(nade, delta) {
   return false;
 }
 
-// Avança `nade` ({pos:{x,y,z}, vel:{x,y,z}, grounded}) em `dt` segundos.
-// Retorna true se a granada quicou (audivelmente) neste passo.
-export function stepGrenade(nade, dt) {
+// Avança `nade` ({pos:{x,y,z}, vel:{x,y,z}, grounded}) em `dt` segundos
+// contra os `bounds` do mapa. Retorna true se quicou (audivelmente).
+export function stepGrenade(nade, dt, bounds) {
   nade.vel.y -= NADE.GRAVITY * dt;
   if (!nade.grounded) {
     const drag = Math.exp(-NADE.AIR_DRAG * dt);
     nade.vel.x *= drag; nade.vel.z *= drag;
   }
   let bounced = false;
-  if (moveAxis(nade, 'x', nade.vel.x * dt)) bounced = true;
-  if (moveAxis(nade, 'z', nade.vel.z * dt)) bounced = true;
-  if (moveY(nade, nade.vel.y * dt)) bounced = true;
+  if (moveAxis(nade, 'x', nade.vel.x * dt, bounds)) bounced = true;
+  if (moveAxis(nade, 'z', nade.vel.z * dt, bounds)) bounced = true;
+  if (moveY(nade, nade.vel.y * dt, bounds)) bounced = true;
   if (nade.grounded) {
     const speed = Math.hypot(nade.vel.x, nade.vel.z);
     if (speed > 0.01) {
@@ -113,11 +111,11 @@ export function stepGrenade(nade, dt) {
 // quique perde fidelidade. Cliente e servidor chamam sempre esta função —
 // nunca stepGrenade() sozinha — para garantir a mesma granularidade dos
 // dois lados (previsão do cliente == verdade do servidor).
-export function advanceGrenade(nade, dt, substeps = 4) {
+export function advanceGrenade(nade, dt, bounds, substeps = 4) {
   const sub = dt / substeps;
   let bounced = false;
   for (let i = 0; i < substeps; i++) {
-    if (stepGrenade(nade, sub)) bounced = true;
+    if (stepGrenade(nade, sub, bounds)) bounced = true;
   }
   return bounced;
 }

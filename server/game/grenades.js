@@ -42,7 +42,7 @@ export function updateGrenades(room, dt, now) {
       room.grenades.delete(nade.id);
       continue;
     }
-    if (advanceGrenade(nade, dt)) bounces.push(nade);
+    if (advanceGrenade(nade, dt, room.map.BOUNDS)) bounces.push(nade);
   }
   return { bounces, explosions, smokeDeploys };
 }
@@ -62,7 +62,7 @@ export function explodeGrenade(room, nade, players, damageFn) {
     const dist = Math.hypot(cx, cy, cz);
     if (dist > NADE.DMG_RADIUS) continue;
     const dl = dist || 0.001;
-    if (raycastSolids(x, y, z, cx / dl, cy / dl, cz / dl) < dist - 0.4) continue; // cobertura bloqueia
+    if (raycastSolids(room.map.BOUNDS, x, y, z, cx / dl, cy / dl, cz / dl) < dist - 0.4) continue; // cobertura bloqueia
     const t = Math.max(0, 1 - dist / NADE.DMG_RADIUS);
     const dmg = Math.round(NADE.DMG_MAX * Math.pow(t, 1.15));   // queda mais suave: perto machuca mais
     if (dmg > 0) damageFn(room, owner, p, dmg, false, 3, false, false);

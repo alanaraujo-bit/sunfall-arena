@@ -9,7 +9,9 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
-import { SOLIDS, BARRELS, BARREL_W, BARREL_H } from '/shared/mapdata.js';
+import { BARREL_W, BARREL_H } from '/shared/mapdata.js';
+import { getMap, DEFAULT_MAP } from '/shared/maps/index.js';
+import { buildOcasoWorld } from './world-ocaso.js';
 import { tex, skyTex } from './textures.js';
 
 const TEAL = 0x3fc8b4, CORAL = 0xd95350, CREAM = 0xf2e3c8;
@@ -314,6 +316,11 @@ function mergeStatics(srcRoot, dstRoot) {
 // ---------------- Mundo ----------------
 
 export function buildWorld(scene, opts = {}) {
+  const map = opts.map || getMap(DEFAULT_MAP);
+  // Cada mapa tem seu próprio builder visual; este arquivo constrói o Cânion
+  // (mapa 1). O Ocaso (mapa 2) mora em world-ocaso.js.
+  if (map.KEY === 'ocaso') return buildOcasoWorld(scene, map, opts);
+
   const decor = opts.decor !== false;
   const animated = [];
 
@@ -396,7 +403,7 @@ export function buildWorld(scene, opts = {}) {
   }
 
   // Sólidos do mapa
-  for (const s of SOLIDS) {
+  for (const s of map.SOLIDS) {
     // barris ficam FORA do merge: cada um precisa ser escondido/trocado por
     // destroço individualmente quando explode (ver loop dedicado abaixo)
     if (s.mat === 'barrel') continue;
@@ -418,7 +425,7 @@ export function buildWorld(scene, opts = {}) {
   // Barris explosivos — individuais (não fundidos): cada um alterna entre o
   // corpo intacto e o destroço conforme o servidor confirma dano/reset.
   const barrelDims = { w: BARREL_W, h: BARREL_H, d: BARREL_W };
-  const barrels = BARRELS.map(b => {
+  const barrels = map.BARRELS.map(b => {
     const intact = makeBarrel(barrelDims);
     const wreck = makeBarrelWreck(barrelDims);
     // wreck.position compensa: makeBarrelWreck() assume origem no CHÃO

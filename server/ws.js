@@ -4,6 +4,7 @@
 // ============================================================
 import { WebSocketServer } from 'ws';
 import { PLAYER, rayBox, raycastSolids, BARREL_DMG_RADIUS } from '../shared/mapdata.js';
+import { MAPS } from '../shared/maps/index.js';
 import {
   rooms, findOrCreatePublic, createCustom, getByCode, realCount, MAX_REAL,
   nextPlayerId, nextColor, spawnPos, snapshot, broadcastRoom,
@@ -198,6 +199,7 @@ export function attachWs(server) {
         id: self.id,
         code: room.code,
         mode: room.mode,
+        map: room.mapKey,
         gm: room.settings.gm,
         team: self.team,
         kl: room.settings.kl,
@@ -247,7 +249,8 @@ export function attachWs(server) {
             const bots = Math.min(6, Math.max(0, msg.bots | 0));
             const kl = [10, 20, 30].includes(+msg.kl) ? +msg.kl : 20;
             const tlMin = [5, 10, 15].includes(+msg.tl) ? +msg.tl : 10;
-            joinRoom(createCustom({ gm, bots, kl, tl: tlMin * 60 * 1000 }, auth ? auth.accountId : null), displayName);
+            const map = MAPS[msg.map] ? msg.map : undefined;
+            joinRoom(createCustom({ gm, bots, kl, tl: tlMin * 60 * 1000, map }, auth ? auth.accountId : null), displayName);
           } else if (msg.mode === 'join') {
             const target = getByCode(msg.code);
             if (!target) { send({ t: 'err', code: 'room_not_found' }); return; }
@@ -369,7 +372,7 @@ export function attachWs(server) {
           recordFire(room, now, self.id, [ox, oy, oz], [dx, dy, dz], wi);
 
           const sv = Math.min(now, Math.max(now - REWIND_MAX_MS, +msg.sv || now));
-          const tMap = raycastSolids(ox, oy, oz, dx, dy, dz);
+          const tMap = raycastSolids(room.map.BOUNDS, ox, oy, oz, dx, dy, dz);
           let victim = null, hitT = tMap, head = false;
           for (const p of room.players.values()) {
             if (p === self || !p.alive) continue;
@@ -443,7 +446,7 @@ export function attachWs(server) {
             const d = Math.hypot(cx, cy, cz);
             if (d > km.range || d < 0.001) continue;
             if ((cx * dx + cy * dy + cz * dz) / d < km.arc) continue;        // fora do cone
-            if (raycastSolids(ox, oy, oz, cx / d, cy / d, cz / d) < d - 0.4) continue; // parede no meio
+            if (raycastSolids(room.map.BOUNDS, ox, oy, oz, cx / d, cy / d, cz / d) < d - 0.4) continue; // parede no meio
             if (d < bestD) { bestD = d; victim = p; }
           }
           if (victim) {
