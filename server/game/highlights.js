@@ -8,9 +8,13 @@
 // como um killcam, só que de uma jogada de qualquer jogador, não a sua morte.
 // ============================================================
 
-const REPLAY_BUF_MS = 13000;   // retenção do buffer rolante (cobre até um quad-kill lento)
+const REPLAY_BUF_MS = 22000;   // retenção do buffer rolante (> MAX_REPLAY + lead-in, com folga)
 const MULTI_KILL_WINDOW_MS = 4000;   // mesma janela do HUD client-side (MULTI_KILL_WINDOW)
-const LEAD_IN_MS = 1500;    // quanto do passado antes do 1º abate entra no replay
+const LEAD_IN_MS = 5000;    // passado antes do 1º abate: mostra a jogada se armando, não só o tiro
+const MAX_REPLAY_MS = 15000; // teto da janela: sequência muito longa mostra só o trecho final.
+// Sem esse teto, um MULTI KILL de 5+ (kills a cada <4s emendados) gerava uma
+// janela maior que o próprio buffer — o começo do replay não tinha frame algum
+// e o cliente ficava CONGELADO no primeiro quadro por vários segundos.
 // SEM padding depois do último abate: a captura é síncrona (dentro de damage(),
 // no mesmo instante do abate que fecha a partida) — frames "futuros" ainda
 // nem existem no buffer. O cliente segura no último quadro sozinho (mesma
@@ -57,11 +61,12 @@ export function registerKill(room, attacker, victim, head, wi, bs) {
 
 function captureBestMoment(room, killerId, kills) {
   const firstAt = kills[0].atSv, lastAt = kills[kills.length - 1].atSv;
-  const winStart = firstAt - LEAD_IN_MS, winEnd = lastAt;
+  const winEnd = lastAt;
+  const idealStart = Math.max(firstAt - LEAD_IN_MS, winEnd - MAX_REPLAY_MS);
   const ids = new Set([killerId, ...kills.map(k => k.victimId)]);
 
   const frames = room.replayBuf
-    .filter(f => f.sv >= winStart - 200 && f.sv <= winEnd)
+    .filter(f => f.sv >= idealStart - 200 && f.sv <= winEnd)
     .map(f => {
       const p = {};
       for (const id of ids) if (f.p[id]) p[id] = f.p[id];
@@ -69,6 +74,10 @@ function captureBestMoment(room, killerId, kills) {
     });
   // histórico curto demais (streak logo no início da sala, buffer ainda vazio) — ignora
   if (frames.length < 3) return;
+
+  // startSv = primeiro frame QUE EXISTE — nunca prometer ao cliente um trecho
+  // sem dados (é isso que congelava o replay no início)
+  const winStart = Math.max(idealStart, frames[0].sv);
 
   const shots = room.fireBuf
     .filter(f => f.id === killerId && f.wall >= winStart - 300 && f.wall <= winEnd + 60)

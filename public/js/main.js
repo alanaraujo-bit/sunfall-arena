@@ -2196,7 +2196,7 @@ function refreshNadeHUD() {
 }
 
 let multiKillT = null;
-const MULTI_KILL_LABEL = { 2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'QUAD KILL' };
+const MULTI_KILL_LABEL = { 2: 'DOUBLE KILL', 3: 'TRIPLE KILL', 4: 'QUAD KILL', 5: 'PENTA KILL' };
 function showMultiKill(n) {
   const label = MULTI_KILL_LABEL[n] || 'MULTI KILL';
   hud.multiKill.textContent = label;
@@ -2422,7 +2422,7 @@ const KILLCAM_MS = 5000;        // quanto do passado reproduzir (~5s)
 const KILLCAM_HOLD_MS = 900;    // pausa no instante da morte/abate (queda da vítima)
 const KILLCAM_AIM_MS = 1500;    // rampa do "abrir a mira" (ADS) antes do tiro final
 const DEATH_FALLBACK_MS = 2200; // morte sem killcam: tempo até pedir respawn sozinho
-const MOMENT_HOLD_MS = 1400;    // "melhor momento": segura mais no final (todo mundo assiste)
+const MOMENT_HOLD_MS = 1800;    // "melhor momento": hold maior — a última vítima leva ~900ms pra cair
 
 // killcam.mode:
 //   'death'  — sua morte, pela visão de quem te matou (fluxo original)
@@ -2454,6 +2454,7 @@ const killcam = {
   respawnSent: false,
   momentDone: false
 };
+if (TESTMODE) window.__DEBUG_TEST = { killcam, get remotes() { return remotes; } };
 let deathTimer = null;   // failsafe client-side para morte sem killcam
 // disparos remotos recentes (p/ reproduzir no killcam): { wall, id, o:[3], d:[3], w }
 const fireLog = [];
@@ -2594,7 +2595,8 @@ function enterBestMomentReplay(bm) {
   const lastW = bm.kills[bm.kills.length - 1].w;
   killcam.killerW = (lastW === 1 || lastW === 2) ? lastW : 0;
   killcam.frames = bm.frames;
-  killcam.startSv = bm.startSv;
+  // nunca começar antes do primeiro frame real — trecho sem dados = replay congelado
+  killcam.startSv = Math.max(bm.startSv, bm.frames[0] ? bm.frames[0].sv : bm.startSv);
   killcam.endSv = bm.endSv;
   killcam.momentKills = bm.kills;
   killcam.momentDone = false;
@@ -2758,6 +2760,11 @@ function updateKillcam(dt) {
     sv = killcam.endSv;                            // fase 2: segura no tiro + queda
     if (!moment) killcam.fallT = Math.min(1, (elapsed - replayMs) / holdMs);
   }
+  // relógio "virtual" que NÃO para no fim dos frames: o último abate acontece
+  // exatamente no último quadro gravado, então a queda da última vítima (e um
+  // eventual tiro na borda) precisa continuar progredindo durante o hold —
+  // com o sv congelado em endSv, a última vítima nunca caía.
+  const svFall = killcam.startSv + elapsed;
 
   hud.killcamProgress.style.width =
     (Math.min(1, elapsed / (replayMs + holdMs)) * 100).toFixed(1) + '%';
@@ -2807,7 +2814,7 @@ function updateKillcam(dt) {
   if (killcam.shots) {
     if (moment) {
       for (const s of killcam.shots) {
-        if (!s.played && s.wall <= sv) { s.played = true; replayKillerShot(s); }
+        if (!s.played && s.wall <= svFall) { s.played = true; replayKillerShot(s); }
       }
     } else {
       const playbackWall = killcam.deathWall - replayMs + Math.min(elapsed, replayMs);
@@ -2818,10 +2825,11 @@ function updateKillcam(dt) {
   }
 
   if (moment) {
-    // cada vítima cai no seu próprio instante (não todas juntas no final)
+    // cada vítima cai no seu próprio instante (não todas juntas no final);
+    // svFall (não sv) pra última vítima cair DURANTE o hold
     for (const kill of killcam.momentKills) {
       const model = killcam.momentVictims.get(kill.victimId);
-      const fallT = Math.max(0, Math.min(1, (sv - kill.atSv) / KILLCAM_HOLD_MS));
+      const fallT = Math.max(0, Math.min(1, (svFall - kill.atSv) / KILLCAM_HOLD_MS));
       poseKillcamEntity(model, kcLerp(smp.a, smp.b, smp.alpha, kill.victimId), dt, fallT);
     }
   } else {
