@@ -54,7 +54,17 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0) {
   victim.hp = 0;
   victim.alive = false;
   victim.deaths++;
-  if (attacker !== victim) attacker.kills++;
+  victim.streak = 0;
+  if (attacker !== victim) {
+    attacker.kills++;
+    attacker.streak = (attacker.streak || 0) + 1;
+    if (attacker.streak % KIT_STREAK === 0 && (attacker.kits || 0) < KIT_MAX) {
+      attacker.kits = (attacker.kits || 0) + 1;
+      if (attacker.ws && attacker.ws.readyState === 1) {
+        attacker.ws.send(JSON.stringify({ t: 'kit', n: attacker.kits }));
+      }
+    }
+  }
   broadcastRoom(room, { t: 'dmg', id: victim.id, hp: 0, by: attacker.id, h: head });
   broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi });
 
@@ -145,7 +155,8 @@ export function attachWs(server) {
         color: (auth && auth.color) || nextColor(target),
         team: target.settings.gm === 'tdm' ? assignTeam(target) : null,
         pos: spawnPos(target), yaw: 0, pitch: 0, anim: 0,
-        hp: 100, kills: 0, deaths: 0, alive: true, bot: false, ws
+        hp: 100, kills: 0, deaths: 0, streak: 0, kits: 0, healingKit: false,
+        alive: true, bot: false, ws
       };
       room = target;
       room.players.set(self.id, self);
@@ -222,6 +233,7 @@ export function attachWs(server) {
           if (self.team === wanted) return;
           self.team = wanted;
           self.deaths++;               // trocar de time custa uma morte (respawn)
+          self.streak = 0;
           self.alive = false;
           broadcastRoom(room, { t: 'teamchg', id: self.id, team: wanted });
           setTimeout(() => {
@@ -264,6 +276,20 @@ export function attachWs(server) {
           self.yaw = +msg.r[0] || 0;
           self.pitch = +msg.r[1] || 0;
           self.anim = msg.a | 0;
+          break;
+        }
+        case 'usekit': {
+          if (!self.alive || room.state !== 'playing') break;
+          if (!self.kits || self.healingKit) break;
+          self.kits--;
+          self.healingKit = true;
+          const p = self, r = room;
+          setTimeout(() => {
+            p.healingKit = false;
+            if (!rooms.has(r.code) || !r.players.has(p.id) || !p.alive) return;
+            p.hp = Math.min(100, p.hp + KIT_HEAL);
+            send({ t: 'heal', id: p.id, hp: p.hp });
+          }, KIT_USE_MS);
           break;
         }
         case 'fire': {
