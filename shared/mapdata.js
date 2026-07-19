@@ -101,9 +101,20 @@ export function floorTopAt(bounds, x, z, fromY, r = PLAYER.R * 0.8) {
 
 // Empurra uma posição para fora dos sólidos (horizontal) — usado pelos bots.
 // `lim` é o clamp do mapa (export LIM de cada shared/maps/*.js).
-export function pushOut(bounds, lim, p, r = PLAYER.R, h = PLAYER.H) {
+//
+// A janela vertical (0.95 subida de degrau / 1.4 teto) tem que ficar EM
+// SINCRONIA com botBlocked() em server/game/bots.js — as duas funções
+// decidem "isso bloqueia o bot?" pro MESMO corpo, e antes usavam janelas
+// diferentes (esta usava a altura FIXA do jogador H=1.8): moveBot() deixava
+// o bot subir um degrau (dentro do alcance de 0.95 acima dos pés), mas
+// pushOut() via aquele mesmo degrau como bloqueio de corpo inteiro e
+// empurrava de volta pra posição exata de antes — bot preso pra sempre
+// bem na borda entre dois degraus (achado pelo playtest da Fase 7: todo
+// ponto de travamento permanente era uma junção de escada).
+export function pushOut(bounds, lim, p, r = PLAYER.R) {
   for (const b of bounds) {
-    if (p.y + h <= b.miny || p.y >= b.maxy) continue;
+    if (b.maxy - p.y <= 0.95) continue;   // degrau: sobe, não empurra
+    if (b.miny - p.y > 1.4) continue;     // teto: passa por baixo
     const ox = Math.min(p.x + r - b.minx, b.maxx - (p.x - r));
     const oz = Math.min(p.z + r - b.minz, b.maxz - (p.z - r));
     if (ox <= 0 || oz <= 0) continue;

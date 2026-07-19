@@ -49,7 +49,7 @@ export function makeBot(room) {
     pos: spawnPos(room), yaw: 0, pitch: 0, anim: 1,
     hp: 100, kills: 0, deaths: 0, alive: true, bot: true, ws: null,
     wp: (Math.random() * room.map.PATROL.length) | 0,
-    fireT: 1 + Math.random() * 2, burst: 0, strafe: 0, stuckT: 0
+    fireT: 1 + Math.random() * 2, burst: 0, strafe: 0, stuckT: 0, combatStuckT: 0
   };
 }
 
@@ -88,7 +88,23 @@ export function updateBot(room, bot, dt, damage) {
     const side = Math.sin(bot.strafe * 1.7) > 0 ? 1 : -1;
     const px = Math.cos(bot.yaw) * side, pz = -Math.sin(bot.yaw) * side;
     const moved = moveBot(room.map.BOUNDS, bot, px * 2.6 * dt, pz * 2.6 * dt);
-    if (!moved) bot.strafe += 1.2;   // encostou na parede → troca de direção
+    if (!moved) {
+      bot.strafe += 1.2;   // encostou na parede → troca de direção
+      // MAS trocar de lado não ajuda se os dois lados do strafe estiverem
+      // bloqueados ao mesmo tempo (canto apertado, muretas empilhadas da
+      // Escadaria, canal do Aqueduto) — sem isso o bot fica preso pra
+      // sempre atirando do mesmo lugar (achado pelo playtest da Fase 7).
+      // Depois de meio segundo preso, tenta se AFASTAR direto do alvo:
+      // por onde o bot chegou até ali quase sempre tem espaço livre.
+      bot.combatStuckT = (bot.combatStuckT || 0) + dt;
+      if (bot.combatStuckT > 0.35) {
+        let ax = bot.pos.x - target.pos.x, az = bot.pos.z - target.pos.z;
+        const al = Math.hypot(ax, az) || 1;
+        moveBot(room.map.BOUNDS, bot, (ax / al) * 2.6 * dt, (az / al) * 2.6 * dt);
+      }
+    } else {
+      bot.combatStuckT = 0;
+    }
     bot.anim = 1;
 
     bot.fireT -= dt;

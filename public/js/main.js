@@ -2477,7 +2477,13 @@ const killcam = {
   respawnSent: false,
   momentDone: false
 };
-if (TESTMODE) window.__DEBUG_TEST = { killcam, get remotes() { return remotes; } };
+// perf: exposto só com ?test na URL — auditoria de draw calls (Fase 7 do
+// Ocaso) sem tocar em nada de produção. renderer.info.render é o contador
+// nativo do three.js, mesma fonte do HUD de performance.
+if (TESTMODE) window.__DEBUG_TEST = {
+  killcam, get remotes() { return remotes; },
+  get perf() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geoms: renderer.info.memory.geometries }; }
+};
 let deathTimer = null;   // failsafe client-side para morte sem killcam
 // disparos remotos recentes (p/ reproduzir no killcam): { wall, id, o:[3], d:[3], w }
 const fireLog = [];
