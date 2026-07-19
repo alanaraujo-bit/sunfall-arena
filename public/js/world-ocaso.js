@@ -200,9 +200,12 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   liveRoot.add(new THREE.HemisphereLight(0xb0c4d8, 0xd8a065, 0.78));
   liveRoot.add(new THREE.AmbientLight(0xffdfb8, 0.2));
   // sol: baixo e bem a oeste — é A bússola do mapa (sombras sempre apontam
-  // pro leste). Mais rasante que o rig provisório da Fase 3.
+  // pro leste). Elevação ~24° (não mais rasante que isso: testado em
+  // produção que um sol a ~16° de elevação é fácil demais de nunca cruzar
+  // o campo de visão andando pelo mapa — o jogador reportou "não apareceu"
+  // mesmo com o sprite funcionando, só porque nunca olhou bem pra baixo).
   const sun = new THREE.DirectionalLight(0xffb878, 2.65);
-  sun.position.set(-58, 17, 8);
+  sun.position.set(-58, 26, 8);
   sun.castShadow = false;
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.left = -58; sun.shadow.camera.right = 58;
@@ -222,6 +225,9 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   // o jogador olha pra cima). Billboard automático (THREE.Sprite): sempre
   // de frente pra câmera, então fica visível de qualquer ângulo em que o
   // sol esteja no campo de visão, igual um sol de verdade no infinito.
+  // Grande de propósito (72 un. ≈ 18° de diâmetro angular): tem que ser
+  // fácil de notar/achar olhando na direção geral certa, não um alvo
+  // minúsculo que só aparece mirando exatamente para o ponto exato.
   {
     const sunDir = new THREE.Vector3(sun.position.x, sun.position.y, sun.position.z).normalize();
     const sunDist = 230;   // dentro do domo do céu (raio 260), perto da borda
@@ -231,7 +237,7 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     });
     const sunSprite = new THREE.Sprite(glowM);
     sunSprite.position.copy(sunDir).multiplyScalar(sunDist);
-    sunSprite.scale.set(56, 56, 1);
+    sunSprite.scale.set(72, 72, 1);
     sunSprite.frustumCulled = false;
     liveRoot.add(sunSprite);
   }
