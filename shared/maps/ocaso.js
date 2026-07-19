@@ -1,9 +1,7 @@
 // ============================================================
 // MAPA 02 — OCASO (vila em terraços no desfiladeiro, ao poente)
-// >>> FASE 2: BLOCKOUT COMPLETO <<<
-// Todos os colisores do layout aprovado (design/mapa-02-ocaso.md),
-// com materiais placeholder. Arquitetura de verdade (vãos, arcos,
-// telhados, kit modular) entra na Fase 3.
+// Layout completo (design/mapa-02-ocaso.md) — colisores físicos do mapa.
+// O visual (arquitetura, materiais, props, luz) mora em world-ocaso.js.
 //
 // Convenções: norte = -Z, leste = +X. Terraços:
 //   Mercado y=0 (z 10..44) · Vila y=2,6 (z -16..10) · Templo y=5,2 (z -44..-16)
@@ -13,7 +11,7 @@
 import { B, stairs, buildBounds, BARREL_W, BARREL_H } from '../mapdata.js';
 
 export const KEY = 'ocaso';
-export const NAME = 'Ocaso (em obras)';
+export const NAME = 'Ocaso';
 export const LIM = 43;
 
 // Barris explosivos — [x, z] + y (base). Pontos táticos do design.

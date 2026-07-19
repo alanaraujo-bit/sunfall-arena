@@ -892,6 +892,39 @@ export function texRough(name, base = 0.9, amp = 0.25, size) {
   return t;
 }
 
+// Disco solar do poente: núcleo quase branco, halo dourado generoso e uma
+// segunda camada mais larga e fraca por baixo (glow atmosférico) — usado
+// como sprite 3D posicionado na direção da luz (não pintado no domo do
+// céu, que distorce/some perto do zênite quando o jogador olha pra cima).
+export function sunTex() {
+  if (cache.has('sunDisc')) return cache.get('sunDisc');
+  const s = 256;
+  const [c, ctx] = canvas(s);
+  const cx = s / 2, cy = s / 2;
+  // glow externo, largo e suave
+  let g = ctx.createRadialGradient(cx, cy, s * 0.08, cx, cy, s * 0.5);
+  g.addColorStop(0, hexA('#ffd9a0', 0.55));
+  g.addColorStop(0.5, hexA('#ffb870', 0.22));
+  g.addColorStop(1, hexA('#ffb870', 0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  // halo médio, mais denso
+  g = ctx.createRadialGradient(cx, cy, s * 0.04, cx, cy, s * 0.26);
+  g.addColorStop(0, hexA('#fff4d8', 0.95));
+  g.addColorStop(0.45, hexA('#ffdb96', 0.7));
+  g.addColorStop(1, hexA('#ffb870', 0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  // núcleo brilhante
+  g = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 0.1);
+  g.addColorStop(0, '#fffdf6');
+  g.addColorStop(0.6, '#fff2cc');
+  g.addColorStop(1, hexA('#ffe6a8', 0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set('sunDisc', t);
+  return t;
+}
+
 // Sprite radial suave (partículas / clarão de tiro)
 export function spriteTex(inner = '#fff8e0', outer = '#ffb040') {
   const key = 'sprite' + inner + outer;
@@ -1010,20 +1043,30 @@ export function skyTexOcaso() {
   haze.addColorStop(1, hexA('#e8a878', 0.5));
   ctx.fillStyle = haze; ctx.fillRect(0, hazeY - s * 0.1, s, s * 0.16);
 
-  // sol baixo, bem a oeste (a "bússola" do mapa)
+  // brilho atmosférico baixo, bem a oeste (a "bússola" do mapa) — SUTIL de
+  // propósito: o disco nítido do sol é um sprite 3D à parte (world-ocaso.js,
+  // sempre de frente pra câmera, na direção real da luz). Um disco GRANDE
+  // pintado aqui competia com o sprite e, projetado na esfera, distorcia
+  // perto das bordas — isto aqui é só o "ar quente" ao redor dele.
   const sx = s * 0.16, sy = s * 0.56;
-  let rg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 170);
-  rg.addColorStop(0, '#fffaf0');
-  rg.addColorStop(0.22, hexA('#ffe4ac', 0.95));
-  rg.addColorStop(0.55, hexA('#ffc888', 0.4));
+  let rg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 85);
+  rg.addColorStop(0, hexA('#fff2d0', 0.55));
+  rg.addColorStop(0.4, hexA('#ffdca0', 0.28));
   rg.addColorStop(1, hexA('#ffb070', 0));
-  ctx.fillStyle = rg; ctx.fillRect(sx - 180, sy - 180, 360, 360);
+  ctx.fillStyle = rg; ctx.fillRect(sx - 95, sy - 95, 190, 190);
 
   // nuvens com base aquecida: sombra fria no topo, brilho quente por baixo
-  // (luz rasante do poente batendo na barriga da nuvem)
+  // (luz rasante do poente batendo na barriga da nuvem). Restritas ao ALTO
+  // do céu (Y 0,06-0,3 — longe da faixa de transição pro horizonte) e
+  // pequenas: perto do "horizonte tangencial" da esfera (onde a câmera
+  // olha quase raspando a superfície), QUALQUER forma pintada na textura
+  // fica esticada ao extremo pela projeção equirect — uma nuvem grande
+  // bem ali virava uma faixa reta cobrindo metade da tela (achado ao
+  // investigar o relato do Alan: "não tem sol" era essa distorção
+  // dominando o céu, não falta de sol).
   for (let i = 0; i < 10; i++) {
-    const cx = R() * s, cy = rr(0.14, 0.48) * s, cw = rr(55, 165), ch = cw * 0.3;
-    ctx.fillStyle = hexA('#e8dcc4', rr(0.2, 0.4));
+    const cx = R() * s, cy = rr(0.06, 0.3) * s, cw = rr(30, 68), ch = cw * 0.3;
+    ctx.fillStyle = hexA('#e8dcc4', rr(0.16, 0.32));
     for (let j = 0; j < 4; j++) {
       ctx.beginPath();
       ctx.ellipse(cx + rr(-cw * 0.4, cw * 0.4), cy + rr(-ch * 0.45, ch * 0.15),
@@ -1032,7 +1075,7 @@ export function skyTexOcaso() {
     }
     // barriga quente — só na metade inferior, mais forte perto do horizonte
     const warmth = 0.2 + (cy / s) * 0.5;
-    ctx.fillStyle = hexA('#ffb878', rr(0.25, 0.5) * warmth + 0.1);
+    ctx.fillStyle = hexA('#ffb878', rr(0.2, 0.4) * warmth + 0.08);
     ctx.beginPath();
     ctx.ellipse(cx, cy + ch * 0.55, cw * 0.62, ch * 0.42, 0, 0, 7);
     ctx.fill();

@@ -549,6 +549,25 @@ body {
 .mc-desc { font-size: 12px; opacity: .72; line-height: 1.5; }
 #custom-panel { margin-top: 4px; }
 
+/* seletor de mapa (multiplayer público) */
+#map-select-status { margin-bottom: 14px; }
+.map-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 100%; padding: 16px 18px; margin-bottom: 12px; text-align: left;
+  font-family: inherit; color: #f2e3c8; cursor: pointer;
+  background: rgba(14,10,6,.55); border: 1px solid rgba(242,227,200,.16);
+  border-radius: 14px; transition: border-color .15s, background .15s;
+}
+.map-card:hover { border-color: rgba(63,200,180,.55); background: rgba(14,10,6,.75); }
+.map-card:disabled { cursor: default; opacity: .5; }
+.map-card:disabled:hover { border-color: rgba(242,227,200,.16); background: rgba(14,10,6,.55); }
+.map-card-info { display: flex; flex-direction: column; gap: 4px; }
+.map-card-name { font-size: 15px; letter-spacing: 3px; color: #6ee0c8; }
+.map-card-players { font-size: 12px; opacity: .8; display: flex; align-items: center; gap: 6px; }
+.map-card-dot { width: 8px; height: 8px; border-radius: 50%; background: #55606a; flex: none; }
+.map-card-players.has-players .map-card-dot { background: #6ee0c8; box-shadow: 0 0 6px rgba(110,224,200,.7); }
+.map-card-go { font-size: 11px; letter-spacing: 2px; color: #f0c04c; opacity: .85; white-space: nowrap; }
+
 /* config: sub-navegação lateral */
 .cfg-layout { display: flex; gap: 20px; text-align: left; }
 #cfg-side { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }

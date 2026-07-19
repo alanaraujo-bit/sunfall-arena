@@ -3,7 +3,7 @@
 // e personalizadas com código. Cada sala tem jogadores, bots,
 // placar e cronômetro de partida próprios.
 // ============================================================
-import { getMap, DEFAULT_MAP } from '../../shared/maps/index.js';
+import { getMap, DEFAULT_MAP, MAPS } from '../../shared/maps/index.js';
 import { makeBot } from './bots.js';
 import { awardWin, persistMatchPlayed } from './stats.js';
 import { NADE_COUNT_START, SMOKE_COUNT_START } from './grenades.js';
@@ -57,11 +57,25 @@ function makeRoom(mode, settings, hostAccountId = null) {
   return room;
 }
 
-export function findOrCreatePublic() {
+export function findOrCreatePublic(mapKey) {
+  const key = MAPS[mapKey] ? mapKey : DEFAULT_MAP;
   for (const room of rooms.values()) {
-    if (room.mode === 'public' && realCount(room) < MAX_REAL) return room;
+    if (room.mode === 'public' && room.mapKey === key && realCount(room) < MAX_REAL) return room;
   }
-  return makeRoom('public', { gm: 'ffa', bots: PUBLIC_BOT_TARGET, kl: PUBLIC_KL, tl: PUBLIC_TL });
+  return makeRoom('public', { gm: 'ffa', bots: PUBLIC_BOT_TARGET, kl: PUBLIC_KL, tl: PUBLIC_TL, map: key });
+}
+
+// Jogadores reais em salas PÚBLICAS agora, por mapa — usado pelo seletor de
+// mapa do lobby (o jogador escolhe onde tem gente jogando de verdade, sem
+// precisar entrar às cegas). Mapas sem nenhuma sala pública ativa aparecem
+// com 0 (não com "sala inexistente" — o jogador pode ser o primeiro).
+export function publicRoomCounts() {
+  const counts = {};
+  for (const key of Object.keys(MAPS)) counts[key] = 0;
+  for (const room of rooms.values()) {
+    if (room.mode === 'public') counts[room.mapKey] = (counts[room.mapKey] || 0) + realCount(room);
+  }
+  return counts;
 }
 
 export function createCustom({ gm, bots, kl, tl, map }, hostAccountId) {

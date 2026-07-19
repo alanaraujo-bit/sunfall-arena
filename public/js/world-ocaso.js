@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { BARREL_W, BARREL_H, raycastSolids } from '/shared/mapdata.js';
-import { tex, texNormal, texRough, skyTexOcaso } from './textures.js';
+import { tex, texNormal, texRough, skyTexOcaso, sunTex } from './textures.js';
 import { mergeStatics, makeBarrel, makeBarrelWreck, scaleUV, jitterGeo } from './world.js';
 
 const TEAL = 0x3fc8b4;
@@ -216,6 +216,25 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   eastFill.position.set(48, 12, -14);
   eastFill.castShadow = false;
   liveRoot.add(eastFill);
+
+  // Disco do sol: objeto 3D de verdade na MESMA direção da luz — não é só
+  // pintado na textura do domo (que distorce/some perto do zênite conforme
+  // o jogador olha pra cima). Billboard automático (THREE.Sprite): sempre
+  // de frente pra câmera, então fica visível de qualquer ângulo em que o
+  // sol esteja no campo de visão, igual um sol de verdade no infinito.
+  {
+    const sunDir = new THREE.Vector3(sun.position.x, sun.position.y, sun.position.z).normalize();
+    const sunDist = 230;   // dentro do domo do céu (raio 260), perto da borda
+    const glowM = new THREE.SpriteMaterial({
+      map: sunTex(), transparent: true, depthWrite: false, fog: false,
+      blending: THREE.AdditiveBlending, color: 0xffffff
+    });
+    const sunSprite = new THREE.Sprite(glowM);
+    sunSprite.position.copy(sunDir).multiplyScalar(sunDist);
+    sunSprite.scale.set(56, 56, 1);
+    sunSprite.frustumCulled = false;
+    liveRoot.add(sunSprite);
+  }
 
   // ---------------- Desfiladeiro distante (2 camadas, fora da área jogável) ----------------
   // Silhuetas jitteradas (mesma técnica dos paredões do perímetro) mais

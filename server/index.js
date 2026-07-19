@@ -11,6 +11,7 @@ import authRoutes from './routes/auth.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import friendsRoutes from './routes/friends.routes.js';
 import playersRoutes from './routes/players.routes.js';
+import roomsRoutes from './routes/rooms.routes.js';
 import { attachWs, startGameLoop } from './ws.js';
 import { staticMiddleware } from './static.js';
 
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', profileRoutes);
 app.use('/api/friends', friendsRoutes);
 app.use('/api', playersRoutes);
+app.use('/api', roomsRoutes);
 
 // Em produção o frontend é servido pelo Vercel; localmente, `npm start`
 // continua servindo public/ direto deste processo por conveniência.

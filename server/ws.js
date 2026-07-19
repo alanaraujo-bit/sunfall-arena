@@ -243,7 +243,8 @@ export function attachWs(server) {
             : String(msg.name || 'Recruta').slice(0, 14);
 
           if (msg.mode === 'public') {
-            joinRoom(findOrCreatePublic(), displayName);
+            const map = MAPS[msg.map] ? msg.map : undefined;
+            joinRoom(findOrCreatePublic(map), displayName);
           } else if (msg.mode === 'create') {
             const gm = msg.gm === 'tdm' ? 'tdm' : 'ffa';
             const bots = Math.min(6, Math.max(0, msg.bots | 0));

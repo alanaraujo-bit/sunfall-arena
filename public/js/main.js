@@ -5,7 +5,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { PLAYER, raycastSolids } from '/shared/mapdata.js';
-import { getMap, DEFAULT_MAP } from '/shared/maps/index.js';
+import { getMap, DEFAULT_MAP, MAP_LIST } from '/shared/maps/index.js';
 import { buildWorld, makeCharacter, makeViewmodel, makeGrenadeMesh, makeSmokeCanisterMesh } from './world.js';
 import { NADE, SMOKE, SMOKE_LIFE_MS, advanceGrenade, launchGrenade } from '/shared/nadephysics.js';
 import { tex, spriteTex, setTexQuality, smokeTex } from './textures.js';
@@ -157,6 +157,7 @@ const $ = id => document.getElementById(id);
 const hud = {
   menu: $('menu'), nameInput: $('name-input'),
   mpBtn: $('mp-btn'), customBtn: $('custom-btn'), customPanel: $('custom-panel'),
+  mapSelectStatus: $('map-select-status'), mapSelectList: $('map-select-list'),
   cfgMap: $('cfg-map'), cfgGm: $('cfg-gm'), cfgBots: $('cfg-bots'), cfgKl: $('cfg-kl'), cfgTl: $('cfg-tl'),
   createBtn: $('create-btn'), codeInput: $('code-input'), joinBtn: $('join-btn'),
   idChip: $('id-chip'), idAvatar: $('id-avatar'), idName: $('id-name'),
@@ -546,7 +547,7 @@ function updatePerf(dt) {
 const screens = {
   account: $('screen-account'), profile: $('screen-profile'), friends: $('screen-friends'),
   rank: $('screen-rank'), config: $('screen-config'), modes: $('screen-modes'),
-  armory: $('screen-armory')
+  armory: $('screen-armory'), mapSelect: $('screen-map-select')
 };
 let currentScreen = null;
 
@@ -3496,8 +3497,55 @@ function sendPlay(msg) {
   else { pendingPlay = msg; connectPresence(); }
 }
 
-hud.startBtn.addEventListener('click', () => { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); });
-hud.mpBtn.addEventListener('click', () => { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); });
+// Seletor de mapa do multiplayer público: mostra quantos jogadores REAIS
+// (não bots) estão em cada mapa agora, pra escolher onde tem partida de
+// verdade em vez de entrar às cegas. Consulta uma vez ao abrir a tela.
+async function openMapSelect() {
+  showScreen('mapSelect');
+  hud.mapSelectStatus.classList.remove('hidden');
+  hud.mapSelectStatus.textContent = 'Consultando salas…';
+  renderMapSelect(MAP_LIST.map(m => ({ ...m, players: null })));
+  try {
+    const { maps } = await apiPublicGet('/public-rooms');
+    hud.mapSelectStatus.classList.add('hidden');
+    renderMapSelect(maps);
+  } catch {
+    hud.mapSelectStatus.textContent = 'Não consegui checar quantos jogadores tem agora — pode entrar assim mesmo.';
+  }
+}
+function renderMapSelect(maps) {
+  hud.mapSelectList.innerHTML = maps.map(m => {
+    const known = m.players !== null && m.players !== undefined;
+    const label = !known ? 'consultando…' : (m.players === 1 ? '1 jogador agora' : `${m.players} jogadores agora`);
+    return `
+      <button type="button" class="map-card" data-map="${esc(m.key)}">
+        <div class="map-card-info">
+          <span class="map-card-name">${esc(m.name)}</span>
+          <span class="map-card-players${known && m.players > 0 ? ' has-players' : ''}">
+            <span class="map-card-dot"></span>${label}
+          </span>
+        </div>
+        <span class="map-card-go">JOGAR ▸</span>
+      </button>`;
+  }).join('');
+  hud.mapSelectList.querySelectorAll('.map-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeScreen();
+      sendPlay({ t: 'play', mode: 'public', map: btn.dataset.map });
+    });
+  });
+}
+
+// modo de teste automatizado: entra direto (sem o seletor) pro smoke test
+// continuar funcionando sozinho, igual sempre funcionou.
+hud.startBtn.addEventListener('click', () => {
+  if (TESTMODE) { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); return; }
+  openMapSelect();
+});
+hud.mpBtn.addEventListener('click', () => {
+  if (TESTMODE) { closeScreen(); sendPlay({ t: 'play', mode: 'public' }); return; }
+  openMapSelect();
+});
 hud.createBtn.addEventListener('click', () => { closeScreen(); sendPlay({
   t: 'play', mode: 'create', gm: hud.cfgGm.value, map: hud.cfgMap.value,
   bots: +hud.cfgBots.value, kl: +hud.cfgKl.value, tl: +hud.cfgTl.value
