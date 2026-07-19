@@ -78,11 +78,12 @@ export const SFX = {
   // Tiros em camadas: transiente mecânico + corpo + soco grave (+ eco no sniper).
   // `v` varia o timbre por disparo (rajada não soa metralhadora de brinquedo);
   // `muf` abafa os agudos com a distância (vol < 1 = tiro de outro jogador longe).
-  shot(sniper = false, vol = 1) {
+  // `kind`: 'ar' | 'sniper' | 'shotgun'.
+  shot(kind = 'ar', vol = 1) {
     ensure();
     const v = 0.94 + Math.random() * 0.12;
     const muf = 0.45 + 0.55 * Math.min(1, vol);
-    if (sniper) {
+    if (kind === 'sniper') {
       // FERRÃO-SR: estalo seco de ferrolho + corpo grave longo + eco duplo
       if (vol > 0.35) noise(0.035, 0.5 * vol, 6000, 2500, 'highpass');
       noise(0.34, 0.55 * vol, 1500 * v * muf, 90);
@@ -90,6 +91,13 @@ export const SFX = {
       tone(57, 0.42, 0.4 * vol, 'sine', 24);
       noise(0.22, 0.16 * vol, 900 * muf, 140, 'lowpass', 0.1);
       noise(0.3, 0.09 * vol, 600 * muf, 90, 'lowpass', 0.22);
+    } else if (kind === 'shotgun') {
+      // BRECHA-12: estouro largo e grave (chumbo em leque) — sem clique
+      // metálico de ferrolho, corpo curto e denso + soco grave pesado
+      if (vol > 0.35) noise(0.05, 0.55 * vol, 3200, 900, 'bandpass');
+      noise(0.26, 0.62 * vol, 1400 * v * muf, 160);
+      tone(95 * v, 0.16, 0.5 * vol, 'sawtooth', 45);
+      tone(52, 0.32, 0.42 * vol, 'sine', 30, 0.015);
     } else {
       // FALCÃO-9: clique do mecanismo + corpo médio + soco curto no grave
       if (vol > 0.35) noise(0.018, 0.3 * vol, 5200, 3000, 'highpass');
@@ -98,6 +106,15 @@ export const SFX = {
       tone(86 * v, 0.1, 0.26 * vol, 'sine', 46);
     }
   },
+  // BRECHA-12: bombear o fore-end após o tiro — dois estalos mecânicos secos
+  pump() {
+    ensure();
+    noise(0.05, 0.28, 2200, 900, 'bandpass');
+    noise(0.06, 0.24, 1800, 700, 'bandpass', 0.09);
+    tone(180, 0.04, 0.12, 'square', 90, 0.02);
+  },
+  // BRECHA-12: um cartucho encaixado durante a recarga (repete por cartucho)
+  shellIn() { ensure(); noise(0.05, 0.22, 2600, 1000, 'highpass'); tone(260, 0.05, 0.14, 'square', 160); },
 
   // ---- Faca ----
   // corte no ar: sopro curto e agudo varrendo grave

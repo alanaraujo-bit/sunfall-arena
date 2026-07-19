@@ -973,6 +973,39 @@ export function makeViewmodel(kind) {
     muzzle = new THREE.Object3D();
     muzzle.position.set(0, 0.015, -0.56);
     grp.add(muzzle);
+  } else if (kind === 'brecha') {
+    // ---------------- Escopeta bomba "BRECHA-12" ----------------
+    // Silhueta curta e grossa (calibre 12), bem diferente do fuzil/sniper:
+    // cano largo, tubo de munição visível sob o cano, bomba (fore-end) que
+    // desliza pra trás após o tiro — grp.userData.pump é essa peça, animada
+    // por main.js (pumpT) a cada disparo.
+    add(new RoundedBoxGeometry(0.095, 0.1, 0.28, 2, 0.016), metal, 0, 0, 0.04);              // receiver curto e largo
+    const barrel = add(new THREE.CylinderGeometry(0.03, 0.03, 0.34, 12), darkM, 0, 0.03, -0.32);
+    barrel.rotation.x = Math.PI / 2;
+    const magTube = add(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 10), metal, 0, -0.015, -0.26);
+    magTube.rotation.x = Math.PI / 2;                                                        // tubo de munição
+    add(new THREE.SphereGeometry(0.011, 8, 8), accent, 0, 0.046, -0.49);                     // massa de mira (bead)
+    add(new THREE.BoxGeometry(0.09, 0.018, 0.1), accent, 0, 0.04, -0.02);                    // detalhe teal
+
+    // bomba/fore-end: grupo próprio p/ animar o recuo do pump em main.js
+    const pumpGroup = new THREE.Group();
+    pumpGroup.position.set(0, -0.015, -0.2);
+    grp.add(pumpGroup);
+    const pumpMesh = new THREE.Mesh(new RoundedBoxGeometry(0.078, 0.078, 0.16, 2, 0.015), wood);
+    pumpGroup.add(pumpMesh);
+    for (const gz of [-0.05, 0, 0.05]) {
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.084, 0.006, 0.014), darkM);
+      ridge.position.set(0, 0.03, gz);
+      pumpGroup.add(ridge);
+    }
+    grp.userData.pump = pumpGroup;
+
+    add(new RoundedBoxGeometry(0.055, 0.11, 0.2, 2, 0.016), wood, 0, -0.005, 0.34);          // coronha curta
+    const grip = add(new RoundedBoxGeometry(0.055, 0.12, 0.06, 2, 0.012), wood, 0, -0.09, 0.16);
+    grip.rotation.x = -0.3;
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.03, -0.5);
+    grp.add(muzzle);
   } else {
     add(new RoundedBoxGeometry(0.07, 0.1, 0.5, 2, 0.015), metal, 0, 0, 0.02);              // corpo
     const barrel = add(new THREE.CylinderGeometry(0.019, 0.019, 0.55, 10), metal, 0, 0.012, -0.5);

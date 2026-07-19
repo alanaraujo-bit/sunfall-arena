@@ -23,10 +23,18 @@ import { setPresence, clearPresence, getPresence } from './presence.js';
 import { query } from './db.js';
 
 // ---------------- Armas (fonte da verdade — o cliente não decide dano) ----------------
-const WEAPONS = [
-  { dmg: 16, head: 1.75, int: 0.115 },   // FALCÃO-9
-  { dmg: 92, head: 2, int: 1.05 }        // FERRÃO-SR
-];
+// Índice 5 (BRECHA) fica "solto" de propósito: o mesmo número identifica a
+// arma em TODOS os espaços compartilhados com o cliente (ícone do kill feed,
+// viewmodel do killcam, protocolo `w` da mensagem `fire`) — 2/3/4 já
+// pertencem a faca/granada/barril nesses espaços, então a próxima arma de
+// fogo livre é 5 (ver WEAPON_ICONS/viewmodels/BRECHA em public/js/main.js).
+const WEAPONS = [];
+WEAPONS[0] = { dmg: 16, head: 1.75, int: 0.115 };                                   // FALCÃO-9
+WEAPONS[1] = { dmg: 92, head: 2, int: 1.05 };                                       // FERRÃO-SR
+WEAPONS[5] = {                                                                      // BRECHA-12 (escopeta)
+  dmg: 135, head: 1.3, int: 0.82,          // dmg = só p/ dano a barril (blast único, não por bago)
+  pellets: 9, pelletDmgNear: 15, pelletDmgFar: 2, pelletRange: 11, pelletSpread: 0.14
+};
 // Faca (índice 2). Alcance/cone ligeiramente mais generosos que a previsão do
 // cliente para nunca rejeitar um golpe que o atirador viu conectar.
 // arc = cosseno do meio-ângulo do cone frontal aceito.
@@ -42,6 +50,37 @@ const KIT_HEAL = 50;      // vida restaurada por uso
 const KIT_USE_MS = 1000;  // tempo de canalização
 const RESPAWN_MIN_MS = 500;       // tempo mínimo morto antes de poder renascer (evita abuso)
 const RESPAWN_FAILSAFE_MS = 5000; // renascimento automático caso o cliente nunca peça (saiu/ocioso)
+
+// resolve um raio contra jogadores + mapa (usado pelo tiro único e por cada
+// bago da escopeta) — retorna o alvo mais próximo (ou null) e se foi cabeça
+function raycastHit(room, self, ox, oy, oz, dx, dy, dz, sv) {
+  const tMap = raycastSolids(room.map.BOUNDS, ox, oy, oz, dx, dy, dz);
+  let victim = null, hitT = tMap, head = false;
+  for (const p of room.players.values()) {
+    if (p === self || !p.alive) continue;
+    if (room.settings.gm === 'tdm' && p.team === self.team) continue;
+    const rp = rewindPos(p, sv);
+    // cabeça (esfera)
+    const hx = rp.x - ox, hy = rp.y + PLAYER.HEAD_Y - oy, hz = rp.z - oz;
+    const tc = hx * dx + hy * dy + hz * dz;
+    if (tc > 0) {
+      const d2 = hx * hx + hy * hy + hz * hz - tc * tc;
+      if (d2 < PLAYER.HEAD_R * PLAYER.HEAD_R && tc < hitT) {
+        hitT = tc; victim = p; head = true;
+        continue;
+      }
+    }
+    // corpo (AABB)
+    const R = PLAYER.R;
+    const tb = rayBox(ox, oy, oz, dx, dy, dz, {
+      minx: rp.x - R, maxx: rp.x + R,
+      miny: rp.y, maxy: rp.y + PLAYER.BODY_H,
+      minz: rp.z - R, maxz: rp.z + R
+    });
+    if (tb < hitT) { hitT = tb; victim = p; head = false; }
+  }
+  return { victim, head, hitT };
+}
 
 // posição do jogador rebobinada para o instante `sv` (lag compensation)
 function rewindPos(p, sv) {
@@ -352,11 +391,14 @@ export function attachWs(server) {
           // Tiro autoritativo: o servidor valida cadência e origem, rebobina o
           // mundo para o instante que o atirador via (sv) e refaz o raycast.
           if (!self.alive || room.state !== 'playing') break;
-          const wi = msg.w === 1 ? 1 : 0;
+          // só aceita índices de arma de fogo reais (WEAPONS[wi] existe) —
+          // qualquer outro valor (inclusive não-inteiros, tipo "constructor")
+          // cai pro FALCÃO-9 em vez de corromper o cálculo de dano
+          const wi = Number.isInteger(msg.w) && WEAPONS[msg.w] ? msg.w : 0;
           const w = WEAPONS[wi];
           const now = Date.now();
-          self.lastFire = self.lastFire || [0, 0];
-          if (now - self.lastFire[wi] < w.int * 1000 * 0.85) break;   // cadência da arma
+          self.lastFire = self.lastFire || {};
+          if (now - (self.lastFire[wi] || 0) < w.int * 1000 * 0.85) break;   // cadência da arma
           self.lastFire[wi] = now;
 
           if (!Array.isArray(msg.o) || !Array.isArray(msg.d)) break;
@@ -373,44 +415,61 @@ export function attachWs(server) {
           recordFire(room, now, self.id, [ox, oy, oz], [dx, dy, dz], wi);
 
           const sv = Math.min(now, Math.max(now - REWIND_MAX_MS, +msg.sv || now));
-          const tMap = raycastSolids(room.map.BOUNDS, ox, oy, oz, dx, dy, dz);
-          let victim = null, hitT = tMap, head = false;
-          for (const p of room.players.values()) {
-            if (p === self || !p.alive) continue;
-            if (room.settings.gm === 'tdm' && p.team === self.team) continue;
-            const rp = rewindPos(p, sv);
-            // cabeça (esfera)
-            const hx = rp.x - ox, hy = rp.y + PLAYER.HEAD_Y - oy, hz = rp.z - oz;
-            const tc = hx * dx + hy * dy + hz * dz;
-            if (tc > 0) {
-              const d2 = hx * hx + hy * hy + hz * hz - tc * tc;
-              if (d2 < PLAYER.HEAD_R * PLAYER.HEAD_R && tc < hitT) {
-                hitT = tc; victim = p; head = true;
-                continue;
+
+          if (w.pellets) {
+            // BRECHA-12: N bagos, cada um com um leque próprio gerado AQUI no
+            // servidor (nunca confiar num array de direções vindo do cliente —
+            // isso deixaria um cliente malicioso "espalhar" bagos em qualquer
+            // direção, virando um tiro múltiplo mirado em vez de um leque real).
+            const hits = new Map();   // victim.id -> { dmg, head, victim }
+            let barrelHit = null, barrelT = Infinity;
+            for (let i = 0; i < w.pellets; i++) {
+              let pdx = dx + (Math.random() - 0.5) * w.pelletSpread * 2;
+              let pdy = dy + (Math.random() - 0.5) * w.pelletSpread * 2;
+              let pdz = dz + (Math.random() - 0.5) * w.pelletSpread * 2;
+              const pl = Math.hypot(pdx, pdy, pdz) || 1;
+              pdx /= pl; pdy /= pl; pdz /= pl;
+              const { victim, head, hitT } = raycastHit(room, self, ox, oy, oz, pdx, pdy, pdz, sv);
+              if (victim) {
+                const t = Math.min(1, hitT / w.pelletRange);
+                const pdmg = Math.max(0, w.pelletDmgNear + (w.pelletDmgFar - w.pelletDmgNear) * t);
+                if (pdmg > 0) {
+                  const acc = hits.get(victim.id) || { dmg: 0, head: false, victim };
+                  acc.dmg += pdmg * (head ? w.head : 1);
+                  if (head) acc.head = true;
+                  hits.set(victim.id, acc);
+                }
+              } else {
+                for (const b of room.barrels) {
+                  if (!b.alive) continue;
+                  const t = rayBox(ox, oy, oz, pdx, pdy, pdz, barrelBounds(b));
+                  if (t < barrelT) { barrelT = t; barrelHit = b; }
+                }
               }
             }
-            // corpo (AABB)
-            const R = PLAYER.R;
-            const tb = rayBox(ox, oy, oz, dx, dy, dz, {
-              minx: rp.x - R, maxx: rp.x + R,
-              miny: rp.y, maxy: rp.y + PLAYER.BODY_H,
-              minz: rp.z - R, maxz: rp.z + R
-            });
-            if (tb < hitT) { hitT = tb; victim = p; head = false; }
-          }
-          if (victim) {
-            damage(room, self, victim, Math.round(w.dmg * (head ? w.head : 1)), head, wi);
-          } else {
-            // ninguém no meio da bala — ela pode ter parado num barril vivo
-            let barrelHit = null, barrelT = hitT;
-            for (const b of room.barrels) {
-              if (!b.alive) continue;
-              const t = rayBox(ox, oy, oz, dx, dy, dz, barrelBounds(b));
-              if (t < barrelT) { barrelT = t; barrelHit = b; }
+            for (const { dmg, head, victim } of hits.values()) {
+              damage(room, self, victim, Math.round(dmg), head, wi);
             }
-            if (barrelHit) {
+            if (barrelHit && hits.size === 0) {
               const res = damageBarrel(room, barrelHit, w.dmg, self, room.players, damage);
               if (res) broadcastRoom(room, { t: 'barrelboom', id: res.id, x: res.x, y: res.y, z: res.z });
+            }
+          } else {
+            const { victim, head, hitT } = raycastHit(room, self, ox, oy, oz, dx, dy, dz, sv);
+            if (victim) {
+              damage(room, self, victim, Math.round(w.dmg * (head ? w.head : 1)), head, wi);
+            } else {
+              // ninguém no meio da bala — ela pode ter parado num barril vivo
+              let barrelHit = null, barrelT = hitT;
+              for (const b of room.barrels) {
+                if (!b.alive) continue;
+                const t = rayBox(ox, oy, oz, dx, dy, dz, barrelBounds(b));
+                if (t < barrelT) { barrelT = t; barrelHit = b; }
+              }
+              if (barrelHit) {
+                const res = damageBarrel(room, barrelHit, w.dmg, self, room.players, damage);
+                if (res) broadcastRoom(room, { t: 'barrelboom', id: res.id, x: res.x, y: res.y, z: res.z });
+              }
             }
           }
           break;

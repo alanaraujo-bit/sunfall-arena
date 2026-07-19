@@ -205,7 +205,80 @@ function buildFerraoSR() {
   return g;
 }
 
-const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR };
+// ------------------------------------------------------------
+// Modelo 3D detalhado — BRECHA-12 (escopeta bomba real do jogo)
+// Silhueta curta e grossa (calibre 12): cano largo, tubo de munição
+// visível sob o cano, bomba (fore-end) estriada, coronha curta e
+// porta de ejeção lateral. Acentos vermelhos (identidade própria,
+// diferente do teal/âmbar das outras duas).
+// ------------------------------------------------------------
+function buildBrecha12() {
+  const g = new THREE.Group();
+
+  const gun = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x83898f, roughness: 0.46, metalness: 0.85 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xb4bcc2, roughness: 0.3, metalness: 0.92 });
+  const poly = new THREE.MeshStandardMaterial({ color: 0x22201d, roughness: 0.76, metalness: 0.1 });
+  const wood = new THREE.MeshStandardMaterial({ map: tex('wood2'), color: 0x8a5a34, roughness: 0.7 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x121110, roughness: 0.85, metalness: 0.1 });
+  const red = new THREE.MeshStandardMaterial({ color: 0xd95350, roughness: 0.4, metalness: 0.5, emissive: 0x3a0e0c, emissiveIntensity: 0.6 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xc79a4a, roughness: 0.35, metalness: 0.8 });
+
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    g.add(m);
+    return m;
+  };
+  const cyl = (r1, r2, h, seg = 16) => new THREE.CylinderGeometry(r1, r2, h, seg);
+  const rbox = (w, h, d, r = 0.012) => new RoundedBoxGeometry(w, h, d, 2, r);
+
+  // ---- receiver curto e largo ----
+  add(rbox(0.46, 0.16, 0.13), gun, 0.06, 0, 0);
+  add(rbox(0.14, 0.09, 0.12), poly, -0.14, 0.01, 0);            // bloco frontal (onde o cano entra)
+  add(new THREE.BoxGeometry(0.014, 0.09, 0.006), dark, 0.06, 0.01, 0.066);    // porta de ejeção
+  add(new THREE.BoxGeometry(0.3, 0.02, 0.005), red, 0.08, -0.05, 0.067);
+  add(new THREE.BoxGeometry(0.3, 0.02, 0.005), red, 0.08, -0.05, -0.067);
+
+  // ---- cano largo + tubo de munição ----
+  add(cyl(0.038, 0.038, 0.42, 18), steel, -0.42, 0.05, 0, 0, 0, Math.PI / 2);
+  add(cyl(0.041, 0.038, 0.02, 18), dark, -0.63, 0.05, 0, 0, 0, Math.PI / 2);      // boca
+  add(new THREE.SphereGeometry(0.012, 8, 8), red, -0.635, 0.05, 0);               // massa de mira (bead)
+  add(cyl(0.024, 0.024, 0.5, 14), gun, -0.36, -0.01, 0, 0, 0, Math.PI / 2);        // tubo de munição
+  add(cyl(0.027, 0.027, 0.03, 14), dark, -0.6, -0.01, 0, 0, 0, Math.PI / 2);       // tampa do tubo
+
+  // ---- bomba / fore-end estriado ----
+  const pump = new THREE.Group(); pump.position.set(-0.28, -0.01, 0); g.add(pump);
+  const padd = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); pump.add(m); return m;
+  };
+  padd(rbox(0.2, 0.09, 0.09), wood, 0, 0, 0);
+  for (let i = 0; i < 7; i++) padd(new THREE.BoxGeometry(0.012, 0.096, 0.096), poly, -0.08 + i * 0.026, 0, 0);
+
+  // ---- carregador/tubo interno + parafusos ----
+  add(rbox(0.05, 0.05, 0.1), brass, -0.1, -0.09, 0);
+
+  // ---- punho + guarda-gatilho ----
+  add(rbox(0.085, 0.15, 0.075), poly, 0.16, -0.12, 0, 0, 0, -0.3);
+  add(new THREE.TorusGeometry(0.048, 0.011, 8, 16, Math.PI), dark, 0.06, -0.1, 0, Math.PI, 0, 0);
+  add(new THREE.BoxGeometry(0.014, 0.038, 0.02), steel, 0.06, -0.09, 0);
+
+  // ---- coronha curta ----
+  add(rbox(0.26, 0.1, 0.09), wood, 0.4, -0.01, 0);
+  add(rbox(0.035, 0.2, 0.1), dark, 0.53, -0.01, 0);              // apoio de ombro
+  add(new THREE.BoxGeometry(0.02, 0.02, 0.005), red, 0.4, 0.05, 0.046);
+
+  // ---- parafusos ----
+  for (const [px, py] of [[0.02, 0.04], [0.14, 0.04]]) {
+    add(cyl(0.008, 0.008, 0.135, 8), steel, px, py, 0, Math.PI / 2, 0, 0);
+  }
+
+  g.position.x = 0.1;
+  g.scale.setScalar(1.1);
+  return g;
+}
+
+const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR, brecha: buildBrecha12 };
 
 // ------------------------------------------------------------
 // Visualizador 3D

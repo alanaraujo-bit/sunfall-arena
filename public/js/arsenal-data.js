@@ -162,27 +162,29 @@ export const ARSENAL = [
     role: 'Curtíssima distância · demolidora',
     icon: '💥',
     accent: '#d95350',
-    model: null,
-    locked: true,
+    model: 'brecha',
+    locked: false,
     desc: 'A resposta da Talon Works para portas trancadas e corredores estreitos. A BRECHA-12 apaga qualquer coisa a um braço de distância — e vira enfeite a partir de dez metros. Recarrega devagar: cada tiro precisa contar.',
     philosophy: 'Dano bruto, sem desculpas. A Talon nunca escondeu que a BRECHA é uma ferramenta de um único propósito: dominar o espaço fechado.',
     trivia: [
       'O nome vem do uso original: abrir passagem em estruturas.',
-      'É recarregada cartucho por cartucho.'
+      'É recarregada cartucho por cartucho — e o gatilho interrompe a recarga a qualquer momento.',
+      'Os 9 bagos de cada cartucho se espalham num leque: quanto mais perto, mais bagos conectam.'
     ],
     core: [
       { k: 'Dano', v: 96 }, { k: 'Cadência', v: 30 }, { k: 'Alcance', v: 16 },
       { k: 'Precisão', v: 24 }, { k: 'Controle', v: 40 }, { k: 'Mobilidade', v: 56 }
     ],
     spec: [
-      { k: 'Tempo de recarga', d: '0.6 s / cartucho' },
+      { k: 'Tempo de recarga', d: '0.6 s / cartucho (interrompível)' },
       { k: 'Carregador', d: '6' },
-      { k: 'Disparo', d: 'Bomba (pump)' },
-      { k: 'Alcance efetivo', d: 'Curtíssimo' },
-      { k: 'Dispersão', d: 'Alta (bagos)' },
-      { k: 'Mobilidade', d: 'Média' },
-      { k: 'Precisão parado', d: 'Baixa' },
-      { k: 'Precisão em mov.', d: 'Baixa' }
+      { k: 'Disparo', d: 'Bomba (pump), 1 por gatilho' },
+      { k: 'Bagos por disparo', d: '9' },
+      { k: 'Dano por bago', d: '15 (perto) → 2 (11 m)' },
+      { k: 'Dano máx. (ponto-cego)', d: '135' },
+      { k: 'Alcance efetivo', d: '~11 m' },
+      { k: 'Dispersão', d: 'Alta (leque de bagos)' },
+      { k: 'Mobilidade', d: 'Média' }
     ]
   },
   {

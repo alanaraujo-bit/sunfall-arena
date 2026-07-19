@@ -22,13 +22,13 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', lastw: 'KeyQ',
+  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', w4: 'Digit4', lastw: 'KeyQ',
   melee: 'KeyV', nade: 'KeyG', smoke: 'KeyC', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', lastw: 'Troca rápida',
+  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', w4: 'Escopeta', lastw: 'Troca rápida',
   melee: 'Golpe rápido', nade: 'Granada', smoke: 'Fumaça', board: 'Placar'
 };
 // Códigos de mouse no mesmo formato dos binds (Mouse0 = esq., Mouse3/4 = laterais)
@@ -805,7 +805,14 @@ function faceCenter() {
 const KNIFE = 2;
 const GRENADE = 3;   // viewmodel da granada de frag — ação overlay, não um "slot"
 const SMOKE_VM = 4;  // viewmodel da granada de fumaça
-const WEAPONS = [
+// BRECHA fica no índice 5 de propósito (não 3 nem 4, já usados pelas granadas
+// como overlay) — o MESMO número identifica a arma em todo lugar que troca
+// dado com o servidor: WEAPON_ICONS, viewmodels[], protocolo `w` da mensagem
+// `fire`/`dmg` e o killcam (showViewmodel(killcam.killerW) usa esse índice
+// direto). Ver espelho server-side em server/ws.js (WEAPONS[5]).
+const BRECHA = 5;
+const WEAPONS = [];
+WEAPONS[0] = {
   // rec = personalidade do recuo:
   //   climb     sobe por tiro (pitch)             drift    deriva lateral na rajada (yaw)
   //   jitter    aleatório lateral                 ramp     tiros até a rajada "assentar"
@@ -813,42 +820,73 @@ const WEAPONS = [
   //   recovHeld recuperação SEGURANDO o gatilho (lenta — deixa o recuo se acumular e ficar visível)
   //   recov     recuperação ao SOLTAR o gatilho (rápida — a mira "cai" de volta pro centro)
   //   vmKick coice da viewmodel         shake  tremor de câmera por disparo
-  { name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false,
-    // sobe rápido e visível desde o 1º tiro; numa rajada segurada o recuo
-    // se acumula até o teto e deriva pro lado — dá pra compensar puxando a mira
-    // pra baixo (lore: controle 86, por isso o teto é domável e não foge)
-    rec: { climb: 0.034, drift: 0.011, jitter: 0.0035, ramp: 5, max: 0.12, recovHeld: 1.7, recov: 11, bloom: 0.0016, bloomMax: 0.018, vmKick: 0.06 } },
-  { name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true,
-    // coice pesado de ferrolho: um soco grande e imediato por tiro, que some
-    // devagar — cada disparo é um evento (ramp 0 = sem comportamento de rajada)
-    rec: { climb: 0.095, drift: 0, jitter: 0.008, ramp: 0, max: 0.16, recovHeld: 3.2, recov: 6, bloom: 0, bloomMax: 0, vmKick: 0.13, shake: 0.045 } },
-  // Faca: arma de oportunidade. Curtíssimo alcance, alto risco/recompensa.
-  { name: 'PRESA-7', melee: true, sniper: false, auto: false,
-    light: { dmg: 55, range: 2.5, arc: 0.62, cd: 0.5,  wind: 0.1,  lunge: 3.6, kick: 0.05 },   // arc = cos do meio-ângulo do cone
-    heavy: { dmg: 80, range: 2.9, arc: 0.6,  cd: 0.85, wind: 0.22, lunge: 6.4, kick: 0.09 } }
-];
-const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️'];
-const ammo = [WEAPONS[0].mag, WEAPONS[1].mag];
+  name: 'FALCÃO-9', dmg: 16, head: 1.75, int: 0.115, mag: 26, reload: 1.35, spread: 0.012, auto: true, kick: 0.012, sniper: false,
+  // sobe rápido e visível desde o 1º tiro; numa rajada segurada o recuo
+  // se acumula até o teto e deriva pro lado — dá pra compensar puxando a mira
+  // pra baixo (lore: controle 86, por isso o teto é domável e não foge)
+  rec: { climb: 0.034, drift: 0.011, jitter: 0.0035, ramp: 5, max: 0.12, recovHeld: 1.7, recov: 11, bloom: 0.0016, bloomMax: 0.018, vmKick: 0.06 }
+};
+WEAPONS[1] = {
+  name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true,
+  // coice pesado de ferrolho: um soco grande e imediato por tiro, que some
+  // devagar — cada disparo é um evento (ramp 0 = sem comportamento de rajada)
+  rec: { climb: 0.095, drift: 0, jitter: 0.008, ramp: 0, max: 0.16, recovHeld: 3.2, recov: 6, bloom: 0, bloomMax: 0, vmKick: 0.13, shake: 0.045 }
+};
+// Faca: arma de oportunidade. Curtíssimo alcance, alto risco/recompensa.
+WEAPONS[KNIFE] = {
+  name: 'PRESA-7', melee: true, sniper: false, auto: false,
+  light: { dmg: 55, range: 2.5, arc: 0.62, cd: 0.5,  wind: 0.1,  lunge: 3.6, kick: 0.05 },   // arc = cos do meio-ângulo do cone
+  heavy: { dmg: 80, range: 2.9, arc: 0.6,  cd: 0.85, wind: 0.22, lunge: 6.4, kick: 0.09 }
+};
+// BRECHA-12: escopeta bomba (pump-action). Identidade própria — sem rajada,
+// sem luneta: 9 bagos num leque largo (o servidor gera o leque de verdade,
+// ver server/ws.js) e recarga cartucho-a-cartucho, interrompível pelo
+// gatilho (startReload/tryFire tratam `shellReload` como um caso à parte
+// do reload normal de pente único das outras armas).
+WEAPONS[BRECHA] = {
+  name: 'BRECHA-12', pellets: 9, head: 1.3, int: 0.82, mag: 6, reload: 0.6, auto: false, sniper: false,
+  shellReload: true,      // recarrega 1 cartucho por vez (0.6s cada), não o pente inteiro
+  pump: true, pumpDur: 0.32,   // duração da animação de bombear após o tiro
+  pelletSpread: 0.14,     // leque visual local — mesmo valor do servidor (server/ws.js
+                           // WEAPONS[5].pelletSpread), só pra previsão bater com o dano real
+  kick: 0.07,
+  rec: { climb: 0.05, drift: 0, jitter: 0.012, ramp: 0, max: 0.14, recovHeld: 3, recov: 7, bloom: 0, bloomMax: 0, vmKick: 0.11, shake: 0.05 }
+};
+const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️', '💥'];
+const ammo = [];
+ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag;
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
 let recoilY = 0;   // componente lateral do recuo (yaw)
 let sprayN = 0;    // tiros consecutivos na rajada atual (padrão de recuo + bloom)
+let pumpT = 0;     // animação da bomba da BRECHA-12 (>0 = em curso)
+
+// resolve o "timbre" do disparo (SFX) a partir do índice da arma — usado
+// tanto pro tiro local quanto pro replay do tiro de jogadores remotos
+function shotKind(wi) {
+  const ww = WEAPONS[wi];
+  return ww && ww.sniper ? 'sniper' : ww && ww.pellets ? 'shotgun' : 'ar';
+}
 
 const vmAR = makeViewmodel('ar');
 const vmSR = makeViewmodel('sr');
 const vmKnife = makeViewmodel('knife');
 const vmNade = makeViewmodel('nade');
 const vmSmoke = makeViewmodel('smoke');
+const vmBrecha = makeViewmodel('brecha');
 const vmRoot = new THREE.Group();
 vmRoot.position.set(0.26, -0.24, -0.5);
-vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group, vmSmoke.group);
+vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group, vmSmoke.group, vmBrecha.group);
 vmSR.group.visible = false;
 vmKnife.group.visible = false;
 vmNade.group.visible = false;
 vmSmoke.group.visible = false;
+vmBrecha.group.visible = false;
 vmRoot.visible = false; // oculto até entrar na partida
 camera.add(vmRoot);
 scene.add(camera);
-const viewmodels = [vmAR, vmSR, vmKnife, vmNade, vmSmoke];
+const viewmodels = [];
+viewmodels[0] = vmAR; viewmodels[1] = vmSR; viewmodels[KNIFE] = vmKnife;
+viewmodels[GRENADE] = vmNade; viewmodels[SMOKE_VM] = vmSmoke; viewmodels[BRECHA] = vmBrecha;
 
 // mostra só a viewmodel do índice `i` (guns e faca)
 function showViewmodel(i) {
@@ -1147,7 +1185,7 @@ const keys = {};
 let mouseDown = false, wantJump = false;
 let lastW = 1; // arma anterior (troca rápida / Q)
 const canvas = renderer.domElement;
-const WEAPON_ORDER = [0, 1, KNIFE]; // ciclo do scroll
+const WEAPON_ORDER = [0, 1, BRECHA, KNIFE]; // ciclo do scroll
 
 // Zera TODO o input preso. Sem isto, perder o foco (alt-tab, notificação,
 // clicar fora) com uma tecla apertada nunca dispara o keyup → a tecla fica
@@ -1180,6 +1218,7 @@ function onBindPress(code) {
   if (code === binds.w1) switchWeapon(0);
   if (code === binds.w2) switchWeapon(1);
   if (code === binds.w3) switchWeapon(KNIFE);
+  if (code === binds.w4) switchWeapon(BRECHA);
   if (code === binds.lastw) quickSwitchWeapon();
   if (code === binds.melee) quickMelee();
   if (code === binds.nade) startNadeCook('frag');
@@ -1279,7 +1318,7 @@ function switchWeapon(i) {
   if (i === curW || reloading || me.dead || me.usingKit > 0) return;
   if (melee.active && melee.quick) return;   // não interromper um golpe rápido em curso
   if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
-  if (i < 0 || i > KNIFE) return;
+  if (!WEAPON_ORDER.includes(i)) return;   // só os slots reais (guns + faca)
   lastW = curW;
   curW = i;
   swapT = 0.25;
@@ -1470,12 +1509,20 @@ function updateMovement(dt) {
 
 // ---------------- Tiro ----------------
 const _dir = new THREE.Vector3(), _origin = new THREE.Vector3(), _muzzleV = new THREE.Vector3();
+const _pDir = new THREE.Vector3();   // direção de cada bago (BRECHA-12) — só efeito local
 
 function tryFire() {
   const w = WEAPONS[curW];
   if (w.melee) return;   // a faca ataca por startMelee, não por tryFire
   const now = performance.now() / 1000;
-  if (!playing || matchEnded || me.dead || reloading > 0 || swapT > 0 || me.usingKit > 0) return;
+  if (!playing || matchEnded || me.dead || swapT > 0 || me.usingKit > 0) return;
+  if (reloading > 0) {
+    // BRECHA-12: o gatilho interrompe a recarga cartucho-a-cartucho e atira
+    // com o que já está na câmara — igual a uma escopeta bomba de verdade.
+    // As outras armas recarregam o pente inteiro de uma vez: sem interrupção.
+    if (w.shellReload && ammo[curW] > 0) reloading = 0;
+    else return;
+  }
   if (nadeState.cooking || nadeState.throwing) return;   // mãos ocupadas com a granada
   if (now - lastShot < w.int) return;
   if (ammo[curW] <= 0) { SFX.empty(); startReload(); return; }
@@ -1487,57 +1534,63 @@ function tryFire() {
   camera.getWorldDirection(_dir);
   const rc = w.rec;
   const bloom = rc ? Math.min(rc.bloomMax, sprayN * rc.bloom) : 0;
-  const spread = (w.sniper && zoomed ? 0 : w.spread) + bloom;
-  if (spread > 0) {
-    _dir.x += (Math.random() - 0.5) * spread * 2;
-    _dir.y += (Math.random() - 0.5) * spread * 2;
-    _dir.z += (Math.random() - 0.5) * spread * 2;
-    _dir.normalize();
-  }
+  const baseSpread = (w.sniper && zoomed ? 0 : (w.spread || 0)) + bloom;
   _origin.copy(me.pos); _origin.y += me.eyeH;
 
-  // raycast: mapa
-  const tMap = raycastSolids(MAP.BOUNDS, _origin.x, _origin.y, _origin.z, _dir.x, _dir.y, _dir.z);
-  // raycast: jogadores
-  let hitId = null, hitT = tMap, headshot = false;
-  const tdm = roomInfo && roomInfo.gm === 'tdm';
-  for (const [id, r] of remotes) {
-    if (!r.alive) continue;
-    if (tdm) { const m = meta.get(id); if (m && m.team === me.team) continue; } // sem fogo amigo
-    const p = r.model.position;
-    // cabeça (esfera)
-    const hx = p.x - _origin.x, hy = p.y + PLAYER.HEAD_Y - _origin.y, hz = p.z - _origin.z;
-    const tc = hx * _dir.x + hy * _dir.y + hz * _dir.z;
-    if (tc > 0) {
-      const d2 = hx * hx + hy * hy + hz * hz - tc * tc;
-      if (d2 < PLAYER.HEAD_R * PLAYER.HEAD_R && tc < hitT) {
-        hitT = tc; hitId = id; headshot = true;
-        continue;
-      }
-    }
-    // corpo (AABB)
-    const bb = {
-      minx: p.x - R, maxx: p.x + R,
-      miny: p.y, maxy: p.y + PLAYER.BODY_H,
-      minz: p.z - R, maxz: p.z + R
-    };
-    const tb = rayBoxLocal(_origin, _dir, bb);
-    if (tb < hitT) { hitT = tb; hitId = id; headshot = false; }
-  }
-
-  const endPoint = _origin.clone().addScaledVector(_dir, Math.min(hitT, 150));
-
-  // efeitos locais
   const vm = viewmodels[curW];
-  if (vmRoot.visible) {
-    vm.muzzle.getWorldPosition(_muzzleV);
-    spawnFlash(_muzzleV);
-    spawnTracer(_muzzleV.clone(), endPoint);
-  } else {
-    spawnTracer(_origin.clone().addScaledVector(_dir, 1.2), endPoint);
+  if (vmRoot.visible) vm.muzzle.getWorldPosition(_muzzleV);
+
+  // Um tiro normal = 1 "bago" sem leque extra; a BRECHA-12 dispara N bagos
+  // num leque (o leque de verdade — o que decide o dano — é gerado pelo
+  // servidor; aqui é só a previsão visual: tracers, sangue/poeira, sacada).
+  const pellets = w.pellets || 1;
+  const tdm = roomInfo && roomInfo.gm === 'tdm';
+  for (let i = 0; i < pellets; i++) {
+    _pDir.copy(_dir);
+    const spread = pellets > 1 ? w.pelletSpread : baseSpread;
+    if (spread > 0) {
+      _pDir.x += (Math.random() - 0.5) * spread * 2;
+      _pDir.y += (Math.random() - 0.5) * spread * 2;
+      _pDir.z += (Math.random() - 0.5) * spread * 2;
+      _pDir.normalize();
+    }
+    const tMap = raycastSolids(MAP.BOUNDS, _origin.x, _origin.y, _origin.z, _pDir.x, _pDir.y, _pDir.z);
+    let hitId = null, hitT = tMap;
+    for (const [id, r] of remotes) {
+      if (!r.alive) continue;
+      if (tdm) { const m = meta.get(id); if (m && m.team === me.team) continue; } // sem fogo amigo
+      const p = r.model.position;
+      // cabeça (esfera)
+      const hx = p.x - _origin.x, hy = p.y + PLAYER.HEAD_Y - _origin.y, hz = p.z - _origin.z;
+      const tc = hx * _pDir.x + hy * _pDir.y + hz * _pDir.z;
+      if (tc > 0) {
+        const d2 = hx * hx + hy * hy + hz * hz - tc * tc;
+        if (d2 < PLAYER.HEAD_R * PLAYER.HEAD_R && tc < hitT) { hitT = tc; hitId = id; continue; }
+      }
+      // corpo (AABB)
+      const bb = {
+        minx: p.x - R, maxx: p.x + R,
+        miny: p.y, maxy: p.y + PLAYER.BODY_H,
+        minz: p.z - R, maxz: p.z + R
+      };
+      const tb = rayBoxLocal(_origin, _pDir, bb);
+      if (tb < hitT) { hitT = tb; hitId = id; }
+    }
+
+    const endPoint = _origin.clone().addScaledVector(_pDir, Math.min(hitT, 150));
+    if (vmRoot.visible) spawnTracer(_muzzleV.clone(), endPoint);
+    else spawnTracer(_origin.clone().addScaledVector(_pDir, 1.2), endPoint);
+    if (hitId !== null) {
+      spawnBurst(endPoint, bloodTex, pellets > 1 ? 2 : 6, 2.5, 0.16);   // sangue previsto; o dano real vem do servidor
+    } else if (hitT < 150) {
+      spawnBurst(endPoint, dustTex, pellets > 1 ? 2 : 5, 2, 0.13);
+    }
   }
+  if (vmRoot.visible) spawnFlash(_muzzleV);
+
   // recuo com personalidade: sobe mais nos primeiros tiros; na rajada longa
   // assenta na vertical e passa a derivar de leve pro lado (padrão + jitter)
+  // — uma vez por gatilho, não por bago
   const deep = rc && rc.ramp > 0 ? Math.min(1, sprayN / rc.ramp) : 0;
   recoil = rc ? Math.min(rc.max, recoil + rc.climb * (1 - 0.35 * deep)) : recoil + w.kick;
   if (rc) {
@@ -1545,21 +1598,20 @@ function tryFire() {
     if (rc.shake) camShake = Math.min(camShake + rc.shake, 0.09);
   }
   vmKick = rc ? Math.min(vmKick + rc.vmKick, rc.vmKick * 2.2) : Math.min(vmKick + 0.06, 0.12);
-  SFX.shot(w.sniper);
+  SFX.shot(shotKind(curW));
+  if (w.pump) { pumpT = w.pumpDur; SFX.pump(); }
 
-  if (hitId !== null) {
-    spawnBurst(endPoint, bloodTex, 6, 2.5, 0.16);   // sangue previsto; o dano real vem do servidor
-  } else if (hitT < 150) {
-    spawnBurst(endPoint, dustTex, 5, 2, 0.13);
-  }
-
-  // O servidor é quem decide o acerto: enviamos direção + o instante do mundo
-  // que estamos vendo (sv); ele rebobina e valida (lag compensation).
+  // O servidor é quem decide o acerto: enviamos a direção BASE (sem o leque
+  // da BRECHA-12 — o servidor gera os bagos dele mesmo, ver server/ws.js) e o
+  // instante do mundo que estamos vendo (sv); ele rebobina e valida (lag
+  // compensation). Num tiro normal a direção já sai com o spread aplicado
+  // (pellets===1 → _pDir É a direção final jitterizada, igual sempre foi).
+  const sendDir = pellets > 1 ? _dir : _pDir;
   const smp = sampleSnapshots();
   net.send({
     t: 'fire',
     o: [_origin.x, _origin.y, _origin.z],
-    d: [_dir.x, _dir.y, _dir.z],
+    d: [sendDir.x, sendDir.y, sendDir.z],
     w: curW,
     sv: smp && smp.sv ? smp.sv : undefined
   });
@@ -2772,7 +2824,7 @@ function replayKillerShot(shot) {
   spawnTracer(start, end, 0xffc080);
   killcam.recoil += W.kick;
   killcam.vmKick = Math.min(killcam.vmKick + 0.06, 0.14);
-  SFX.shot(shot.w === 1, 0.4);
+  SFX.shot(shotKind(shot.w), 0.4);
 }
 
 // chamada todo frame enquanto o killcam roda
@@ -2933,7 +2985,7 @@ net.on('fire', msg => {
   spawnTracer(o.clone().addScaledVector(d, 0.5), o.clone().addScaledVector(d, Math.min(tHit, 150)), 0xffc080);
   spawnFlash(o);
   const dist = o.distanceTo(me.pos);
-  SFX.shot(msg.w === 1, Math.max(0.06, 1 / (1 + dist * 0.09)));
+  SFX.shot(shotKind(msg.w), Math.max(0.06, 1 / (1 + dist * 0.09)));
   // grava p/ o killcam reproduzir os tiros de quem te matou
   const nowW = performance.now();
   fireLog.push({ wall: nowW, id: msg.id, o: [msg.o[0], msg.o[1], msg.o[2]], d: [msg.d[0], msg.d[1], msg.d[2]], w: msg.w | 0 });
@@ -3029,7 +3081,7 @@ net.on('spawn', msg => {
     me.hp = 100;
     me.dead = false;
     faceCenter();
-    ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
+    ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag;
     reloading = 0;
     me.nades = msg.nades ?? NADE.COUNT_START;
     me.smokes = msg.smokes ?? SMOKE.COUNT_START;
@@ -3163,7 +3215,7 @@ net.on('restart', msg => {
       me.vel.set(0, 0, 0);
       me.hp = 100; me.dead = false;
       faceCenter();
-      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag;
+      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag;
       reloading = 0;
       me.nades = p.nades ?? NADE.COUNT_START;
       me.smokes = p.smokes ?? SMOKE.COUNT_START;
@@ -3691,10 +3743,26 @@ function frame() {
     if (reloading > 0) {
       reloading -= dt;
       if (reloading <= 0) {
-        reloading = 0;
-        ammo[curW] = WEAPONS[curW].mag;
-        SFX.reloadEnd();
-        updateAmmoHUD();
+        const w = WEAPONS[curW];
+        if (w.shellReload) {
+          // BRECHA-12: um cartucho por vez — encaixa 1, e se ainda faltar
+          // munição encadeia o próximo (mesma pausa) até completar o tubo
+          ammo[curW] = Math.min(w.mag, ammo[curW] + 1);
+          hud.ammo.textContent = ammo[curW];
+          if (ammo[curW] < w.mag) {
+            reloading = w.reload;
+            SFX.shellIn();
+          } else {
+            reloading = 0;
+            SFX.reloadEnd();
+            updateAmmoHUD();
+          }
+        } else {
+          reloading = 0;
+          ammo[curW] = w.mag;
+          SFX.reloadEnd();
+          updateAmmoHUD();
+        }
       }
     }
     if (swapT > 0) swapT -= dt;
@@ -3751,6 +3819,18 @@ function frame() {
       vmRoot.rotation.z += (0 - vmRoot.rotation.z) * Math.min(1, 10 * dt);
     }
     vmKick *= Math.exp(-10 * dt);
+    // bomba da BRECHA-12: desliza o fore-end pra trás (ejeta) e de volta
+    // (encama) logo após o tiro — a identidade mecânica da escopeta
+    if (pumpT > 0) {
+      pumpT = Math.max(0, pumpT - dt);
+      const slide = vmBrecha.group.userData.pump;
+      if (slide) {
+        const dur = WEAPONS[BRECHA].pumpDur;
+        const p = dur > 0 ? 1 - pumpT / dur : 1;
+        const back = p < 0.5 ? p * 2 : Math.max(0, 2 - p * 2);
+        slide.position.z = 0.075 * back;
+      }
+    }
   } else if (playing && me.dead) {
     camera.position.set(me.pos.x, me.pos.y + 0.6, me.pos.z);
     camera.rotation.y = me.yaw;
