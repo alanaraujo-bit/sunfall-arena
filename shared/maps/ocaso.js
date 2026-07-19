@@ -70,9 +70,10 @@ for (const cx of ARCOS.front) R(cx - 0.3, 16.9, cx + 0.3, 17.5, 0, 3.3, 'pillar'
 for (const cx of ARCOS.back) R(cx - 0.3, 15.1, cx + 0.3, 15.7, 0, 3.3, 'pillar');
 R(-4.6, 14.8, 15.6, 17.8, 3.3, 0.4, 'wood');
 
-// Praça da Fonte (leste)
-R(31.2, 20.2, 34.8, 23.8, 0, 0.95, 'stone2');     // bacia
-R(32.5, 21.5, 33.5, 22.5, 0.95, 1.5, 'stone');    // coluna d'água
+// Praça da Fonte (leste) — mat 'fonte': colisor caixa, visual vem do kit
+// (aro octogonal + água + coluna), igual às colunas 'pillar'
+R(31.2, 20.2, 34.8, 23.8, 0, 0.95, 'fonte');      // bacia
+R(32.5, 21.5, 33.5, 22.5, 0.95, 1.5, 'fonte');    // coluna d'água
 
 // Casas fechadas (colisor = bloco; o cliente decora as fachadas com vãos
 // recuados, telhados, cornijas e vigas). face = lado voltado ao jogador:
@@ -216,6 +217,10 @@ R(23.2, -33.35, 29.2, -33, 8.95, 1.0, 'wood2');        // parapeito sul
 R(28.85, -39, 29.2, -33, 8.95, 1.0, 'wood2');          // parapeito leste
 R(23.2, -39, 23.55, -36, 8.95, 1.0, 'wood2');          // parapeito oeste (com vão p/ escada)
 stairs(S, 22.5, -30.4, 0, -1, 13, 0.29, 0.4, 1.6, 'stone', 5.2);
+
+// ---- Oliveiras (tronco colide; copa é visual — ver world-ocaso.js) ----
+export const OLIVEIRAS = [[8.2, -13.2, 2.6], [29.8, 18.5, 0]];   // [x, z, yBase]
+for (const [ox, oz, oy] of OLIVEIRAS) R(ox - 0.28, oz - 0.28, ox + 0.28, oz + 0.28, oy, 3.0, 'olive');
 
 // ---- Barris (colisores; bid p/ excluir a própria caixa no teste de cobertura) ----
 for (const b of BARRELS) S.push({ ...B(b.x, b.y || 0, b.z, BARREL_W, BARREL_H, BARREL_W, 'barrel'), bid: b.id });

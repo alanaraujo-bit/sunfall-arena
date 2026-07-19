@@ -11,6 +11,7 @@
 // Materiais v2 (normal maps) chegam na Fase 4; props/vida na 5.
 // ============================================================
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { BARREL_W, BARREL_H } from '/shared/mapdata.js';
 import { tex, texNormal, texRough, skyTex } from './textures.js';
 import { mergeStatics, makeBarrel, makeBarrelWreck, scaleUV, jitterGeo } from './world.js';
@@ -358,6 +359,8 @@ export function buildOcasoWorld(scene, map, opts = {}) {
       rock: rockM()
     })[s.mat] || mat('stone');
     if (s.mat === 'pillar') continue;   // visual vem do kit (coluna cilíndrica)
+    if (s.mat === 'olive') continue;    // visual vem do kit (oliveira)
+    if (s.mat === 'fonte') continue;    // visual vem do kit (fonte octogonal)
     if (s.mat === 'rock') {
       const geo = new THREE.BoxGeometry(s.w, s.h + 0.6, s.d, 3, 3, 3);
       jitterGeo(geo, 0.35, 0.3);
@@ -484,18 +487,35 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     color: 0x2e8577, roughness: 0.25, metalness: 0.1, emissive: 0x123f38, emissiveIntensity: 0.35
   }));
   {
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.95, 2.05, 0.95, 8), mat('stone2'));
+    // aro octogonal (UV escalado — senão a pedra "embrulha" e vira tábua)
+    const rimGeo = new THREE.CylinderGeometry(2.0, 2.08, 0.95, 8);
+    scaleUV(rimGeo, 5, 1);
+    const rim = new THREE.Mesh(rimGeo, mat('stone2'));
     rim.position.set(33, 0.475, 22);
     rim.castShadow = true;
     staticRoot.add(rim);
-    const water = new THREE.Mesh(new THREE.CircleGeometry(1.7, 16), waterM);
+    const lip = new THREE.Mesh(new THREE.CylinderGeometry(2.12, 2.12, 0.12, 8), mat('stone'));
+    lip.position.set(33, 0.95, 22);
+    staticRoot.add(lip);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(1.85, 16), waterM);
     water.rotation.x = -Math.PI / 2;
-    water.position.set(33, 0.88, 22);
+    water.position.set(33, 0.9, 22);
     staticRoot.add(water);
-    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 1.6, 8), mat('stone'));
-    spout.position.set(33, 1.65, 22);
+    const colGeo = new THREE.CylinderGeometry(0.34, 0.44, 1.5, 9);
+    scaleUV(colGeo, 3, 1);
+    const spout = new THREE.Mesh(colGeo, mat('stone'));
+    spout.position.set(33, 1.7, 22);
     spout.castShadow = true;
     staticRoot.add(spout);
+    // taça no topo com espelho d'água
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.4, 0.28, 9), mat('stone'));
+    bowl.position.set(33, 2.52, 22);
+    bowl.castShadow = true;
+    staticRoot.add(bowl);
+    const bowlWater = new THREE.Mesh(new THREE.CircleGeometry(0.52, 12), waterM);
+    bowlWater.rotation.x = -Math.PI / 2;
+    bowlWater.position.set(33, 2.63, 22);
+    staticRoot.add(bowlWater);
   }
   {
     const water = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), waterM);
@@ -576,6 +596,271 @@ export function buildOcasoWorld(scene, map, opts = {}) {
       const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 0.55, 10), bellM);
       bell.position.set(26.2, 11.1, -36);
       staticRoot.add(bell);
+    }
+  }
+
+  // ---------------- Props e vida (Fase 5) ----------------
+
+  // Oliveiras (tronco = colisor em ocaso.js; aqui só o visual)
+  const foliageM = cmat('foliage', () => new THREE.MeshStandardMaterial({
+    color: 0x77875c, roughness: 1, flatShading: true
+  }));
+  for (const [ox, oz, oy] of (map.OLIVEIRAS || [])) {
+    let cy = oy;
+    for (const [seg, lean] of [[1.1, 0.06], [1.0, 0.16], [0.9, 0.28]]) {
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, seg, 7), mat('wood2'));
+      t.position.set(ox + lean, cy + seg / 2, oz);
+      t.rotation.z = -lean * 0.8;
+      t.castShadow = true;
+      staticRoot.add(t);
+      cy += seg * 0.92;
+    }
+    for (const [fx, fy, fz, fr] of [[0.5, 3.4, 0, 1.0], [-0.3, 3.1, 0.4, 0.75], [0.2, 3.0, -0.5, 0.7], [0.9, 2.9, 0.3, 0.6]]) {
+      const geo = jitterGeo(new THREE.SphereGeometry(fr, 7, 6), fr * 0.22, fr * 0.22, false);
+      const f = new THREE.Mesh(geo, foliageM);
+      f.position.set(ox + fx, oy + fy, oz + fz);
+      f.castShadow = true;
+      staticRoot.add(f);
+    }
+  }
+
+  if (decor) {
+    const TER = flat('terracotta', 0xb3714c, { roughness: 0.9 });
+    const ROPE = cmat('rope-line', () => new THREE.LineBasicMaterial({ color: 0x4a3820 }));
+
+    // --- mercadorias nas bancas: frutas + rolos de tecido ---
+    const fruitCols = [0xd95350, 0xf0c04c, 0x3fa89a, 0xe08a40];
+    let fi = 0;
+    for (const [bx, bz] of map.BANCAS) {
+      for (const [ox2, oz2] of [[-0.6, -0.2], [0.05, 0.28], [0.62, -0.12]]) {
+        const col = fruitCols[fi++ % 4];
+        const fruit = new THREE.Mesh(
+          new RoundedBoxGeometry(0.3, 0.27, 0.3, 2, 0.09),
+          cmat('fruit' + col, () => new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 })));
+        fruit.position.set(bx + ox2, 1.2, bz + oz2);
+        fruit.castShadow = true;
+        staticRoot.add(fruit);
+      }
+      // rolo de tecido encostado no poste
+      const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.1, 8),
+        cmat('roll' + (fi % 2), () => new THREE.MeshStandardMaterial({ color: fi % 2 ? 0x8fb6a8 : 0xc9714c, roughness: 0.95 })));
+      roll.position.set(bx - 1.35, 0.55, bz + 0.95);
+      roll.rotation.x = 0.12;
+      staticRoot.add(roll);
+    }
+
+    // --- sacos de grão (pilhas de 2+1) ---
+    const sackM = cmat('sack', () => new THREE.MeshStandardMaterial({ color: 0xc0a87e, roughness: 1 }));
+    const sack = (x, y, z, ry) => {
+      const m = new THREE.Mesh(new RoundedBoxGeometry(0.58, 0.36, 0.4, 2, 0.13), sackM);
+      m.position.set(x, y + 0.18, z);
+      m.rotation.y = ry;
+      m.castShadow = true;
+      staticRoot.add(m);
+    };
+    for (const [sx, sz, sy] of [[-6.4, 23.3, 0], [9.2, 27.1, 0], [34.7, 19.5, 0], [-33.2, -14.5, 2.6]]) {
+      sack(sx, sy, sz, 0.3);
+      sack(sx + 0.5, sy, sz + 0.25, -0.4);
+      sack(sx + 0.22, sy + 0.36, sz + 0.1, 0.9);
+    }
+
+    // --- caixotes abertos com mercadoria ---
+    for (const [cx2, cz2, cy2] of [[-22.4, 27.3, 0], [25.2, -7.1, 2.6]]) {
+      boxAt(cx2, cy2 + 0.3, cz2, 0.95, 0.6, 0.95, mat('crate'));
+      const inner = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.1, 0.78), flat('crateIn', 0x2e2418));
+      inner.position.set(cx2, cy2 + 0.56, cz2);
+      staticRoot.add(inner);
+      for (let i = 0; i < 3; i++) {
+        const g = new THREE.Mesh(new THREE.SphereGeometry(0.11, 7, 6),
+          cmat('goods' + i, () => new THREE.MeshStandardMaterial({ color: [0xe0a84c, 0xc9714c, 0x9aa578][i], roughness: 0.8 })));
+        g.position.set(cx2 + (i - 1) * 0.2, cy2 + 0.62, cz2 + (i % 2 ? 0.14 : -0.12));
+        staticRoot.add(g);
+      }
+    }
+
+    // --- ânforas de cerâmica (LatheGeometry) ---
+    const amphoraGeo = (() => {
+      const pts = [];
+      for (const [r, y] of [[0.001, 0], [0.13, 0.02], [0.21, 0.28], [0.17, 0.5], [0.08, 0.62], [0.1, 0.7]]) {
+        pts.push(new THREE.Vector2(r, y));
+      }
+      return new THREE.LatheGeometry(pts, 9);
+    })();
+    for (const [ax2, az2, ay2, n2] of [[-2.6, -9.7, 2.6, 3], [7.1, -5.6, 2.6, 2], [31.1, 24.5, 0, 2], [-13.2, 19.5, 0, 2], [-25.7, -20.5, 5.2, 3], [22.4, -20.3, 5.2, 2]]) {
+      for (let i = 0; i < n2; i++) {
+        const a = new THREE.Mesh(amphoraGeo, TER);
+        const sc = 0.85 + (i * 0.17) % 0.4;
+        a.scale.set(sc, sc, sc);
+        a.position.set(ax2 + i * 0.42 - 0.2, ay2, az2 + (i % 2) * 0.34);
+        if (i === n2 - 1 && n2 > 2) { a.rotation.z = Math.PI / 2.15; a.position.y = ay2 + 0.16; } // uma caída
+        a.castShadow = true;
+        staticRoot.add(a);
+      }
+    }
+
+    // --- lanternas (emissivas — sem custo de luz dinâmica) ---
+    const lampFrameM = cmat('lampF', () => new THREE.MeshStandardMaterial({ color: 0x2e2a24, roughness: 0.6, metalness: 0.5 }));
+    const lampGlowM = cmat('lampG', () => new THREE.MeshStandardMaterial({
+      color: 0xffc266, emissive: 0xff9c3a, emissiveIntensity: 1.6, roughness: 0.5
+    }));
+    const lantern = (x, y, z) => {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.24, 0.17), lampFrameM);
+      f.position.set(x, y, z);
+      staticRoot.add(f);
+      const g = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), lampGlowM);
+      g.position.set(x, y - 0.01, z);
+      staticRoot.add(g);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.1, 4), lampFrameM);
+      cap.position.set(x, y + 0.17, z);
+      staticRoot.add(cap);
+    };
+    const lampPost = (x, z, y) => {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.5, 7), mat('wood2'));
+      p.position.set(x, y + 1.25, z);
+      p.castShadow = true;
+      staticRoot.add(p);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.06), mat('wood2'));
+      arm.position.set(x + 0.2, y + 2.42, z);
+      staticRoot.add(arm);
+      lantern(x + 0.42, y + 2.24, z);
+    };
+    lampPost(30.6, 19.9, 0);            // Fonte
+    lampPost(-24.6, 6.2, 2.6);          // patamar da Escadaria
+    lampPost(-3.2, -3.4, 2.6);          // Pátio
+    lantern(-38.7, 3.1, 19.65);         // Portão (pilar norte)
+    lantern(-38.7, 3.1, 25.35);         // Portão (pilar sul)
+    lantern(-10.6, 2.5, 16.75);         // porta do Ferreiro
+    lantern(-36.05, 4.35, -18.5);       // dentro da Mina (brilha no escuro)
+    lantern(4.9, 4.9, 6.6);             // Beco
+
+    // --- braseiros do Templo (tigela + brasas emissivas) ---
+    for (const [bx2, bz2] of [[-6.5, -31.3], [6.5, -31.3]]) {
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.2, 0.28, 9), lampFrameM);
+      bowl.position.set(bx2, 5.2 + 0.85, bz2);
+      bowl.castShadow = true;
+      staticRoot.add(bowl);
+      for (const [lx, lz] of [[-0.12, 0], [0.1, 0.08], [0, -0.11]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 5), lampFrameM);
+        leg.position.set(bx2 + lx * 2.2, 5.2 + 0.45, bz2 + lz * 2.2);
+        staticRoot.add(leg);
+      }
+      const ember = new THREE.Mesh(new THREE.SphereGeometry(0.19, 7, 6), lampGlowM);
+      ember.position.set(bx2, 5.2 + 1.0, bz2);
+      staticRoot.add(ember);
+    }
+
+    // --- poço com sarilho sobre a cisterna ---
+    for (const px2 of [-1.05, 1.05]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.2, 0.12), mat('wood2'));
+      post.position.set(px2, 2.6 + 1.1, -6);
+      post.castShadow = true;
+      staticRoot.add(post);
+    }
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.3, 7), mat('wood2'));
+    beam.rotation.z = Math.PI / 2;
+    beam.position.set(0, 4.62, -6);
+    staticRoot.add(beam);
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.22, 8), mat('wood'));
+    bucket.position.set(0.3, 3.95, -6);
+    staticRoot.add(bucket);
+    {
+      const g = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0.3, 4.6, -6), new THREE.Vector3(0.3, 4.06, -6)
+      ]);
+      liveRoot.add(new THREE.Line(g, ROPE));
+    }
+
+    // --- bandeirolas cruzando a rua (2 vãos) + varal de tecidos no Beco ---
+    const buntColors = [0xd95350, 0xf2e3c8, 0x3fc8b4, 0xf0c060];
+    function bunting(ax2, ay2, az2, bx2, by2, bz2) {
+      const from = new THREE.Vector3(ax2, ay2, az2), to = new THREE.Vector3(bx2, by2, bz2);
+      const pts = [];
+      const buntG = new THREE.PlaneGeometry(0.28, 0.34);
+      for (let i = 0; i <= 12; i++) {
+        const t = i / 12;
+        const p = from.clone().lerp(to, t);
+        p.y -= Math.sin(t * Math.PI) * 0.6;
+        pts.push(p.clone());
+        if (i > 0 && i < 12) {
+          const col = buntColors[i % 4];
+          const pen = new THREE.Mesh(buntG.clone(), cmat('bunt' + col, () =>
+            new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.9 })));
+          pen.position.copy(p);
+          pen.position.y -= 0.17;
+          pen.rotation.y = Math.atan2(bx2 - ax2, bz2 - az2) + Math.PI / 2;
+          staticRoot.add(pen);
+        }
+      }
+      liveRoot.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ROPE));
+    }
+    bunting(1, 3.25, 17.6, -2, 3.6, 28.9);      // arcada -> casa B
+    bunting(14.5, 3.25, 17.6, 11, 3.7, 27.9);   // arcada -> casa C
+
+    // varal de tecidos sobre o Beco (balança com o vento)
+    {
+      const clothCols = [0xf2e3c8, 0x8fb6a8, 0xc9714c];
+      const g = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(2.75, 5.9, 4.6), new THREE.Vector3(5.25, 5.7, 4.2)
+      ]);
+      liveRoot.add(new THREE.Line(g, ROPE));
+      clothCols.forEach((col, i) => {
+        const pivot = new THREE.Group();
+        const t = (i + 1) / 4;
+        pivot.position.set(2.75 + 2.5 * t, 5.9 - 0.2 * t, 4.6 - 0.4 * t);
+        const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), cmat('cloth' + col, () =>
+          new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 1 })));
+        cloth.position.y = -0.4;
+        cloth.castShadow = true;
+        pivot.add(cloth);
+        liveRoot.add(pivot);
+        animated.push(tt => { pivot.rotation.x = Math.sin(tt * 1.6 + i * 1.4) * 0.12; });
+      });
+    }
+
+    // --- carrinho de mão encostado na casa A ---
+    {
+      const bed = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.07, 1.5), mat('wood'));
+      bed.position.set(-30.28, 1.05, 31.5);
+      bed.rotation.z = 1.18;
+      staticRoot.add(bed);
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.08, 10), mat('wood2'));
+      wheel.rotation.z = Math.PI / 2 - 1.18;
+      wheel.position.set(-30.55, 0.42, 30.9);
+      staticRoot.add(wheel);
+    }
+
+    // --- buganvílias e trepadeiras ---
+    const bougM = cmat('bougain', () => new THREE.MeshStandardMaterial({
+      map: tex('bougain'), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1
+    }));
+    const bplane = (w, h, x, y, z, ry) => {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), bougM);
+      p.position.set(x, y, z);
+      p.rotation.y = ry;
+      staticRoot.add(p);
+    };
+    bplane(2.2, 2.6, -9, 2.4, 28.94, Math.PI);        // casa B (rua)
+    bplane(1.8, 2.6, -16.05, 3.6, 13.5, -Math.PI / 2); // lateral do Ferreiro
+    bplane(2.0, 2.2, 8, 4.6, 9.06, 0);                 // casa do Beco (Vila)
+    bplane(2.6, 2.2, 41.36, 4.4, -6, Math.PI / 2);     // trepadeira do Aqueduto
+    bplane(2.2, 2.0, 41.36, 4.3, -12.5, Math.PI / 2);
+
+    // --- capim seco ---
+    const dryM = cmat('dry', () => new THREE.MeshStandardMaterial({
+      map: tex('dryGrass'), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 1
+    }));
+    const drySpots = [
+      [-18, 37.5, 0], [12, 38.5, 0], [28, 37, 0], [-32, 33, 0], [-28.5, 18.6, 0], [20.5, 26.8, 0],
+      [-10, -15.3, 2.6], [12, -14.6, 2.6], [-26, 3.4, 2.6], [24, -13.5, 2.6],
+      [-38.5, -20, 5.2], [10, -41.5, 5.2], [30, -41, 5.2], [38, -22, 5.2], [36, 14.5, 0]
+    ];
+    for (const [gx, gz, gy] of drySpots) {
+      for (let i = 0; i < 3; i++) {
+        const blade = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.52), dryM);
+        blade.position.set(gx + (i - 1) * 0.12, gy + 0.26, gz + (i % 2) * 0.1);
+        blade.rotation.y = i * 1.07;
+        staticRoot.add(blade);
+      }
     }
   }
 

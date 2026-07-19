@@ -725,6 +725,51 @@ const PAINTERS = {
     }
   },
 
+  // buganvília: folhagem escura com explosão de flores coral/magenta (alfa)
+  bougain(ctx, s) {
+    ctx.clearRect(0, 0, s, s);
+    // galhos finos
+    ctx.strokeStyle = hexA('#5a4630', 0.8);
+    for (let i = 0; i < 5; i++) {
+      ctx.lineWidth = rr(2, 4);
+      wobbly(ctx, s * rr(0.3, 0.7), s, s * rr(0.1, 0.9), s * rr(0.05, 0.4), 6, s * 0.04);
+    }
+    // folhas (densas — o alphaTest come as bordas suaves)
+    for (let i = 0; i < 120; i++) {
+      const x = rr(s * 0.05, s * 0.95), y = rr(s * 0.03, s * 0.92);
+      ctx.fillStyle = ['#44603a', '#54744a', '#3a5232', '#4c6a40'][(R() * 4) | 0];
+      ctx.beginPath();
+      ctx.ellipse(x, y, rr(9, 17), rr(6, 11), rr(0, 3.1), 0, 7);
+      ctx.fill();
+    }
+    // flores (aglomeradas em cachos densos)
+    for (let c = 0; c < 9; c++) {
+      const cx2 = rr(s * 0.12, s * 0.88), cy2 = rr(s * 0.08, s * 0.8);
+      for (let i = 0; i < 18; i++) {
+        ctx.fillStyle = ['#d4527c', '#e06a8a', '#c94868', '#e8828c'][(R() * 4) | 0];
+        ctx.beginPath();
+        ctx.arc(cx2 + rr(-s * 0.08, s * 0.08), cy2 + rr(-s * 0.07, s * 0.07), rr(5, 9), 0, 7);
+        ctx.fill();
+      }
+    }
+  },
+
+  // capim seco do deserto (dourado, alfa)
+  dryGrass(ctx, s) {
+    ctx.clearRect(0, 0, s, s);
+    for (let i = 0; i < 12; i++) {
+      const x = rr(s * 0.1, s * 0.9), h = rr(s * 0.4, s * 0.85);
+      const lean = rr(-s * 0.16, s * 0.16);
+      const g = ctx.createLinearGradient(0, s, 0, s - h);
+      g.addColorStop(0, '#9a8248'); g.addColorStop(1, '#e6d29a');
+      ctx.strokeStyle = g; ctx.lineWidth = rr(7, 13); ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, s);
+      ctx.quadraticCurveTo(x + lean * 0.3, s - h * 0.6, x + lean, s - h);
+      ctx.stroke();
+    }
+  },
+
   // trilha de carroça (faixa horizontal gasta, com falhas)
   wearLine(ctx, s) {
     ctx.clearRect(0, 0, s, s);
