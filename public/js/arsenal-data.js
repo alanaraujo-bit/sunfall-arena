@@ -199,13 +199,14 @@ export const ARSENAL = [
     role: 'Supressão · dano sustentado',
     icon: '🛡️',
     accent: '#8ac850',
-    model: null,
-    locked: true,
+    model: 'muralha',
+    locked: false,
     desc: 'Um muro de fogo portátil. A MURALHA-M carrega munição para durar e não para de cuspir — mas é pesada, sobe muito no recuo e transforma quem a segura em alvo lento. Domina corredores; sofre em duelos rápidos.',
     philosophy: 'A Solmark projetou a MURALHA para negar terreno. Não é sobre acertar todo tiro — é sobre o inimigo não conseguir levantar a cabeça.',
     trivia: [
       'O cano aguenta 200 disparos contínuos antes de precisar esfriar.',
-      'É a arma mais antiga do arsenal ainda em serviço ativo.'
+      'É a arma mais antiga do arsenal ainda em serviço ativo.',
+      'A dispersão encolhe numa rajada longa — segurar o gatilho premia quem aguenta o recuo inicial.'
     ],
     core: [
       { k: 'Dano', v: 62 }, { k: 'Cadência', v: 74 }, { k: 'Alcance', v: 60 },
@@ -215,11 +216,11 @@ export const ARSENAL = [
       { k: 'Tempo de recarga', d: '5.4 s' },
       { k: 'Carregador', d: '100' },
       { k: 'Cadência', d: '~640 disp/min' },
+      { k: 'Dano por tiro', d: '22' },
+      { k: 'Dano na cabeça', d: '40' },
       { k: 'Disparo', d: 'Automático' },
-      { k: 'Alcance efetivo', d: 'Médio-longo' },
-      { k: 'Mobilidade', d: 'Baixa' },
-      { k: 'Precisão parado', d: 'Média (aquece)' },
-      { k: 'Precisão em mov.', d: 'Baixa' }
+      { k: 'Mobilidade', d: 'Baixa (anda mais devagar, saca mais devagar)' },
+      { k: 'Precisão parado', d: 'Média (encolhe segurando o gatilho)' }
     ]
   }
 ];

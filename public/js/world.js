@@ -973,6 +973,42 @@ export function makeViewmodel(kind) {
     muzzle = new THREE.Object3D();
     muzzle.position.set(0, 0.015, -0.56);
     grp.add(muzzle);
+  } else if (kind === 'muralha') {
+    // ---------------- Metralhadora "MURALHA-M" ----------------
+    // A arma mais pesada e volumosa do arsenal: cano espesso com blindagem
+    // perfurada (esfria o cano de 100 tiros), caixa de munição retangular
+    // no lugar de um carregador, bipé dobrado sob o cano e alça de
+    // transporte no topo — silhueta claramente mais "pesada" que qualquer
+    // outra arma.
+    add(new RoundedBoxGeometry(0.09, 0.13, 0.42, 2, 0.016), metal, 0, 0, 0.04);               // corpo grande
+    const barrel = add(new THREE.CylinderGeometry(0.026, 0.026, 0.34, 12), metal, 0, 0.02, -0.4);
+    barrel.rotation.x = Math.PI / 2;
+    // blindagem perfurada do cano (heat shield)
+    const shield = add(new THREE.CylinderGeometry(0.036, 0.036, 0.3, 14, 1, true), darkM, 0, 0.02, -0.38);
+    shield.rotation.x = Math.PI / 2;
+    shield.material = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x1c2228, roughness: 0.6, metalness: 0.6, side: THREE.DoubleSide });
+    for (let i = 0; i < 5; i++) {
+      add(new THREE.CylinderGeometry(0.008, 0.008, 0.04, 8), darkM, 0, 0.02, -0.26 - i * 0.055)
+        .rotation.z = Math.PI / 2;
+    }
+    add(new THREE.CylinderGeometry(0.03, 0.026, 0.03, 12), darkM, 0, 0.02, -0.56).rotation.x = Math.PI / 2; // boca
+    // caixa de munição (100 tiros) — bem maior que qualquer carregador do jogo
+    add(new RoundedBoxGeometry(0.09, 0.13, 0.11, 2, 0.014), darkM, 0, -0.15, 0.08);
+    add(new THREE.BoxGeometry(0.02, 0.1, 0.006), accent, 0, -0.15, 0.135);
+    // bipé dobrado sob o cano
+    for (const sx of [0.03, -0.03]) {
+      add(new THREE.CylinderGeometry(0.006, 0.006, 0.16, 8), metal, sx, -0.05, -0.28)
+        .rotation.z = 0.35 * (sx > 0 ? 1 : -1);
+    }
+    add(new RoundedBoxGeometry(0.06, 0.05, 0.16, 2, 0.014), wood, 0, -0.005, -0.06);           // guarda-mão
+    const grip = add(new RoundedBoxGeometry(0.05, 0.13, 0.07, 2, 0.012), wood, 0, -0.1, 0.2);
+    grip.rotation.x = -0.32;
+    add(new RoundedBoxGeometry(0.06, 0.1, 0.22, 2, 0.018), wood, 0, -0.01, 0.38);              // coronha grande
+    add(new THREE.TorusGeometry(0.045, 0.006, 6, 14), metal, 0, 0.095, -0.02).rotation.x = Math.PI / 2; // alça de transporte
+    add(new THREE.BoxGeometry(0.09, 0.02, 0.1), accent, 0, 0.05, -0.02);                       // detalhe teal
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.02, -0.6);
+    grp.add(muzzle);
   } else if (kind === 'vespa') {
     // ---------------- Submetralhadora "VESPA-C1" ----------------
     // Silhueta pequena e compacta — a arma mais curta do arsenal (mobilidade

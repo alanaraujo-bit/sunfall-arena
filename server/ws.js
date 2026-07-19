@@ -37,6 +37,7 @@ WEAPONS[5] = {                                                                  
 };
 WEAPONS[6] = { dmg: 50, head: 2, int: 0.2 };                                        // SENTINELA-DR (DMR)
 WEAPONS[7] = { dmg: 17, head: 1.7, int: 0.073 };                                    // VESPA-C1 (SMG)
+WEAPONS[8] = { dmg: 22, head: 1.8, int: 0.094 };                                    // MURALHA-M (LMG)
 // Faca (índice 2). Alcance/cone ligeiramente mais generosos que a previsão do
 // cliente para nunca rejeitar um golpe que o atirador viu conectar.
 // arc = cosseno do meio-ângulo do cone frontal aceito.

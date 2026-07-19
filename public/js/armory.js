@@ -420,7 +420,81 @@ function buildVespaC1() {
   return g;
 }
 
-const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR, brecha: buildBrecha12, sentinela: buildSentinelaDR, vespa: buildVespaC1 };
+// ------------------------------------------------------------
+// Modelo 3D detalhado — MURALHA-M (metralhadora real do jogo)
+// A arma mais volumosa e pesada do arsenal: cano espesso com
+// blindagem perfurada, caixa de munição retangular (100 tiros),
+// bipé estendido e alça de transporte. Acentos verdes — identidade
+// "industrial/robusta", nada a ver com a leveza da VESPA.
+// ------------------------------------------------------------
+function buildMuralhaM() {
+  const g = new THREE.Group();
+
+  const gun = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x767c80, roughness: 0.46, metalness: 0.85 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xa8b0b4, roughness: 0.3, metalness: 0.9 });
+  const poly = new THREE.MeshStandardMaterial({ color: 0x1e2320, roughness: 0.72, metalness: 0.16 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x111412, roughness: 0.85, metalness: 0.12 });
+  const wood = new THREE.MeshStandardMaterial({ map: tex('wood2'), color: 0x5c4a30, roughness: 0.75 });
+  const green = new THREE.MeshStandardMaterial({ color: 0x8ac850, roughness: 0.42, metalness: 0.5, emissive: 0x1e3a0c, emissiveIntensity: 0.6 });
+  const shieldMat = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x24292a, roughness: 0.55, metalness: 0.6, side: THREE.DoubleSide });
+
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    g.add(m);
+    return m;
+  };
+  const cyl = (r1, r2, h, seg = 16) => new THREE.CylinderGeometry(r1, r2, h, seg);
+  const rbox = (w, h, d, r = 0.012) => new RoundedBoxGeometry(w, h, d, 2, r);
+
+  // ---- receiver grande ----
+  add(rbox(0.62, 0.15, 0.12), gun, 0.02, 0, 0);
+  add(new THREE.BoxGeometry(0.36, 0.022, 0.005), green, 0.06, -0.04, 0.061);
+  add(new THREE.BoxGeometry(0.36, 0.022, 0.005), green, 0.06, -0.04, -0.061);
+  add(new THREE.TorusGeometry(0.05, 0.007, 6, 16), steel, -0.02, 0.11, 0, Math.PI / 2, 0, 0);   // alça de transporte
+
+  // ---- cano grosso + blindagem perfurada (heat shield) ----
+  add(cyl(0.028, 0.028, 0.42, 16), steel, -0.7, 0.02, 0, 0, 0, Math.PI / 2);
+  add(new THREE.CylinderGeometry(0.042, 0.042, 0.36, 16, 1, true), shieldMat, -0.66, 0.02, 0, 0, 0, Math.PI / 2);
+  for (let i = 0; i < 6; i++) {
+    add(cyl(0.009, 0.009, 0.05, 8), dark, -0.5 - i * 0.06, 0.02, 0, 0, 0, 0).rotation.z = Math.PI / 2;
+  }
+  add(cyl(0.034, 0.03, 0.04, 16), dark, -0.92, 0.02, 0, 0, 0, Math.PI / 2);                      // boca
+
+  // ---- bipé estendido sob o cano ----
+  for (const sgn of [1, -1]) {
+    add(cyl(0.009, 0.009, 0.26, 8), steel, -0.52, -0.13, sgn * 0.14, 0.6 * sgn, 0, 0);
+    add(cyl(0.014, 0.014, 0.03, 8), dark, -0.52, -0.245, sgn * 0.25);   // pé do bipé
+  }
+  add(cyl(0.032, 0.032, 0.02, 12), dark, -0.52, 0.02, 0, 0, 0, Math.PI / 2);                     // dobradiça do bipé
+
+  // ---- caixa de munição (100 tiros) — bem maior que qualquer carregador ----
+  const box = new THREE.Group(); box.position.set(-0.05, -0.19, 0); g.add(box);
+  const badd = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); box.add(m); return m; };
+  badd(rbox(0.16, 0.16, 0.13), poly, 0, 0, 0);
+  badd(new THREE.BoxGeometry(0.02, 0.13, 0.008), green, -0.09, 0.01, 0);
+  badd(rbox(0.05, 0.03, 0.05), dark, 0.05, 0.09, 0);      // guia da correia até o receiver
+
+  // ---- punho + guarda-gatilho ----
+  add(rbox(0.09, 0.16, 0.08), poly, 0.16, -0.13, 0, 0, 0, -0.28);
+  add(new THREE.TorusGeometry(0.05, 0.012, 8, 16, Math.PI), dark, 0.06, -0.11, 0, Math.PI, 0, 0);
+  add(new THREE.BoxGeometry(0.014, 0.04, 0.02), steel, 0.06, -0.1, 0);
+
+  // ---- guarda-mão + coronha ----
+  add(rbox(0.24, 0.09, 0.085), wood, -0.28, -0.02, 0);
+  add(rbox(0.07, 0.11, 0.24), wood, 0.42, -0.01, 0);
+  add(rbox(0.035, 0.19, 0.09), dark, 0.55, -0.02, 0);      // apoio de ombro
+
+  g.position.x = 0.16;
+  g.scale.setScalar(1.1);
+  return g;
+}
+
+const MODEL_BUILDERS = {
+  falcao: buildFalcao9, ferrao: buildFerraoSR, brecha: buildBrecha12,
+  sentinela: buildSentinelaDR, vespa: buildVespaC1, muralha: buildMuralhaM
+};
 
 // ------------------------------------------------------------
 // Visualizador 3D

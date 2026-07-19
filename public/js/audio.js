@@ -78,12 +78,20 @@ export const SFX = {
   // Tiros em camadas: transiente mecânico + corpo + soco grave (+ eco no sniper).
   // `v` varia o timbre por disparo (rajada não soa metralhadora de brinquedo);
   // `muf` abafa os agudos com a distância (vol < 1 = tiro de outro jogador longe).
-  // `kind`: 'ar' | 'sniper' | 'shotgun' | 'dmr' | 'smg'.
+  // `kind`: 'ar' | 'sniper' | 'shotgun' | 'dmr' | 'smg' | 'lmg'.
   shot(kind = 'ar', vol = 1) {
     ensure();
     const v = 0.94 + Math.random() * 0.12;
     const muf = 0.45 + 0.55 * Math.min(1, vol);
-    if (kind === 'smg') {
+    if (kind === 'lmg') {
+      // MURALHA-M: grave e pesada — cada tiro é um soco mecânico mais denso
+      // que o do FALCÃO (calibre maior, arma mais pesada), sem o clique
+      // fino de uma arma leve
+      if (vol > 0.35) noise(0.022, 0.34 * vol, 4200, 1900, 'highpass');
+      noise(0.14, 0.54 * vol, 2100 * v * muf, 230);
+      tone(112 * v, 0.1, 0.38 * vol, 'square', 50);
+      tone(54 * v, 0.15, 0.32 * vol, 'sine', 30);
+    } else if (kind === 'smg') {
       // VESPA-C1: leve e zumbida — apelidada de "serra" pelos operadores.
       // Transiente fino e agudo, corpo curto (cadência tão alta que o som
       // vira quase um zumbido contínuo numa rajada), sem peso grave
