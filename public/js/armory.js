@@ -452,29 +452,29 @@ function buildMuralhaM() {
   add(rbox(0.62, 0.15, 0.12), gun, 0.02, 0, 0);
   add(new THREE.BoxGeometry(0.36, 0.022, 0.005), green, 0.06, -0.04, 0.061);
   add(new THREE.BoxGeometry(0.36, 0.022, 0.005), green, 0.06, -0.04, -0.061);
-  add(new THREE.TorusGeometry(0.05, 0.007, 6, 16), steel, -0.02, 0.11, 0, Math.PI / 2, 0, 0);   // alça de transporte
+  // alça de transporte: meio-arco em pé sobre o receiver — mesma convenção
+  // de rotação (rx=Math.PI pra virar a abertura pra cima) da guarda-gatilho
+  // abaixo, que já é sabida funcionar
+  add(new THREE.TorusGeometry(0.055, 0.007, 6, 16, Math.PI), steel, -0.02, 0.075, 0, Math.PI, 0, 0);
 
   // ---- cano grosso + blindagem perfurada (heat shield) ----
   add(cyl(0.028, 0.028, 0.42, 16), steel, -0.7, 0.02, 0, 0, 0, Math.PI / 2);
   add(new THREE.CylinderGeometry(0.042, 0.042, 0.36, 16, 1, true), shieldMat, -0.66, 0.02, 0, 0, 0, Math.PI / 2);
-  for (let i = 0; i < 6; i++) {
-    add(cyl(0.009, 0.009, 0.05, 8), dark, -0.5 - i * 0.06, 0.02, 0, 0, 0, 0).rotation.z = Math.PI / 2;
-  }
   add(cyl(0.034, 0.03, 0.04, 16), dark, -0.92, 0.02, 0, 0, 0, Math.PI / 2);                      // boca
 
-  // ---- bipé estendido sob o cano ----
+  // ---- bipé dobrado rente ao cano (discreto — evita silhueta "quebrada") ----
   for (const sgn of [1, -1]) {
-    add(cyl(0.009, 0.009, 0.26, 8), steel, -0.52, -0.13, sgn * 0.14, 0.6 * sgn, 0, 0);
-    add(cyl(0.014, 0.014, 0.03, 8), dark, -0.52, -0.245, sgn * 0.25);   // pé do bipé
+    add(cyl(0.007, 0.007, 0.2, 8), steel, -0.52, -0.01, sgn * 0.05, 0, 0, 0.14 * sgn);
+    add(cyl(0.011, 0.011, 0.025, 8), dark, -0.52, -0.105, sgn * 0.055);   // pé do bipé
   }
-  add(cyl(0.032, 0.032, 0.02, 12), dark, -0.52, 0.02, 0, 0, 0, Math.PI / 2);                     // dobradiça do bipé
+  add(cyl(0.03, 0.03, 0.02, 12), dark, -0.52, 0.02, 0, 0, 0, Math.PI / 2);                       // dobradiça do bipé
 
-  // ---- caixa de munição (100 tiros) — bem maior que qualquer carregador ----
-  const box = new THREE.Group(); box.position.set(-0.05, -0.19, 0); g.add(box);
+  // ---- caixa de munição (100 tiros) — encostada direto no receiver ----
+  const box = new THREE.Group(); box.position.set(-0.05, -0.135, 0); g.add(box);
   const badd = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); box.add(m); return m; };
-  badd(rbox(0.16, 0.16, 0.13), poly, 0, 0, 0);
-  badd(new THREE.BoxGeometry(0.02, 0.13, 0.008), green, -0.09, 0.01, 0);
-  badd(rbox(0.05, 0.03, 0.05), dark, 0.05, 0.09, 0);      // guia da correia até o receiver
+  badd(rbox(0.16, 0.15, 0.13), poly, 0, 0, 0);
+  badd(new THREE.BoxGeometry(0.02, 0.12, 0.008), green, -0.09, 0.005, 0);
+  badd(rbox(0.05, 0.03, 0.05), dark, 0.05, 0.08, 0);      // guia da correia até o receiver
 
   // ---- punho + guarda-gatilho ----
   add(rbox(0.09, 0.16, 0.08), poly, 0.16, -0.13, 0, 0, 0, -0.28);
