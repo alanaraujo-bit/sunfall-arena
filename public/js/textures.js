@@ -981,3 +981,64 @@ export function skyTex() {
   cache.set('sky', t);
   return t;
 }
+
+// Céu do Ocaso (Fase 6 — "rig do poente"). Função PRÓPRIA (não reaproveita
+// skyTex): o Cânion usa aquele céu como está desde a Fase 1 e não deve
+// mudar — o mapa 1 fica congelado como referência. Mais dramático que o
+// original: sol mais baixo e mais a oeste, nuvens com base AQUECIDA (luz
+// rasante batendo por baixo, não só um brilho parelho) e uma faixa de bruma
+// quente perto do horizonte, coerente com a regra do mapa (sol baixo a
+// oeste = bússola natural do jogador).
+export function skyTexOcaso() {
+  if (cache.has('skyOcaso')) return cache.get('skyOcaso');
+  const [c, ctx] = canvas(512);
+  const s = 512;
+  const g = ctx.createLinearGradient(0, 0, 0, s);
+  g.addColorStop(0, '#2f5f8e');
+  g.addColorStop(0.38, '#6fa0c4');
+  g.addColorStop(0.5, '#e8c088');
+  g.addColorStop(0.58, '#f2b878');
+  g.addColorStop(0.68, '#e8a274');
+  g.addColorStop(1, '#c8825c');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+
+  // faixa de bruma quente rente ao horizonte (poeira em suspensão no fim de tarde)
+  const hazeY = s * 0.6;
+  const haze = ctx.createLinearGradient(0, hazeY - s * 0.1, 0, hazeY + s * 0.06);
+  haze.addColorStop(0, hexA('#f4c894', 0));
+  haze.addColorStop(0.6, hexA('#f4c894', 0.35));
+  haze.addColorStop(1, hexA('#e8a878', 0.5));
+  ctx.fillStyle = haze; ctx.fillRect(0, hazeY - s * 0.1, s, s * 0.16);
+
+  // sol baixo, bem a oeste (a "bússola" do mapa)
+  const sx = s * 0.16, sy = s * 0.56;
+  let rg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 170);
+  rg.addColorStop(0, '#fffaf0');
+  rg.addColorStop(0.22, hexA('#ffe4ac', 0.95));
+  rg.addColorStop(0.55, hexA('#ffc888', 0.4));
+  rg.addColorStop(1, hexA('#ffb070', 0));
+  ctx.fillStyle = rg; ctx.fillRect(sx - 180, sy - 180, 360, 360);
+
+  // nuvens com base aquecida: sombra fria no topo, brilho quente por baixo
+  // (luz rasante do poente batendo na barriga da nuvem)
+  for (let i = 0; i < 10; i++) {
+    const cx = R() * s, cy = rr(0.14, 0.48) * s, cw = rr(55, 165), ch = cw * 0.3;
+    ctx.fillStyle = hexA('#e8dcc4', rr(0.2, 0.4));
+    for (let j = 0; j < 4; j++) {
+      ctx.beginPath();
+      ctx.ellipse(cx + rr(-cw * 0.4, cw * 0.4), cy + rr(-ch * 0.45, ch * 0.15),
+        cw * rr(0.4, 0.7), ch * rr(0.45, 0.75), 0, 0, 7);
+      ctx.fill();
+    }
+    // barriga quente — só na metade inferior, mais forte perto do horizonte
+    const warmth = 0.2 + (cy / s) * 0.5;
+    ctx.fillStyle = hexA('#ffb878', rr(0.25, 0.5) * warmth + 0.1);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + ch * 0.55, cw * 0.62, ch * 0.42, 0, 0, 7);
+    ctx.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set('skyOcaso', t);
+  return t;
+}

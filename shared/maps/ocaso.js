@@ -33,7 +33,13 @@ function R(x1, z1, x2, z2, y, h, mat) {
 }
 
 // ================= PERÍMETRO =================
-R(-52, -52, 52, -44, 0, 14, 'cliff');   // norte
+// norte em 2 segmentos: vão do MIRANTE (x -8..8) atrás do Altar
+R(-52, -52, -8, -44, 0, 14, 'cliff');
+R(8, -52, 52, -44, 0, 14, 'cliff');
+// Mirante: sacada atrás do Altar com vista do desfiladeiro
+R(-8, -48, 8, -44, 0, 5.2, 'stone');           // piso da sacada (contínuo com o Templo)
+R(-8, -48.6, 8, -48, 5.2, 1.0, 'stone2');      // mureta da vista
+R(-8, -48.3, 8, -48, 6.2, 2.8, 'clip');        // borda do mapa: bloqueio invisível acima da mureta
 R(-52, 44, 52, 52, 0, 14, 'cliff');    // sul
 R(-52, -52, -44, 52, 0, 14, 'cliff');  // oeste
 R(44, -52, 52, 52, 0, 14, 'cliff');    // leste

@@ -12,13 +12,24 @@
 // ============================================================
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { BARREL_W, BARREL_H } from '/shared/mapdata.js';
-import { tex, texNormal, texRough, skyTex } from './textures.js';
+import { BARREL_W, BARREL_H, raycastSolids } from '/shared/mapdata.js';
+import { tex, texNormal, texRough, skyTexOcaso } from './textures.js';
 import { mergeStatics, makeBarrel, makeBarrelWreck, scaleUV, jitterGeo } from './world.js';
 
 const TEAL = 0x3fc8b4;
 
+// RNG determinística local (mesmo princípio do textures.js: todo cliente
+// vê a mesma coisa) — usada só pelo desfiladeiro distante (dressing puro,
+// sem física, mas ainda assim consistente entre telas/capturas).
+let _rs = 445566778;
+function rrand() {
+  _rs ^= _rs << 13; _rs ^= _rs >>> 17; _rs ^= _rs << 5; _rs >>>= 0;
+  return _rs / 4294967296;
+}
+const rr = (a, b) => a + rrand() * (b - a);
+
 export function buildOcasoWorld(scene, map, opts = {}) {
+  _rs = 445566778;   // reseta a cada build — mesmo desfiladeiro sempre, mesmo após rebuild de qualidade
   const decor = opts.decor !== false;
   const animated = [];
   const root = new THREE.Group();
@@ -26,6 +37,73 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   const liveRoot = new THREE.Group();
   root.add(liveRoot);
   const mats = new Map();
+
+  // ---------------- AO por vértice (Fase 6) ----------------
+  // Cor branca uniforme (sem tingimento) — usada em TODA geometria que não
+  // recebe AO real, só para garantir que o atributo 'color' exista em todo
+  // mundo. mergeGeometries() (ver world.js) exige que geometrias do MESMO
+  // material tenham exatamente os mesmos atributos, e várias peças cruas
+  // (colunas, arcos, telhados…) compartilham material com paredes que TÊM
+  // AO baked via boxAt — sem isso a fusão quebraria silenciosamente e cada
+  // peça viraria 1 draw call a mais.
+  function paintUniform(geo, v = 1) {
+    const n = geo.attributes.position.count;
+    const col = new Float32Array(n * 3).fill(v);
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return geo;
+  }
+  // Interceptor: qualquer mesh que chegue ao staticRoot sem 'color' ganha
+  // branco uniforme automaticamente — rede de segurança pro merge nunca
+  // quebrar, mesmo em call sites que criam geometria crua (cilindros,
+  // torus, plane) fora do boxAt().
+  const _staticAdd = staticRoot.add.bind(staticRoot);
+  staticRoot.add = (...objs) => {
+    for (const o of objs) {
+      if (o && o.isMesh && o.geometry && !o.geometry.attributes.color) paintUniform(o.geometry);
+    }
+    return _staticAdd(...objs);
+  };
+
+  // Oclusão ambiente amostrada num CANTO do mundo: lança raios curtos nas
+  // 3 direções do octante externo daquele canto (as combinações de 2 eixos
+  // do sinal do canto — a diagonal pura fica implícita, é a soma vetorial)
+  // contra os colisores do mapa. Alcance curto (0.55m) — isto é sombra de
+  // CONTATO (parede∼chão, cornija∼parede), não sombra projetada distante.
+  const AO_RANGE = 0.55, AO_STRENGTH = 0.55;
+  function sampleCornerAO(bounds, px, py, pz, sx, sy, sz) {
+    const dirs = [[sx, sy, 0], [sx, 0, sz], [0, sy, sz]];
+    let hits = 0;
+    for (const [dx0, dy0, dz0] of dirs) {
+      const len = Math.hypot(dx0, dy0, dz0) || 1;
+      const dx = dx0 / len, dy = dy0 / len, dz = dz0 / len;
+      // nudge ao longo da própria direção de amostra: como o canto é vértice
+      // de uma caixa convexa, mover-se nessa direção já escapa da própria
+      // caixa — não precisa excluir nada explicitamente.
+      const t = raycastSolids(bounds, px + dx * 0.03, py + dy * 0.03, pz + dz * 0.03, dx, dy, dz, AO_RANGE);
+      if (t < AO_RANGE) hits++;
+    }
+    return 1 - (hits / dirs.length) * AO_STRENGTH;   // 1 = aberto, mais escuro = mais encravado
+  }
+  // Assa AO nos 8 cantos de uma caixa (mundo: cx,cy,cz = centro; w,h,d =
+  // dimensões) e escreve num atributo 'color' por vértice. BoxGeometry não
+  // rotacionada: o SINAL da posição local de cada vértice já indica a qual
+  // canto ele pertence (mesmo sinal em x/y/z = mesmo octante).
+  function bakeBoxAO(geo, cx, cy, cz, w, h, d, bounds) {
+    const hw = w / 2, hh = h / 2, hd = d / 2;
+    const corner = {};   // 'sx,sy,sz' -> luminosidade 0..1
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      corner[`${sx},${sy},${sz}`] = sampleCornerAO(bounds, cx + sx * hw, cy + sy * hh, cz + sz * hd, sx, sy, sz);
+    }
+    const pos = geo.attributes.position;
+    const col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const sx = pos.getX(i) < 0 ? -1 : 1, sy = pos.getY(i) < 0 ? -1 : 1, sz = pos.getZ(i) < 0 ? -1 : 1;
+      const v = corner[`${sx},${sy},${sz}`];
+      col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return geo;
+  }
 
   function cmat(key, make) {
     let m = mats.get(key);
@@ -49,7 +127,7 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     const cfg = V2[name] || { t: name, n: 0.6, rb: 0.92, ra: 0.15 };
     return cmat('t:' + name, () => {
       const m = new THREE.MeshStandardMaterial({
-        map: tex(cfg.t), metalness: 0, color: cfg.tint ?? 0xffffff
+        map: tex(cfg.t), metalness: 0, color: cfg.tint ?? 0xffffff, vertexColors: true
       });
       const nm = texNormal(cfg.t, cfg.n);
       if (nm) m.normalMap = nm;
@@ -79,10 +157,21 @@ export function buildOcasoWorld(scene, map, opts = {}) {
 
   // mesh de caixa com UV proporcional, já no staticRoot.
   // plasterUV: reboco não repete na vertical (o rodapé terracota fica na base)
-  function boxAt(cx, cy, cz, w, h, d, material, plasterUV = false) {
+  // ao: assa oclusão ambiente real nos 8 cantos — mas só vale a pena (e só
+  // fica bonito) em peças de escala arquitetônica de DETALHE: moldura,
+  // cornija, contraforte, viga, caixote. Uma caixa GIGANTE (laje de terraço
+  // de 80m, corpo inteiro de uma casa de 12m) só tem 8 vértices no total —
+  // "assar AO nos cantos" nela criaria um gradiente esticado ao longo de
+  // dezenas de metros (iluminação errada), não sombra de contato. Por isso
+  // o AO real só liga quando a maior dimensão horizontal cabe num "canto"
+  // de verdade; peças grandes caem no branco uniforme (a `paintUniform`
+  // dentro do interceptor de staticRoot.add cuida disso sozinha).
+  const AO_MAX_SPAN = 8;
+  function boxAt(cx, cy, cz, w, h, d, material, plasterUV = false, ao = true) {
     const geo = new THREE.BoxGeometry(w, h, d);
     if (plasterUV) scaleUV(geo, Math.max(1, Math.round(Math.max(w, d) / 4)), 1);
     else scaleUV(geo, Math.max(1, Math.max(w, d) / 3), Math.max(1, h / 3));
+    if (ao && Math.max(w, d) <= AO_MAX_SPAN) bakeBoxAO(geo, cx, cy, cz, w, h, d, map.BOUNDS);
     const m = new THREE.Mesh(geo, material);
     m.position.set(cx, cy, cz);
     m.castShadow = m.receiveShadow = true;
@@ -94,19 +183,26 @@ export function buildOcasoWorld(scene, map, opts = {}) {
     return boxAt((x1 + x2) / 2, y + h / 2, (z1 + z2) / 2, x2 - x1, h, z2 - z1, material);
   }
 
-  // ---------------- Céu, luz, chão ----------------
+  // ---------------- Céu, luz, chão (Fase 6 — rig do poente) ----------------
+  // Céu PRÓPRIO do Ocaso (skyTexOcaso, não skyTex): o Cânion fica congelado
+  // como referência, não pode herdar mudança nenhuma daqui. Domo maior
+  // (260, casa com o alcance da névoa) pra sobrar espaço pro desfiladeiro
+  // distante mais adiante sem ficar por fora dele.
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(130, 24, 14),
-    new THREE.MeshBasicMaterial({ map: skyTex(), side: THREE.BackSide, fog: false })
+    new THREE.SphereGeometry(260, 24, 14),
+    new THREE.MeshBasicMaterial({ map: skyTexOcaso(), side: THREE.BackSide, fog: false })
   );
   sky.frustumCulled = false;
   liveRoot.add(sky);
-  scene.fog = new THREE.Fog(0xe8bd8c, 70, 260);
+  scene.fog = new THREE.Fog(0xe8b488, 65, 260);
 
-  liveRoot.add(new THREE.HemisphereLight(0xb8cede, 0xd8a065, 0.8));
-  liveRoot.add(new THREE.AmbientLight(0xffdfb8, 0.22));
-  const sun = new THREE.DirectionalLight(0xffc98a, 2.5);
-  sun.position.set(-55, 24, 6);
+  // luz ambiente: céu frio por cima, chão quente por baixo (bounce genérico)
+  liveRoot.add(new THREE.HemisphereLight(0xb0c4d8, 0xd8a065, 0.78));
+  liveRoot.add(new THREE.AmbientLight(0xffdfb8, 0.2));
+  // sol: baixo e bem a oeste — é A bússola do mapa (sombras sempre apontam
+  // pro leste). Mais rasante que o rig provisório da Fase 3.
+  const sun = new THREE.DirectionalLight(0xffb878, 2.65);
+  sun.position.set(-58, 17, 8);
   sun.castShadow = false;
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.left = -58; sun.shadow.camera.right = 58;
@@ -114,6 +210,44 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   sun.shadow.camera.near = 5; sun.shadow.camera.far = 180;
   sun.shadow.bias = -0.0008;
   liveRoot.add(sun);
+  // "bounce falso": luz fria e fraca vindo do leste, sem sombra própria —
+  // só pra tirar o breu total do lado de trás de quem olha pro sol.
+  const eastFill = new THREE.DirectionalLight(0x7fa0c8, 0.4);
+  eastFill.position.set(48, 12, -14);
+  eastFill.castShadow = false;
+  liveRoot.add(eastFill);
+
+  // ---------------- Desfiladeiro distante (2 camadas, fora da área jogável) ----------------
+  // Silhuetas jitteradas (mesma técnica dos paredões do perímetro) mais
+  // altas e mais longe, tingidas pra bruma — dão profundidade além do que
+  // o jogador alcança sem física nem custo extra de física, e cada camada
+  // vira só 1 draw call (mesmo material, funde no staticRoot).
+  if (decor) {
+    // picos ESTREITOS e NUMEROSOS (não poucos painéis largos!) — largura
+    // pequena o bastante pra cada caixa virar um "pico" distinto, com
+    // segmentação escalando com o tamanho (mesma fórmula do 'cliff' do
+    // perímetro: s.w/4) pra o jitter conseguir quebrar a silhueta de
+    // verdade em vez de só amassar levemente uma face enorme e quase lisa.
+    function ridgeLayer(radius, count, minH, maxH, color, opacity) {
+      const m = flat('ridge' + color, color, { flatShading: true, transparent: opacity < 1, opacity });
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2 + rr(-0.05, 0.05);
+        const w = radius * rr(0.11, 0.19), h = rr(minH, maxH), d = w * rr(0.55, 0.85);
+        const segX = Math.max(3, Math.ceil(w / 4)), segZ = Math.max(3, Math.ceil(d / 4));
+        const geo = new THREE.BoxGeometry(w, h, d, segX, 4, segZ);
+        jitterGeo(geo, w * 0.3, h * 0.35);
+        const mesh = new THREE.Mesh(geo, m);
+        // raio com jitter próprio: picos não ficam todos num círculo perfeito
+        const r = radius * rr(0.94, 1.08);
+        mesh.position.set(Math.cos(a) * r, h / 2 - 3, Math.sin(a) * r);
+        mesh.rotation.y = a + rr(-0.3, 0.3);
+        mesh.castShadow = mesh.receiveShadow = false;
+        staticRoot.add(mesh);
+      }
+    }
+    ridgeLayer(120, 30, 16, 34, 0xc4926e, 0.9);    // camada próxima — picos que se sobrepõem
+    ridgeLayer(172, 26, 26, 54, 0xa8846e, 0.6);    // camada distante, mais alta e mais hazy
+  }
 
   const groundM = cmat('ground', () => {
     const t = tex('sand').clone();
@@ -339,6 +473,7 @@ export function buildOcasoWorld(scene, map, opts = {}) {
   // ---------------- Terreno / terraços ----------------
   for (const s of map.SOLIDS) {
     if (s.mat === 'barrel') continue;
+    if (s.mat === 'clip') continue;   // bloqueio de colisão puro — sem visual (Mirante)
     if (s.mat === 'cliff') {
       const geo = new THREE.BoxGeometry(
         s.w + 1.5, s.h + 3, s.d + 1.5,
