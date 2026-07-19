@@ -278,7 +278,84 @@ function buildBrecha12() {
   return g;
 }
 
-const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR, brecha: buildBrecha12 };
+// ------------------------------------------------------------
+// Modelo 3D detalhado — SENTINELA-DR (fuzil tático real do jogo)
+// Meio-termo visual entre o FALCÃO e a FERRÃO: corpo alongado,
+// ação semiautomática sem ferrolho exposto, luneta MÉDIA (bem mais
+// curta que a da FERRÃO) e coronha ajustável. Acentos azuis —
+// identidade própria, diferente do teal/âmbar/vermelho das outras três.
+// ------------------------------------------------------------
+function buildSentinelaDR() {
+  const g = new THREE.Group();
+
+  const gun = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x84898f, roughness: 0.42, metalness: 0.88 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xb8c0c6, roughness: 0.26, metalness: 0.94 });
+  const poly = new THREE.MeshStandardMaterial({ color: 0x1f242a, roughness: 0.73, metalness: 0.14 });
+  const poly2 = new THREE.MeshStandardMaterial({ color: 0x2d333a, roughness: 0.6, metalness: 0.2 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x121519, roughness: 0.85, metalness: 0.1 });
+  const blue = new THREE.MeshStandardMaterial({ color: 0x5c9ce8, roughness: 0.4, metalness: 0.5, emissive: 0x14335c, emissiveIntensity: 0.6 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x0e1620, roughness: 0.1, metalness: 0.45, transparent: true, opacity: 0.55 });
+
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    g.add(m);
+    return m;
+  };
+  const cyl = (r1, r2, h, seg = 16) => new THREE.CylinderGeometry(r1, r2, h, seg);
+  const rbox = (w, h, d, r = 0.012) => new RoundedBoxGeometry(w, h, d, 2, r);
+
+  // ---- receiver alongado ----
+  add(rbox(0.64, 0.13, 0.1), gun, 0.02, 0, 0);
+  add(rbox(0.44, 0.06, 0.092), poly2, 0.2, 0.08, 0);            // trilho traseiro elevado
+  add(new THREE.BoxGeometry(0.3, 0.02, 0.004), blue, 0.06, -0.03, 0.051);
+  add(new THREE.BoxGeometry(0.3, 0.02, 0.004), blue, 0.06, -0.03, -0.051);
+  add(cyl(0.014, 0.014, 0.045, 12), steel, 0.24, 0.1, 0.055, Math.PI / 2, 0, 0);   // manopla de rearme
+
+  // ---- cano médio + freio de boca curto ----
+  add(cyl(0.024, 0.024, 0.44, 18), steel, -0.66, 0.015, 0, 0, 0, Math.PI / 2);
+  add(cyl(0.03, 0.027, 0.08, 16), dark, -0.9, 0.015, 0, 0, 0, Math.PI / 2);        // freio de boca
+  for (let i = 0; i < 3; i++) add(new THREE.BoxGeometry(0.06, 0.008, 0.045), gun, -0.885 + i * 0.024, 0.033, 0);
+  add(cyl(0.03, 0.03, 0.025, 16), poly2, -0.44, 0.015, 0, 0, 0, Math.PI / 2);      // bloco de gás
+
+  // ---- luneta MÉDIA — bem mais curta que a da FERRÃO ----
+  const sc = new THREE.Group(); sc.position.set(0.06, 0.19, 0); g.add(sc);
+  const sadd = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); sc.add(m); return m;
+  };
+  sadd(rbox(0.02, 0.06, 0.045), dark, -0.075, -0.03, 0);
+  sadd(rbox(0.02, 0.06, 0.045), dark, 0.075, -0.03, 0);
+  sadd(cyl(0.042, 0.042, 0.17, 20), poly, 0, 0.008, 0, 0, 0, Math.PI / 2);         // tubo curto
+  sadd(cyl(0.05, 0.045, 0.05, 20), poly2, -0.11, 0.008, 0, 0, 0, Math.PI / 2);     // sino objetiva pequeno
+  sadd(cyl(0.048, 0.048, 0.006, 20), glass, -0.134, 0.008, 0, 0, 0, Math.PI / 2);
+  sadd(cyl(0.038, 0.038, 0.03, 20), dark, 0.1, 0.008, 0, 0, 0, Math.PI / 2);       // ocular
+  sadd(cyl(0.04, 0.04, 0.006, 20), glass, 0.115, 0.008, 0, 0, 0, Math.PI / 2);
+  sadd(cyl(0.016, 0.016, 0.04, 12), blue, 0, 0.05, 0);                            // torre de elevação
+
+  // ---- guarda-mão + carregador ----
+  add(rbox(0.4, 0.09, 0.085), poly, -0.42, -0.005, 0);
+  add(new THREE.BoxGeometry(0.02, 0.02, 0.004), blue, -0.42, -0.005, 0.044);
+  add(rbox(0.1, 0.15, 0.075), poly, -0.08, -0.14, 0, 0, 0, 0.05);
+  add(new THREE.BoxGeometry(0.008, 0.13, 0.05), blue, -0.12, -0.14, 0);
+
+  // ---- punho + guarda-gatilho ----
+  add(rbox(0.085, 0.16, 0.075), poly, 0.15, -0.13, 0, 0, 0, -0.3);
+  add(new THREE.TorusGeometry(0.05, 0.011, 8, 16, Math.PI), dark, 0.04, -0.11, 0, Math.PI, 0, 0);
+  add(new THREE.BoxGeometry(0.014, 0.04, 0.02), steel, 0.04, -0.1, 0);
+
+  // ---- coronha ajustável ----
+  add(cyl(0.02, 0.02, 0.15, 12), poly2, 0.38, 0.01, 0, 0, 0, Math.PI / 2);
+  add(rbox(0.05, 0.14, 0.08), poly, 0.47, -0.01, 0);
+  add(rbox(0.03, 0.16, 0.084), dark, 0.5, -0.01, 0);
+  add(new THREE.BoxGeometry(0.02, 0.02, 0.004), blue, 0.47, 0.05, 0.041);
+
+  g.position.x = 0.1;
+  g.scale.setScalar(1.08);
+  return g;
+}
+
+const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR, brecha: buildBrecha12, sentinela: buildSentinelaDR };
 
 // ------------------------------------------------------------
 // Visualizador 3D

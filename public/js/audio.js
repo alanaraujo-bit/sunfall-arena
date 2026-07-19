@@ -78,7 +78,7 @@ export const SFX = {
   // Tiros em camadas: transiente mecânico + corpo + soco grave (+ eco no sniper).
   // `v` varia o timbre por disparo (rajada não soa metralhadora de brinquedo);
   // `muf` abafa os agudos com a distância (vol < 1 = tiro de outro jogador longe).
-  // `kind`: 'ar' | 'sniper' | 'shotgun'.
+  // `kind`: 'ar' | 'sniper' | 'shotgun' | 'dmr'.
   shot(kind = 'ar', vol = 1) {
     ensure();
     const v = 0.94 + Math.random() * 0.12;
@@ -91,6 +91,14 @@ export const SFX = {
       tone(57, 0.42, 0.4 * vol, 'sine', 24);
       noise(0.22, 0.16 * vol, 900 * muf, 140, 'lowpass', 0.1);
       noise(0.3, 0.09 * vol, 600 * muf, 90, 'lowpass', 0.22);
+    } else if (kind === 'dmr') {
+      // SENTINELA-DR: estalo seco e ressonante — mais "definido"/precavido
+      // que o FALCÃO (sem clique de rajada) e sem o peso do ferrolho da
+      // FERRÃO (é semiautomática, cada tiro é um evento isolado)
+      if (vol > 0.35) noise(0.022, 0.38 * vol, 5600, 2200, 'highpass');
+      noise(0.15, 0.48 * vol, 2000 * v * muf, 260);
+      tone(132 * v, 0.1, 0.34 * vol, 'square', 58);
+      tone(64 * v, 0.16, 0.28 * vol, 'sine', 34);
     } else if (kind === 'shotgun') {
       // BRECHA-12: estouro largo e grave (chumbo em leque) — sem clique
       // metálico de ferrolho, corpo curto e denso + soco grave pesado

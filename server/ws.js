@@ -35,6 +35,7 @@ WEAPONS[5] = {                                                                  
   dmg: 135, head: 1.3, int: 0.82,          // dmg = só p/ dano a barril (blast único, não por bago)
   pellets: 9, pelletDmgNear: 15, pelletDmgFar: 2, pelletRange: 11, pelletSpread: 0.14
 };
+WEAPONS[6] = { dmg: 50, head: 2, int: 0.2 };                                        // SENTINELA-DR (DMR)
 // Faca (índice 2). Alcance/cone ligeiramente mais generosos que a previsão do
 // cliente para nunca rejeitar um golpe que o atirador viu conectar.
 // arc = cosseno do meio-ângulo do cone frontal aceito.

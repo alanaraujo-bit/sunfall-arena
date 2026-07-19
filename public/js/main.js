@@ -22,13 +22,13 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', w4: 'Digit4', lastw: 'KeyQ',
+  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', w4: 'Digit4', w5: 'Digit5', lastw: 'KeyQ',
   melee: 'KeyV', nade: 'KeyG', smoke: 'KeyC', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', w4: 'Escopeta', lastw: 'Troca rápida',
+  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', w4: 'Escopeta', w5: 'Fuzil Tático', lastw: 'Troca rápida',
   melee: 'Golpe rápido', nade: 'Granada', smoke: 'Fumaça', board: 'Placar'
 };
 // Códigos de mouse no mesmo formato dos binds (Mouse0 = esq., Mouse3/4 = laterais)
@@ -811,6 +811,7 @@ const SMOKE_VM = 4;  // viewmodel da granada de fumaça
 // `fire`/`dmg` e o killcam (showViewmodel(killcam.killerW) usa esse índice
 // direto). Ver espelho server-side em server/ws.js (WEAPONS[5]).
 const BRECHA = 5;
+const SENTINELA = 6;   // mesmo esquema de índice global do BRECHA — ver comentário acima
 const WEAPONS = [];
 WEAPONS[0] = {
   // rec = personalidade do recuo:
@@ -827,7 +828,9 @@ WEAPONS[0] = {
   rec: { climb: 0.034, drift: 0.011, jitter: 0.0035, ramp: 5, max: 0.12, recovHeld: 1.7, recov: 11, bloom: 0.0016, bloomMax: 0.018, vmKick: 0.06 }
 };
 WEAPONS[1] = {
-  name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05, sniper: true,
+  name: 'FERRÃO-SR', dmg: 92, head: 2, int: 1.05, mag: 5, reload: 1.8, spread: 0.05, auto: false, kick: 0.05,
+  sniper: true,           // flavor: SFX de ferrolho + tratamento de killcam específico
+  zoom: true, zoomFov: 24, // mecânica de ADS: luneta cheia (esconde a arma, zera o spread)
   // coice pesado de ferrolho: um soco grande e imediato por tiro, que some
   // devagar — cada disparo é um evento (ramp 0 = sem comportamento de rajada)
   rec: { climb: 0.095, drift: 0, jitter: 0.008, ramp: 0, max: 0.16, recovHeld: 3.2, recov: 6, bloom: 0, bloomMax: 0, vmKick: 0.13, shake: 0.045 }
@@ -852,9 +855,22 @@ WEAPONS[BRECHA] = {
   kick: 0.07,
   rec: { climb: 0.05, drift: 0, jitter: 0.012, ramp: 0, max: 0.14, recovHeld: 3, recov: 7, bloom: 0, bloomMax: 0, vmKick: 0.11, shake: 0.05 }
 };
-const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️', '💥'];
+// SENTINELA-DR: fuzil tático semiautomático, meio-termo entre o FALCÃO e a
+// FERRÃO — mais rápida de disparar que a sniper (cadência real, sem
+// ferrolho) mas cada tiro pesa bem menos: 2 corpo ou 1 cabeça derrubam
+// qualquer alvo (dmg 50 × head 2 = 100). Luneta MÉDIA própria (zoomFov 46,
+// bem menos "tubo" que os 24 da FERRÃO) — usa o mesmo mecanismo de ADS
+// (zoom/zoomFov), não é mais um exclusivo hardcoded da sniper.
+WEAPONS[SENTINELA] = {
+  name: 'SENTINELA-DR', dmg: 50, head: 2, int: 0.2, mag: 12, reload: 2.7, spread: 0.016, auto: false,
+  dmr: true,               // flavor: SFX própria (nem clique do FALCÃO, nem ferrolho da FERRÃO)
+  zoom: true, zoomFov: 46,
+  kick: 0.05,
+  rec: { climb: 0.06, drift: 0.008, jitter: 0.006, ramp: 0, max: 0.13, recovHeld: 2.8, recov: 8, bloom: 0, bloomMax: 0, vmKick: 0.09, shake: 0.025 }
+};
+const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️', '💥', '🎯'];
 const ammo = [];
-ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag;
+ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag;
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
 let recoilY = 0;   // componente lateral do recuo (yaw)
 let sprayN = 0;    // tiros consecutivos na rajada atual (padrão de recuo + bloom)
@@ -864,7 +880,11 @@ let pumpT = 0;     // animação da bomba da BRECHA-12 (>0 = em curso)
 // tanto pro tiro local quanto pro replay do tiro de jogadores remotos
 function shotKind(wi) {
   const ww = WEAPONS[wi];
-  return ww && ww.sniper ? 'sniper' : ww && ww.pellets ? 'shotgun' : 'ar';
+  if (!ww) return 'ar';
+  if (ww.sniper) return 'sniper';
+  if (ww.pellets) return 'shotgun';
+  if (ww.dmr) return 'dmr';
+  return 'ar';
 }
 
 const vmAR = makeViewmodel('ar');
@@ -873,20 +893,23 @@ const vmKnife = makeViewmodel('knife');
 const vmNade = makeViewmodel('nade');
 const vmSmoke = makeViewmodel('smoke');
 const vmBrecha = makeViewmodel('brecha');
+const vmSentinela = makeViewmodel('sentinela');
 const vmRoot = new THREE.Group();
 vmRoot.position.set(0.26, -0.24, -0.5);
-vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group, vmSmoke.group, vmBrecha.group);
+vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group, vmSmoke.group, vmBrecha.group, vmSentinela.group);
 vmSR.group.visible = false;
 vmKnife.group.visible = false;
 vmNade.group.visible = false;
 vmSmoke.group.visible = false;
 vmBrecha.group.visible = false;
+vmSentinela.group.visible = false;
 vmRoot.visible = false; // oculto até entrar na partida
 camera.add(vmRoot);
 scene.add(camera);
 const viewmodels = [];
 viewmodels[0] = vmAR; viewmodels[1] = vmSR; viewmodels[KNIFE] = vmKnife;
 viewmodels[GRENADE] = vmNade; viewmodels[SMOKE_VM] = vmSmoke; viewmodels[BRECHA] = vmBrecha;
+viewmodels[SENTINELA] = vmSentinela;
 
 // mostra só a viewmodel do índice `i` (guns e faca)
 function showViewmodel(i) {
@@ -1185,7 +1208,7 @@ const keys = {};
 let mouseDown = false, wantJump = false;
 let lastW = 1; // arma anterior (troca rápida / Q)
 const canvas = renderer.domElement;
-const WEAPON_ORDER = [0, 1, BRECHA, KNIFE]; // ciclo do scroll
+const WEAPON_ORDER = [0, 1, BRECHA, SENTINELA, KNIFE]; // ciclo do scroll
 
 // Zera TODO o input preso. Sem isto, perder o foco (alt-tab, notificação,
 // clicar fora) com uma tecla apertada nunca dispara o keyup → a tecla fica
@@ -1219,6 +1242,7 @@ function onBindPress(code) {
   if (code === binds.w2) switchWeapon(1);
   if (code === binds.w3) switchWeapon(KNIFE);
   if (code === binds.w4) switchWeapon(BRECHA);
+  if (code === binds.w5) switchWeapon(SENTINELA);
   if (code === binds.lastw) quickSwitchWeapon();
   if (code === binds.melee) quickMelee();
   if (code === binds.nade) startNadeCook('frag');
@@ -1284,7 +1308,7 @@ canvas.addEventListener('mousedown', e => {
   }
   if (e.button === 2) {
     if (curW === KNIFE) startMelee(true);
-    else if (WEAPONS[curW].sniper && !reloading && !me.dead) setZoom(true);
+    else if (WEAPONS[curW].zoom && !reloading && !me.dead) setZoom(true);
   }
 });
 addEventListener('contextmenu', e => e.preventDefault());
@@ -1292,7 +1316,10 @@ addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('blur', () => { clearInput(); cancelNadeCook(); });
 addEventListener('mousemove', e => {
   if (document.pointerLockElement !== canvas || !playing || me.dead) return;
-  const s = (+hud.sens.value) * (zoomed ? 0.35 : 1) * 0.0022;
+  // sensibilidade cai proporcional ao quanto a luneta de fato aproxima (razão
+  // de FOV) — luneta média (SENTINELA) reduz bem menos que a cheia (FERRÃO)
+  const zoomRatio = zoomed ? (WEAPONS[curW].zoomFov / BASE_FOV) : 1;
+  const s = (+hud.sens.value) * zoomRatio * 0.0022;
   me.yaw -= e.movementX * s;
   me.pitch = Math.max(-1.55, Math.min(1.55, me.pitch - e.movementY * s));
 });
@@ -1309,7 +1336,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 function setZoom(z) {
-  zoomed = z && WEAPONS[curW].sniper;
+  zoomed = z && !!WEAPONS[curW].zoom;
   hud.scope.classList.toggle('show', zoomed);
   vmRoot.visible = playing && !zoomed;
 }
@@ -1534,7 +1561,7 @@ function tryFire() {
   camera.getWorldDirection(_dir);
   const rc = w.rec;
   const bloom = rc ? Math.min(rc.bloomMax, sprayN * rc.bloom) : 0;
-  const baseSpread = (w.sniper && zoomed ? 0 : (w.spread || 0)) + bloom;
+  const baseSpread = (w.zoom && zoomed ? 0 : (w.spread || 0)) + bloom;
   _origin.copy(me.pos); _origin.y += me.eyeH;
 
   const vm = viewmodels[curW];
@@ -2857,8 +2884,10 @@ function updateKillcam(dt) {
     : Math.min(1, Math.max(0, (elapsed - (replayMs - KILLCAM_AIM_MS)) / KILLCAM_AIM_MS));
   killcam.aim += (aimTarget - killcam.aim) * Math.min(1, 6 * dt);
 
-  // sniper mira → luneta (esconde a arma, mostra o scope); SMG → só estreita o FOV
-  const scoped = killcam.killerW === 1 && killcam.aim > 0.55;
+  // arma com luneta (zoom) → esconde a arma, mostra o scope; sem luneta →
+  // só estreita o FOV de leve (efeito de "foco" cosmético, sem tubo)
+  const kw = WEAPONS[killcam.killerW] || WEAPONS[0];
+  const scoped = !!kw.zoom && killcam.aim > 0.55;
   hud.scope.classList.toggle('show', scoped);
 
   const smp = kcSample(frames, sv);
@@ -2872,7 +2901,7 @@ function updateKillcam(dt) {
   }
 
   // FOV do ADS (faca não mira: mantém o FOV base)
-  const adsFov = killcam.killerW === 1 ? ZOOM_FOV : (killcam.killerW === 2 ? BASE_FOV : BASE_FOV * 0.72);
+  const adsFov = kw.zoom ? kw.zoomFov : (kw.melee ? BASE_FOV : BASE_FOV * 0.72);
   const fov = BASE_FOV + (adsFov - BASE_FOV) * killcam.aim;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
 
@@ -3081,7 +3110,7 @@ net.on('spawn', msg => {
     me.hp = 100;
     me.dead = false;
     faceCenter();
-    ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag;
+    ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag;
     reloading = 0;
     me.nades = msg.nades ?? NADE.COUNT_START;
     me.smokes = msg.smokes ?? SMOKE.COUNT_START;
@@ -3215,7 +3244,7 @@ net.on('restart', msg => {
       me.vel.set(0, 0, 0);
       me.hp = 100; me.dead = false;
       faceCenter();
-      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag;
+      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag;
       reloading = 0;
       me.nades = p.nades ?? NADE.COUNT_START;
       me.smokes = p.smokes ?? SMOKE.COUNT_START;
@@ -3794,7 +3823,7 @@ function frame() {
 
     // FOV dinâmico
     const hv = Math.hypot(me.vel.x, me.vel.z);
-    const targetFov = zoomed ? ZOOM_FOV : BASE_FOV + (me.sliding ? 6 : 0) + Math.max(0, (hv - 8.2)) * 0.5;
+    const targetFov = zoomed ? WEAPONS[curW].zoomFov : BASE_FOV + (me.sliding ? 6 : 0) + Math.max(0, (hv - 8.2)) * 0.5;
     const prevFov = camera.fov;
     camera.fov += (targetFov - camera.fov) * Math.min(1, 12 * dt);
     // só recalcula a projeção se o FOV de fato mudou (economiza CPU)

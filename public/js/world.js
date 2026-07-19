@@ -973,6 +973,35 @@ export function makeViewmodel(kind) {
     muzzle = new THREE.Object3D();
     muzzle.position.set(0, 0.015, -0.56);
     grp.add(muzzle);
+  } else if (kind === 'sentinela') {
+    // ---------------- Fuzil tático "SENTINELA-DR" ----------------
+    // Meio-termo entre o FALCÃO (curto, ágil) e a FERRÃO (longa, pesada):
+    // corpo alongado, ação semiautomática sem ferrolho exposto, e uma
+    // luneta MÉDIA — bem mais curta que a da sniper (silhueta reconhecível
+    // de longe, sem confundir as duas).
+    add(new RoundedBoxGeometry(0.078, 0.115, 0.5, 2, 0.015), metal, 0, 0, 0.02);              // corpo alongado
+    const barrel = add(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 12), metal, 0, 0.018, -0.42);
+    barrel.rotation.x = Math.PI / 2;
+    add(new THREE.CylinderGeometry(0.028, 0.025, 0.06, 12), darkM, 0, 0.018, -0.63)
+      .rotation.x = Math.PI / 2;                                                              // freio de boca curto
+    // luneta média — bem mais curta que a da FERRÃO
+    const scope = add(new THREE.CylinderGeometry(0.03, 0.03, 0.14, 12), darkM, 0, 0.088, -0.1);
+    scope.rotation.x = Math.PI / 2;
+    add(new THREE.CylinderGeometry(0.033, 0.033, 0.016, 12), accent, 0, 0.088, -0.165)
+      .rotation.x = Math.PI / 2;
+    add(new THREE.CylinderGeometry(0.033, 0.033, 0.016, 12), accent, 0, 0.088, -0.035)
+      .rotation.x = Math.PI / 2;
+    add(new THREE.BoxGeometry(0.016, 0.045, 0.016), metal, 0, 0.048, -0.1);                   // suporte da luneta
+    add(new RoundedBoxGeometry(0.06, 0.06, 0.22, 2, 0.015), wood, 0, -0.02, -0.24);           // guarda-mão
+    const mag = add(new RoundedBoxGeometry(0.05, 0.19, 0.09, 2, 0.012), darkM, 0, -0.13, 0.02);
+    mag.rotation.x = 0.16;
+    const grip = add(new RoundedBoxGeometry(0.05, 0.13, 0.07, 2, 0.012), wood, 0, -0.1, 0.16);
+    grip.rotation.x = -0.32;
+    add(new RoundedBoxGeometry(0.06, 0.1, 0.2, 2, 0.018), wood, 0, -0.01, 0.34);              // coronha
+    add(new THREE.BoxGeometry(0.078, 0.02, 0.1), accent, 0, 0.05, -0.06);                     // detalhe teal
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.018, -0.66);
+    grp.add(muzzle);
   } else if (kind === 'brecha') {
     // ---------------- Escopeta bomba "BRECHA-12" ----------------
     // Silhueta curta e grossa (calibre 12), bem diferente do fuzil/sniper:

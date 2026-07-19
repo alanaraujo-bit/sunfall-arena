@@ -129,13 +129,14 @@ export const ARSENAL = [
     role: 'Média-longa · precisão',
     icon: '🎯',
     accent: '#5c9ce8',
-    model: null,
-    locked: true,
+    model: 'sentinela',
+    locked: false,
     desc: 'Meio-termo entre o fuzil e a sniper. A SENTINELA-DR premia quem mira na cabeça: cada disparo semiautomático castiga a média-longa distância com estabilidade rara. Lenta nas mãos erradas; implacável nas certas.',
     philosophy: 'A Veyra acredita que precisão é escolha, não sorte. A SENTINELA foi calibrada para que dois toques limpos derrubem qualquer alvo — desde que você acerte.',
     trivia: [
       'O gatilho tem curso ajustável de fábrica em três estágios.',
-      'Favorita de quem “segura” pontos-chave da arena.'
+      'Favorita de quem “segura” pontos-chave da arena.',
+      'A luneta é deliberadamente mais curta que a da FERRÃO-SR: aproxima sem fechar o campo de visão inteiro.'
     ],
     core: [
       { k: 'Dano', v: 80 }, { k: 'Cadência', v: 44 }, { k: 'Alcance', v: 82 },
@@ -145,11 +146,11 @@ export const ARSENAL = [
       { k: 'Tempo de recarga', d: '2.7 s' },
       { k: 'Carregador', d: '12' },
       { k: 'Cadência', d: '~300 disp/min' },
+      { k: 'Dano por tiro', d: '50' },
+      { k: 'Dano na cabeça', d: '100 (letal)' },
       { k: 'Disparo', d: 'Semiautomático' },
-      { k: 'Alcance efetivo', d: 'Longo' },
-      { k: 'Mira', d: 'Luneta média' },
-      { k: 'Precisão parado', d: 'Muito alta' },
-      { k: 'Precisão em mov.', d: 'Média' }
+      { k: 'Mira', d: 'Luneta média (ADS)' },
+      { k: 'Precisão parado', d: 'Muito alta (spread zerado na mira)' }
     ]
   },
   {
