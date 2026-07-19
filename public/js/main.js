@@ -13,6 +13,9 @@ import { Net, api, apiAuth, apiPublicGet } from './net.js';
 import { SFX, getAudioContext } from './audio.js';
 import * as Music from './music.js';
 import { initArmory } from './armory.js';
+import { PRIMARY_WEAPONS, resolvePrimary } from '/shared/loadout.js';
+import { getActiveClass, loadClasses, getActiveIndex, setActiveIndex } from './classes.js';
+import { byId as weaponById } from './arsenal-data.js';
 
 // Log de erros visível no DOM (debug em headless)
 const errlog = document.getElementById('errlog');
@@ -22,13 +25,13 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', w4: 'Digit4', w5: 'Digit5', w6: 'Digit6', w7: 'Digit7', lastw: 'KeyQ',
+  w1: 'Digit1', w3: 'Digit3', lastw: 'KeyQ',
   melee: 'KeyV', nade: 'KeyG', smoke: 'KeyC', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', w4: 'Escopeta', w5: 'Fuzil Tático', w6: 'Submetralhadora', w7: 'Metralhadora', lastw: 'Troca rápida',
+  w1: 'Arma da classe', w3: 'Faca', lastw: 'Troca rápida',
   melee: 'Golpe rápido', nade: 'Granada', smoke: 'Fumaça', board: 'Placar'
 };
 // Códigos de mouse no mesmo formato dos binds (Mouse0 = esq., Mouse3/4 = laterais)
@@ -165,6 +168,8 @@ const hud = {
   btnFullscreen: $('btn-fullscreen'),
   navFriends: $('nav-friends'), friendsHint: $('friends-hint'),
   modeChip: $('mode-chip'), modeChipTitle: $('mode-chip-title'), modeChipSub: $('mode-chip-sub'),
+  classChip: $('class-chip'), classChipIco: $('class-chip-ico'),
+  classChipName: $('class-chip-name'), classChipWeapon: $('class-chip-weapon'),
   startBtn: $('start-btn'), playDock: $('play-dock'), pauseCard: $('pause-card'),
   teamSwitch: $('team-switch'), team0: $('team-0'), team1: $('team-1'),
   roomLine: $('room-line'), roomCode: $('room-code'),
@@ -179,6 +184,7 @@ const hud = {
   ammo: $('ammo'), wname: $('weapon-name'), feed: $('feed'), board: $('board'),
   boardRows: $('board-rows'), hitmarker: $('hitmarker'), dmgFlash: $('dmg-flash'),
   death: $('death'), deathBy: $('death-by'), scope: $('scope'), game: $('hud'),
+  respawnClasses: $('respawn-classes'),
   killcam: $('killcam'), killcamBy: $('killcam-by'), killcamProgress: $('killcam-progress'),
   killcamTag: $('killcam-tag'), killcamByText: $('killcam-bytext'),
   fade: $('fade'),
@@ -567,7 +573,21 @@ function closeScreen() {
   if (armory && currentScreen === 'armory') armory.close();
   for (const el of Object.values(screens)) el.classList.remove('show');
   currentScreen = null;
+  refreshClassChip();   // a classe pode ter mudado enquanto o Arsenal estava aberto
 }
+
+// Mostra no lobby qual classe/arma vai pra próxima partida — clicar abre o
+// Arsenal direto na classe ativa pra trocar.
+function refreshClassChip() {
+  if (!hud.classChip) return;
+  const c = getActiveClass();
+  const w = weaponById(c.primary);
+  hud.classChipName.textContent = c.name;
+  hud.classChipWeapon.textContent = w ? w.name : '—';
+  hud.classChipIco.textContent = w ? w.icon : '⚡';
+  hud.classChip.style.setProperty('--acc', w ? w.accent : '#3fc8b4');
+}
+refreshClassChip();
 
 // botões que abrem telas
 hud.idChip.onclick = () => showScreen('account');
@@ -577,6 +597,7 @@ hud.navRank.onclick = () => showScreen('rank');
 hud.navConfig.onclick = () => showScreen('config');
 hud.modeChip.onclick = () => showScreen('modes');
 $('nav-arsenal').onclick = () => showScreen('armory');
+hud.classChip.onclick = () => showScreen('armory');
 
 // fechar telas: botão ✕, clicar fora do painel, ou Esc
 for (const el of Object.values(screens)) {
@@ -900,7 +921,20 @@ WEAPONS[MURALHA] = {
 };
 const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️', '💥', '🎯', '🐝', '🛡️'];
 const ammo = [];
-ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag; ammo[VESPA] = WEAPONS[VESPA].mag; ammo[MURALHA] = WEAPONS[MURALHA].mag;
+// Sistema de classes: cada jogador leva SÓ a arma primária da classe ativa
+// (+ faca) — não mais as 6 simultaneamente. `myPrimary` é o índice real
+// (0/1/BRECHA/SENTINELA/VESPA/MURALHA) da classe em uso; muda a cada
+// respawn se o jogador trocar de classe no seletor. O servidor é quem
+// decide de verdade (self.primary em server/ws.js) — isto aqui é só a
+// cópia local pra saber qual viewmodel/HUD mostrar.
+let myPrimary = resolvePrimary(getActiveClass().primary);
+let WEAPON_ORDER = [myPrimary, KNIFE];   // ciclo do scroll
+function applyPrimary(wi) {
+  myPrimary = WEAPONS[wi] && !WEAPONS[wi].melee ? wi : PRIMARY_WEAPONS.falcao;
+  WEAPON_ORDER = [myPrimary, KNIFE];
+  ammo[myPrimary] = WEAPONS[myPrimary].mag;
+}
+applyPrimary(myPrimary);
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
 let recoilY = 0;   // componente lateral do recuo (yaw)
 let sprayN = 0;    // tiros consecutivos na rajada atual (padrão de recuo + bloom)
@@ -1242,9 +1276,8 @@ function updateRemotes(dt, t) {
 // ---------------- Input ----------------
 const keys = {};
 let mouseDown = false, wantJump = false;
-let lastW = 1; // arma anterior (troca rápida / Q)
+let lastW = KNIFE; // arma anterior (troca rápida / Q) — só primária/faca agora
 const canvas = renderer.domElement;
-const WEAPON_ORDER = [0, 1, BRECHA, SENTINELA, VESPA, MURALHA, KNIFE]; // ciclo do scroll
 
 // Zera TODO o input preso. Sem isto, perder o foco (alt-tab, notificação,
 // clicar fora) com uma tecla apertada nunca dispara o keyup → a tecla fica
@@ -1274,13 +1307,8 @@ function onBindPress(code) {
   if (code === binds.jump) wantJump = true;
   if (code === binds.reload) startReload();
   if (code === binds.kit) tryUseKit();
-  if (code === binds.w1) switchWeapon(0);
-  if (code === binds.w2) switchWeapon(1);
+  if (code === binds.w1) switchWeapon(myPrimary);
   if (code === binds.w3) switchWeapon(KNIFE);
-  if (code === binds.w4) switchWeapon(BRECHA);
-  if (code === binds.w5) switchWeapon(SENTINELA);
-  if (code === binds.w6) switchWeapon(VESPA);
-  if (code === binds.w7) switchWeapon(MURALHA);
   if (code === binds.lastw) quickSwitchWeapon();
   if (code === binds.melee) quickMelee();
   if (code === binds.nade) startNadeCook('frag');
@@ -1397,11 +1425,11 @@ function switchWeapon(i) {
 // Alterna com a última arma usada (estilo CS: tecla Q por padrão)
 function quickSwitchWeapon() {
   let target = lastW;
-  if (target === curW) target = curW === 0 ? 1 : 0;
+  if (target === curW) target = curW === myPrimary ? KNIFE : myPrimary;
   switchWeapon(target);
 }
 
-// Scroll do mouse: cicla FALCÃO → FERRÃO → faca → …
+// Scroll do mouse: cicla arma da classe → faca → …
 function cycleWeapon(dir) {
   let idx = WEAPON_ORDER.indexOf(curW);
   if (idx < 0) idx = 0;
@@ -2428,6 +2456,7 @@ function clearRoomState() {
   snapBuf.length = 0;
   hud.feed.textContent = '';
   hud.death.classList.remove('show');
+  hideRespawnClasses();
   hud.endscreen.classList.remove('show');
   if (endCountTimer) { clearInterval(endCountTimer); endCountTimer = null; }
   matchEnded = false;
@@ -2435,7 +2464,7 @@ function clearRoomState() {
   me.kits = 0; me.usingKit = 0;
   multiKillCount = 0; lastKillTime = 0;
   cancelMelee(); melee.cd = 0; knifeEquipT = 0; knifeInspectT = 0;
-  curW = 0; showViewmodel(0); camShake = 0; recoil = 0; recoilY = 0; sprayN = 0;
+  curW = myPrimary; showViewmodel(myPrimary); camShake = 0; recoil = 0; recoilY = 0; sprayN = 0;
   cancelNadeCook(); nadeState.throwing = false;
   me.nades = NADE.COUNT_START; me.smokes = SMOKE.COUNT_START;
   clearAllNadeMeshes();
@@ -2456,6 +2485,8 @@ net.on('init', msg => {
       me.hp = p.hp; me.k = 0; me.d = 0;
       me.nades = p.nades ?? NADE.COUNT_START;
       me.smokes = p.smokes ?? SMOKE.COUNT_START;
+      applyPrimary(Number.isInteger(p.primary) ? p.primary : myPrimary);
+      curW = myPrimary; showViewmodel(myPrimary); updateAmmoHUD();
       faceCenter();
     } else addRemote(p);
   }
@@ -2566,9 +2597,11 @@ function sampleSnapshots() {
 // câmera nos olhos do assassino. Estilo Black Ops 2.
 // ============================================================
 const KILLCAM_MS = 5000;        // quanto do passado reproduzir (~5s)
-const KILLCAM_HOLD_MS = 900;    // pausa no instante da morte/abate (queda da vítima)
+// aumentados (900→1600 / 2200→2800) pra dar tempo real de bater o olho no
+// seletor de classe do respawn e escolher, sem virar uma espera arrastada
+const KILLCAM_HOLD_MS = 1600;   // pausa no instante da morte/abate (queda da vítima)
 const KILLCAM_AIM_MS = 1500;    // rampa do "abrir a mira" (ADS) antes do tiro final
-const DEATH_FALLBACK_MS = 2200; // morte sem killcam: tempo até pedir respawn sozinho
+const DEATH_FALLBACK_MS = 2800; // morte sem killcam: tempo até pedir respawn sozinho
 const MOMENT_HOLD_MS = 1800;    // "melhor momento": hold maior — a última vítima leva ~900ms pra cair
 
 // killcam.mode:
@@ -2652,10 +2685,42 @@ function kcSample(frames, sv) {
   return { a: frames[0], b: frames[1] || null, alpha: 0 };
 }
 
+// ---------------- Seletor de classe no respawn (Create-a-Class, estilo BO2) ----------------
+// Fica visível do momento da morte até o respawn de fato acontecer —
+// independente de estar mostrando o card de morte simples ou o killcam.
+// Clicar numa classe já escolhe e pede o respawn na hora; não mexer usa a
+// classe ativa quando o timer/tecla F disparar o respawn automático.
+function buildRespawnClasses() {
+  const classes = loadClasses();
+  const active = getActiveIndex();
+  hud.respawnClasses.innerHTML = '';
+  classes.forEach((c, i) => {
+    const w = weaponById(c.primary);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rc-btn' + (i === active ? ' active' : '');
+    if (w) btn.style.setProperty('--acc', w.accent);
+    btn.innerHTML =
+      `<span class="rc-ico">${w ? w.icon : '❓'}</span>` +
+      `<span class="rc-name">${c.name}</span>` +
+      `<span class="rc-wname">${w ? w.name : '—'}</span>`;
+    btn.onclick = () => requestRespawn(i);
+    hud.respawnClasses.appendChild(btn);
+  });
+}
+function showRespawnClasses() {
+  buildRespawnClasses();
+  hud.respawnClasses.classList.add('show');
+}
+function hideRespawnClasses() {
+  hud.respawnClasses.classList.remove('show');
+}
+
 // Decide entre killcam (assassino válido + histórico) ou morte simples.
 function startDeathSequence(killerId, killerW) {
   clearTimeout(deathTimer); deathTimer = null;
   killcam.respawnSent = false;
+  showRespawnClasses();
 
   if (collectKillcamFrames(killerId)) {
     enterKillcam(killerId, killerW);
@@ -2690,7 +2755,10 @@ function enterKillcam(killerId, killerW) {
   killcam.active = true;
   killcam.mode = 'death';
   killcam.killerId = killerId;
-  killcam.killerW = (killerW === 1 || killerW === 2) ? killerW : 0;
+  // aceita qualquer arma real do catálogo (não só FERRÃO/faca — bug antigo
+  // fazia o killcam mostrar sempre o FALCÃO quando quem te matou usava
+  // BRECHA/SENTINELA/VESPA/MURALHA)
+  killcam.killerW = WEAPONS[killerW] ? killerW : 0;
   killcam.t0 = performance.now();
   killcam.deathWall = killcam.t0;
   killcam.fallT = 0;
@@ -2804,13 +2872,23 @@ function fadeCut() {
 }
 
 // Pede o respawn ao servidor (fim do killcam ou tecla F). Só uma vez.
-function requestRespawn() {
+// `classIdx`: índice de classe escolhido no seletor (clique num botão) —
+// se omitido (tecla F ou timers automáticos), usa a classe ativa atual e
+// não manda `primary` (o servidor preserva a arma que o jogador já tinha).
+function requestRespawn(classIdx) {
   if (!me.dead || killcam.respawnSent) return;
   killcam.respawnSent = true;
   clearTimeout(deathTimer); deathTimer = null;
-  net.send({ t: 'respawn' });
+  let primaryId;
+  if (Number.isInteger(classIdx)) {
+    setActiveIndex(classIdx);
+    const c = loadClasses()[classIdx];
+    if (c) primaryId = c.primary;
+  }
+  net.send({ t: 'respawn', primary: primaryId });
   hud.killcam.classList.remove('show');
   hud.death.classList.remove('show');
+  hideRespawnClasses();
   hud.fade.classList.add('on');   // fade pra preto enquanto o servidor confirma
 }
 
@@ -3154,12 +3232,14 @@ net.on('spawn', msg => {
     me.hp = 100;
     me.dead = false;
     faceCenter();
-    ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag; ammo[VESPA] = WEAPONS[VESPA].mag; ammo[MURALHA] = WEAPONS[MURALHA].mag;
+    applyPrimary(Number.isInteger(msg.primary) ? msg.primary : myPrimary);
+    curW = myPrimary; showViewmodel(myPrimary);
     reloading = 0;
     me.nades = msg.nades ?? NADE.COUNT_START;
     me.smokes = msg.smokes ?? SMOKE.COUNT_START;
     cancelNadeCook(); nadeState.throwing = false;
     hud.death.classList.remove('show');
+    hideRespawnClasses();
     endKillcam();
     clearTimeout(deathTimer); deathTimer = null;
     killcam.respawnSent = false;
@@ -3187,6 +3267,7 @@ net.on('end', msg => {
   mouseDown = false;
   setZoom(false);
   hud.death.classList.remove('show');
+  hideRespawnClasses();
   endKillcam();   // corta uma killcam pessoal em andamento (mesmo comportamento de sempre)
   clearTimeout(deathTimer); deathTimer = null;
   killcam.respawnSent = false;
@@ -3288,7 +3369,8 @@ net.on('restart', msg => {
       me.vel.set(0, 0, 0);
       me.hp = 100; me.dead = false;
       faceCenter();
-      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag; ammo[VESPA] = WEAPONS[VESPA].mag; ammo[MURALHA] = WEAPONS[MURALHA].mag;
+      applyPrimary(Number.isInteger(p.primary) ? p.primary : myPrimary);
+      curW = myPrimary; showViewmodel(myPrimary);
       reloading = 0;
       me.nades = p.nades ?? NADE.COUNT_START;
       me.smokes = p.smokes ?? SMOKE.COUNT_START;
@@ -3306,6 +3388,7 @@ net.on('restart', msg => {
     }
   }
   hud.death.classList.remove('show');
+  hideRespawnClasses();
   endKillcam();
   clearTimeout(deathTimer); deathTimer = null;
   killcam.respawnSent = false;
@@ -3617,6 +3700,7 @@ function sendPlay(msg) {
   }
   msg.name = playName();
   me.name = msg.name;
+  msg.primary = getActiveClass().primary;   // classe escolhida no Arsenal — servidor valida
   hud.menuStatus.textContent = 'Conectando…';
   if (net.open) net.send(msg);
   else { pendingPlay = msg; connectPresence(); }

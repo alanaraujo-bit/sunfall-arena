@@ -4,6 +4,7 @@
 // ============================================================
 import { WebSocketServer } from 'ws';
 import { PLAYER, rayBox, raycastSolids, BARREL_DMG_RADIUS, BARREL_H } from '../shared/mapdata.js';
+import { resolvePrimary } from '../shared/loadout.js';
 import { MAPS } from '../shared/maps/index.js';
 import {
   rooms, findOrCreatePublic, createCustom, getByCode, realCount, MAX_REAL,
@@ -114,7 +115,7 @@ function respawnPlayer(room, victim) {
   victim.smokes = SMOKE_COUNT_START;
   broadcastRoom(room, {
     t: 'spawn', id: victim.id, pos: [victim.pos.x, victim.pos.y, victim.pos.z],
-    nades: victim.nades, smokes: victim.smokes
+    nades: victim.nades, smokes: victim.smokes, primary: victim.primary
   });
 }
 
@@ -222,7 +223,7 @@ export function attachWs(server) {
       room = null;
     }
 
-    function joinRoom(target, displayName) {
+    function joinRoom(target, displayName, primaryId) {
       self = {
         id: nextPlayerId(),
         accountId: auth ? auth.accountId : null,
@@ -232,6 +233,7 @@ export function attachWs(server) {
         pos: spawnPos(target), yaw: 0, pitch: 0, anim: 0,
         hp: 100, kills: 0, deaths: 0, streak: 0, kits: 0, healingKit: false,
         nades: NADE_COUNT_START, smokes: SMOKE_COUNT_START,
+        primary: resolvePrimary(primaryId),   // arma da classe escolhida — única fonte de dano real
         alive: true, bot: false, ws
       };
       room = target;
@@ -284,21 +286,25 @@ export function attachWs(server) {
             ? auth.username
             : String(msg.name || 'Recruta').slice(0, 14);
 
+          // arma da classe escolhida no Arsenal — resolvida/validada em joinRoom
+          // (resolvePrimary cai pro FALCÃO-9 se vier vazio/inválido)
+          const primaryId = typeof msg.primary === 'string' ? msg.primary : undefined;
+
           if (msg.mode === 'public') {
             const map = MAPS[msg.map] ? msg.map : undefined;
-            joinRoom(findOrCreatePublic(map), displayName);
+            joinRoom(findOrCreatePublic(map), displayName, primaryId);
           } else if (msg.mode === 'create') {
             const gm = msg.gm === 'tdm' ? 'tdm' : 'ffa';
             const bots = Math.min(6, Math.max(0, msg.bots | 0));
             const kl = [10, 20, 30].includes(+msg.kl) ? +msg.kl : 20;
             const tlMin = [5, 10, 15].includes(+msg.tl) ? +msg.tl : 10;
             const map = MAPS[msg.map] ? msg.map : undefined;
-            joinRoom(createCustom({ gm, bots, kl, tl: tlMin * 60 * 1000, map }, auth ? auth.accountId : null), displayName);
+            joinRoom(createCustom({ gm, bots, kl, tl: tlMin * 60 * 1000, map }, auth ? auth.accountId : null), displayName, primaryId);
           } else if (msg.mode === 'join') {
             const target = getByCode(msg.code);
             if (!target) { send({ t: 'err', code: 'room_not_found' }); return; }
             if (realCount(target) >= MAX_REAL) { send({ t: 'err', code: 'room_full' }); return; }
-            joinRoom(target, displayName);
+            joinRoom(target, displayName, primaryId);
           }
           return;
         }
@@ -325,7 +331,7 @@ export function attachWs(server) {
             self.smokes = SMOKE_COUNT_START;
             broadcastRoom(room, {
               t: 'spawn', id: self.id, pos: [self.pos.x, self.pos.y, self.pos.z],
-              nades: self.nades, smokes: self.smokes
+              nades: self.nades, smokes: self.smokes, primary: self.primary
             });
           }, 600);
           return;
@@ -353,6 +359,11 @@ export function attachWs(server) {
           // Pedido de renascimento (fim do killcam ou tecla F). Só vale se está
           // morto; respeita o tempo mínimo para não virar teleporte instantâneo.
           if (self.alive || room.state !== 'playing') break;
+          // troca de classe no respawn (opcional): só aplica dentro deste bloco
+          // onde o jogador já está confirmado morto — nunca dá pra trocar de
+          // arma "no meio do tiroteio" por essa via. Omitir o campo preserva a
+          // arma atual (nunca reseta pro FALCÃO-9 por omissão).
+          if (typeof msg.primary === 'string') self.primary = resolvePrimary(msg.primary);
           const waited = Date.now() - (self.deadAt || 0);
           if (waited >= RESPAWN_MIN_MS) {
             respawnPlayer(room, self);
@@ -394,10 +405,10 @@ export function attachWs(server) {
           // Tiro autoritativo: o servidor valida cadência e origem, rebobina o
           // mundo para o instante que o atirador via (sv) e refaz o raycast.
           if (!self.alive || room.state !== 'playing') break;
-          // só aceita índices de arma de fogo reais (WEAPONS[wi] existe) —
-          // qualquer outro valor (inclusive não-inteiros, tipo "constructor")
-          // cai pro FALCÃO-9 em vez de corromper o cálculo de dano
-          const wi = Number.isInteger(msg.w) && WEAPONS[msg.w] ? msg.w : 0;
+          // a arma é SEMPRE a da classe do jogador (self.primary) — nunca o
+          // que o cliente manda em msg.w. Isso fecha a brecha de um cliente
+          // hackeado disparar uma arma que não é da classe escolhida.
+          const wi = self.primary;
           const w = WEAPONS[wi];
           const now = Date.now();
           self.lastFire = self.lastFire || {};

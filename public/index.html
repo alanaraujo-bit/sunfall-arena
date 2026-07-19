@@ -69,6 +69,10 @@
       </div>
     </div>
 
+    <!-- Seletor de classe no respawn: aparece morto (com ou sem killcam na
+         tela) até o respawn de fato acontecer. Clicar escolhe na hora. -->
+    <div id="respawn-classes"></div>
+
     <!-- KILLCAM (estilo Black Ops 2): replay pela visão de quem te matou -->
     <div id="killcam">
       <div class="kc-bars"></div>
@@ -131,6 +135,13 @@
 
     <!-- DOCK DE JOGAR -->
     <div id="play-dock" class="lobby-only">
+      <button type="button" id="class-chip" title="Trocar classe no Arsenal">
+        <span id="class-chip-ico">⚡</span>
+        <span id="class-chip-txt">
+          <span id="class-chip-name">Classe 1</span>
+          <span id="class-chip-weapon">FALCÃO-9</span>
+        </span>
+      </button>
       <button type="button" id="mode-chip">
         <span id="mode-chip-title">MULTIPLAYER</span>
         <span id="mode-chip-sub">Todos contra Todos · público</span>
@@ -474,6 +485,7 @@
           </div>
           <button type="button" class="arm-close screen-close" id="arm-close" title="Fechar">✕</button>
         </header>
+        <div class="arm-class-tabs" id="arm-class-tabs"></div>
         <div class="arm-grid">
           <aside class="arm-list-wrap">
             <div class="arm-list-title">PRIMÁRIAS <span>6</span></div>

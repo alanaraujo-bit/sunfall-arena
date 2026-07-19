@@ -135,7 +135,7 @@ export function snapshot(p) {
     id: p.id, name: p.name, color: p.color, bot: !!p.bot,
     team: p.team ?? null,
     pos: [p.pos.x, p.pos.y, p.pos.z], hp: p.hp, k: p.kills, d: p.deaths,
-    nades: p.nades || 0, smokes: p.smokes || 0
+    nades: p.nades || 0, smokes: p.smokes || 0, primary: p.primary ?? 0
   };
 }
 

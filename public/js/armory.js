@@ -9,6 +9,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { tex } from './textures.js';
 import { ARSENAL, ATTACH_SLOTS, byId } from './arsenal-data.js';
+import { loadClasses, saveClasses, getActiveIndex, setActiveIndex } from './classes.js';
+import { CLASS_SLOTS } from '/shared/loadout.js';
 
 // ------------------------------------------------------------
 // Modelo 3D detalhado — FALCÃO-9 (fuzil de assalto real do jogo)
@@ -573,14 +575,10 @@ function makeViewer(canvas) {
 }
 
 // ------------------------------------------------------------
-// Tela do Arsenal
+// Tela do Arsenal — vitrine das armas + gerenciador de classes
+// (Create-a-Class estilo BO2: várias classes salvas, cada uma com
+// sua arma primária; a classe ativa é a que entra em combate).
 // ------------------------------------------------------------
-const LOADOUT_KEY = 'sf_loadout';
-function loadLoadout() {
-  try { return { primary: 'falcao', secondary: null, ...JSON.parse(localStorage.getItem(LOADOUT_KEY) || '{}') }; }
-  catch { return { primary: 'falcao', secondary: null }; }
-}
-
 export function initArmory() {
   const $ = id => document.getElementById(id);
   const listEl = $('arm-list');
@@ -590,12 +588,17 @@ export function initArmory() {
   const canvas = $('arm-canvas');
   const equipBtn = $('arm-equip');
   const slotPrimary = $('arm-slot-primary');
+  const classTabsEl = $('arm-class-tabs');
   if (!listEl || !canvas) return { open() {}, close() {} };
 
   let viewer = null;
   let selectedId = 'falcao';
-  let loadout = loadLoadout();
+  let classes = loadClasses();
+  let classIdx = getActiveIndex();   // classe em edição = classe ativa (mesmo modelo mental de sempre)
+  let renamingIdx = -1;
   let raf = 0, lastT = 0, open = false, ro = null;
+
+  const curClass = () => classes[classIdx] || classes[0];
 
   // ---- cards da lista ----
   const cards = new Map();
@@ -649,24 +652,78 @@ export function initArmory() {
   }
 
   function updateBadges() {
+    const equippedId = curClass().primary;
     for (const w of ARSENAL) {
       const card = cards.get(w.id);
       const b = card.querySelector('.ac-badges');
       let html = '';
       if (w.locked) html += '<i class="bd lock">🔒</i>';
-      if (loadout.primary === w.id) html += '<i class="bd eq">EQUIPADA</i>';
+      if (equippedId === w.id) html += '<i class="bd eq">EQUIPADA</i>';
       b.innerHTML = html;
-      card.classList.toggle('equipped', loadout.primary === w.id);
+      card.classList.toggle('equipped', equippedId === w.id);
     }
-    const pw = byId(loadout.primary);
+    const pw = byId(equippedId);
     slotPrimary.querySelector('.arm-slot-name').textContent = pw ? pw.name : '—';
     slotPrimary.style.setProperty('--acc', pw ? pw.accent : '#3fc8b4');
   }
 
   function updateEquipBtn(w) {
+    const equippedId = curClass().primary;
     if (w.locked) { equipBtn.textContent = 'BLOQUEADA'; equipBtn.disabled = true; equipBtn.className = 'arm-equip locked'; }
-    else if (loadout.primary === w.id) { equipBtn.textContent = 'EQUIPADA ✓'; equipBtn.disabled = true; equipBtn.className = 'arm-equip done'; }
+    else if (equippedId === w.id) { equipBtn.textContent = 'EQUIPADA ✓'; equipBtn.disabled = true; equipBtn.className = 'arm-equip done'; }
     else { equipBtn.textContent = 'EQUIPAR'; equipBtn.disabled = false; equipBtn.className = 'arm-equip'; }
+  }
+
+  // ---- tira de abas de classe ----
+  function renderClassTabs() {
+    if (!classTabsEl) return;
+    classTabsEl.innerHTML = '';
+    classes.forEach((c, i) => {
+      const w = byId(c.primary);
+      const tab = document.createElement('div');
+      tab.className = 'arm-class-tab' + (i === classIdx ? ' active' : '');
+      tab.style.setProperty('--acc', w ? w.accent : '#3fc8b4');
+      if (renamingIdx === i) {
+        tab.innerHTML = `<input class="act-rename" type="text" maxlength="16" value="${c.name.replace(/"/g, '&quot;')}">`;
+        classTabsEl.appendChild(tab);
+        const input = tab.querySelector('input');
+        input.focus(); input.select();
+        const commit = () => {
+          const v = input.value.trim();
+          if (v) c.name = v.slice(0, 16);
+          renamingIdx = -1;
+          saveClasses(classes);
+          renderClassTabs();
+        };
+        input.onblur = commit;
+        input.onkeydown = e => {
+          if (e.key === 'Enter') input.blur();
+          else if (e.key === 'Escape') { renamingIdx = -1; renderClassTabs(); }
+        };
+        return;
+      }
+      tab.innerHTML = `
+        <span class="act-name">${c.name}</span>
+        <span class="act-weapon">${w ? w.icon + ' ' + w.name : '—'}</span>
+        <button type="button" class="act-edit" title="Renomear">✎</button>`;
+      tab.querySelector('.act-edit').onclick = ev => {
+        ev.stopPropagation();
+        renamingIdx = i;
+        renderClassTabs();
+      };
+      tab.onclick = () => selectClass(i);
+      classTabsEl.appendChild(tab);
+    });
+  }
+
+  function selectClass(i) {
+    if (i === classIdx) return;
+    classIdx = i;
+    setActiveIndex(i);
+    renderClassTabs();
+    updateBadges();
+    const w = byId(curClass().primary);
+    if (w) updateEquipBtn(w);
   }
 
   function select(id) {
@@ -688,9 +745,10 @@ export function initArmory() {
 
   equipBtn.onclick = () => {
     const w = byId(selectedId);
-    if (w.locked || loadout.primary === w.id) return;
-    loadout.primary = w.id;
-    try { localStorage.setItem(LOADOUT_KEY, JSON.stringify(loadout)); } catch { /* ignore */ }
+    if (w.locked || curClass().primary === w.id) return;
+    curClass().primary = w.id;
+    saveClasses(classes);
+    renderClassTabs();
     updateBadges();
     updateEquipBtn(w);
     equipBtn.classList.remove('pulse'); void equipBtn.offsetWidth; equipBtn.classList.add('pulse');
@@ -740,13 +798,16 @@ export function initArmory() {
     open() {
       if (!viewer) { viewer = makeViewer(canvas); }
       open = true;
-      loadout = loadLoadout();
+      classes = loadClasses();
+      classIdx = getActiveIndex();
+      renamingIdx = -1;
       viewer.resize();
+      renderClassTabs();
       updateBadges();
-      // ?armory=<id> abre direto numa arma; senão, na primária equipada
+      // ?armory=<id> abre direto numa arma; senão, na primária da classe ativa
       const deep = new URLSearchParams(location.search).get('armory');
       const startId = deep && byId(deep) ? deep
-        : (loadout.primary && byId(loadout.primary) ? loadout.primary : 'falcao');
+        : (curClass().primary && byId(curClass().primary) ? curClass().primary : 'falcao');
       select(startId);
       if (!ro && 'ResizeObserver' in window) {
         ro = new ResizeObserver(() => { if (open && viewer) viewer.resize(); });
