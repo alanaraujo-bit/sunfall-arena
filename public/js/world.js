@@ -973,6 +973,33 @@ export function makeViewmodel(kind) {
     muzzle = new THREE.Object3D();
     muzzle.position.set(0, 0.015, -0.56);
     grp.add(muzzle);
+  } else if (kind === 'vespa') {
+    // ---------------- Submetralhadora "VESPA-C1" ----------------
+    // Silhueta pequena e compacta — a arma mais curta do arsenal (mobilidade
+    // altíssima), com carregador reto bem grande pra caber os 25 tiros à
+    // vista, coronha tubular retrátil (sem massa de madeira) e cano curto.
+    add(new RoundedBoxGeometry(0.068, 0.09, 0.28, 2, 0.014), metal, 0, 0, 0.02);              // corpo curto
+    const barrel = add(new THREE.CylinderGeometry(0.016, 0.016, 0.14, 10), metal, 0, 0.01, -0.2);
+    barrel.rotation.x = Math.PI / 2;
+    add(new THREE.CylinderGeometry(0.022, 0.02, 0.03, 10), darkM, 0, 0.01, -0.28)
+      .rotation.x = Math.PI / 2;                                                               // boca
+    add(new RoundedBoxGeometry(0.05, 0.055, 0.14, 2, 0.01), darkM, 0, -0.015, -0.08);          // guarda-mão curto
+    const mag = add(new RoundedBoxGeometry(0.04, 0.22, 0.075, 2, 0.01), darkM, 0, -0.16, 0.03);
+    mag.rotation.x = 0.1;                                                                       // carregador reto e grande
+    const grip = add(new RoundedBoxGeometry(0.045, 0.11, 0.06, 2, 0.01), darkM, 0, -0.085, 0.13);
+    grip.rotation.x = -0.3;
+    // coronha tubular retrátil (2 hastes finas + placa de ombro), sem madeira
+    for (const sx of [0.018, -0.018]) {
+      add(new THREE.CylinderGeometry(0.007, 0.007, 0.22, 8), metal, sx, 0.01, 0.24)
+        .rotation.x = Math.PI / 2;
+    }
+    add(new RoundedBoxGeometry(0.06, 0.09, 0.02, 2, 0.008), darkM, 0, 0.01, 0.35);              // placa de ombro
+    add(new THREE.BoxGeometry(0.01, 0.03, 0.01), metal, 0, 0.055, -0.14);                       // massa de mira dianteira
+    add(new RoundedBoxGeometry(0.035, 0.03, 0.03, 2, 0.008), metal, 0, 0.055, 0.08);            // alça traseira
+    add(new THREE.BoxGeometry(0.06, 0.014, 0.09), accent, 0, 0.036, -0.02);                     // detalhe teal
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.01, -0.3);
+    grp.add(muzzle);
   } else if (kind === 'sentinela') {
     // ---------------- Fuzil tático "SENTINELA-DR" ----------------
     // Meio-termo entre o FALCÃO (curto, ágil) e a FERRÃO (longa, pesada):

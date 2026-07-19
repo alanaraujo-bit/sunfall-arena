@@ -78,12 +78,20 @@ export const SFX = {
   // Tiros em camadas: transiente mecânico + corpo + soco grave (+ eco no sniper).
   // `v` varia o timbre por disparo (rajada não soa metralhadora de brinquedo);
   // `muf` abafa os agudos com a distância (vol < 1 = tiro de outro jogador longe).
-  // `kind`: 'ar' | 'sniper' | 'shotgun' | 'dmr'.
+  // `kind`: 'ar' | 'sniper' | 'shotgun' | 'dmr' | 'smg'.
   shot(kind = 'ar', vol = 1) {
     ensure();
     const v = 0.94 + Math.random() * 0.12;
     const muf = 0.45 + 0.55 * Math.min(1, vol);
-    if (kind === 'sniper') {
+    if (kind === 'smg') {
+      // VESPA-C1: leve e zumbida — apelidada de "serra" pelos operadores.
+      // Transiente fino e agudo, corpo curto (cadência tão alta que o som
+      // vira quase um zumbido contínuo numa rajada), sem peso grave
+      if (vol > 0.35) noise(0.014, 0.26 * vol, 6200, 3800, 'bandpass');
+      noise(0.075, 0.36 * vol, 3400 * v * muf, 700);
+      tone(210 * v, 0.05, 0.24 * vol, 'square', 110);
+      tone(105 * v, 0.06, 0.16 * vol, 'sine', 60);
+    } else if (kind === 'sniper') {
       // FERRÃO-SR: estalo seco de ferrolho + corpo grave longo + eco duplo
       if (vol > 0.35) noise(0.035, 0.5 * vol, 6000, 2500, 'highpass');
       noise(0.34, 0.55 * vol, 1500 * v * muf, 90);

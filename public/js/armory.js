@@ -355,7 +355,72 @@ function buildSentinelaDR() {
   return g;
 }
 
-const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR, brecha: buildBrecha12, sentinela: buildSentinelaDR };
+// ------------------------------------------------------------
+// Modelo 3D detalhado — VESPA-C1 (submetralhadora real do jogo)
+// A menor e mais compacta arma do arsenal: corpo curto, carregador
+// reto grande, coronha tubular retrátil (2 hastes, sem madeira) e
+// cano quase sem projeção. Acentos laranja — identidade "leve e
+// agressiva", nada a ver com o peso visual das outras três.
+// ------------------------------------------------------------
+function buildVespaC1() {
+  const g = new THREE.Group();
+
+  const gun = new THREE.MeshStandardMaterial({ map: tex('metal'), color: 0x808689, roughness: 0.44, metalness: 0.85 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xb4bcc2, roughness: 0.3, metalness: 0.9 });
+  const poly = new THREE.MeshStandardMaterial({ color: 0x232729, roughness: 0.72, metalness: 0.15 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x131515, roughness: 0.85, metalness: 0.1 });
+  const orange = new THREE.MeshStandardMaterial({ color: 0xf0844c, roughness: 0.4, metalness: 0.5, emissive: 0x4a2408, emissiveIntensity: 0.6 });
+
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    g.add(m);
+    return m;
+  };
+  const cyl = (r1, r2, h, seg = 16) => new THREE.CylinderGeometry(r1, r2, h, seg);
+  const rbox = (w, h, d, r = 0.012) => new RoundedBoxGeometry(w, h, d, 2, r);
+
+  // ---- receiver curto e compacto ----
+  add(rbox(0.34, 0.13, 0.11), gun, 0.05, 0, 0);
+  add(new THREE.BoxGeometry(0.2, 0.02, 0.004), orange, 0.05, -0.035, 0.056);
+  add(new THREE.BoxGeometry(0.2, 0.02, 0.004), orange, 0.05, -0.035, -0.056);
+  add(cyl(0.014, 0.014, 0.05, 10), steel, 0.14, 0.075, 0.06, Math.PI / 2, 0, 0);   // manopla de rearme
+
+  // ---- cano curto + boca ----
+  add(cyl(0.02, 0.02, 0.16, 14), steel, -0.24, 0.01, 0, 0, 0, Math.PI / 2);
+  add(cyl(0.026, 0.023, 0.05, 14), dark, -0.335, 0.01, 0, 0, 0, Math.PI / 2);
+  add(rbox(0.16, 0.1, 0.1), poly, -0.1, -0.01, 0);                                 // guarda-mão curto
+
+  // ---- carregador reto e grande (marca registrada da VESPA) ----
+  const mag = new THREE.Group(); mag.position.set(-0.02, -0.2, 0); g.add(mag);
+  const madd = (geo, mat, x, y, z, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.z = rz; mag.add(m); return m; };
+  madd(rbox(0.075, 0.28, 0.09), poly, 0, 0, 0, 0.03);
+  madd(new THREE.BoxGeometry(0.01, 0.24, 0.05), orange, -0.045, 0.01, 0);
+  madd(rbox(0.07, 0.03, 0.086), dark, 0.006, -0.15, 0);
+
+  // ---- punho + guarda-gatilho ----
+  add(rbox(0.08, 0.13, 0.07), poly, 0.12, -0.11, 0, 0, 0, -0.26);
+  add(new THREE.TorusGeometry(0.045, 0.01, 8, 16, Math.PI), dark, 0.04, -0.09, 0, Math.PI, 0, 0);
+  add(new THREE.BoxGeometry(0.012, 0.03, 0.018), steel, 0.04, -0.08, 0);
+
+  // ---- coronha tubular retrátil (2 hastes finas, sem madeira) ----
+  for (const sz of [0.022, -0.022]) {
+    add(cyl(0.008, 0.008, 0.24, 8), steel, 0.24, 0.01, sz, 0, 0, Math.PI / 2);
+  }
+  add(rbox(0.07, 0.11, 0.025), dark, 0.36, 0.01, 0);          // placa de ombro
+  add(new THREE.BoxGeometry(0.02, 0.02, 0.004), orange, 0.36, 0.06, 0.014);
+
+  // ---- miras minimalistas ----
+  add(new THREE.BoxGeometry(0.01, 0.03, 0.01), steel, -0.16, 0.075, 0);
+  add(rbox(0.03, 0.03, 0.025), steel, 0.02, 0.075, 0);
+
+  g.position.x = 0.14;
+  g.scale.setScalar(1.2);   // compensa o corpo curto — mesma presença visual na vitrine
+  return g;
+}
+
+const MODEL_BUILDERS = { falcao: buildFalcao9, ferrao: buildFerraoSR, brecha: buildBrecha12, sentinela: buildSentinelaDR, vespa: buildVespaC1 };
 
 // ------------------------------------------------------------
 // Visualizador 3D

@@ -96,13 +96,14 @@ export const ARSENAL = [
     role: 'Curta distância · agressivo',
     icon: '🐝',
     accent: '#f0844c',
-    model: null,
-    locked: true,
+    model: 'vespa',
+    locked: false,
     desc: 'Leve, faminta e barulhenta. A VESPA despeja um enxame de projéteis a menos de dez metros — feita para quem entra na sala antes de pensar. Passou disso, cada disparo vira desperdício.',
     philosophy: 'Velocidade é sobrevivência. A Kestrel abriu mão de alcance e dano por grama de peso: sacar, mirar e correr com a VESPA é mais rápido do que com qualquer outra arma.',
     trivia: [
       'A cadência é tão alta que o carregador esvazia em pouco mais de um segundo.',
-      'Operadores apelidaram o som do disparo de “serra”.'
+      'Operadores apelidaram o som do disparo de “serra”.',
+      'É a arma mais rápida de sacar do arsenal — e a que deixa quem carrega mais ágil no chão.'
     ],
     core: [
       { k: 'Dano', v: 34 }, { k: 'Cadência', v: 94 }, { k: 'Alcance', v: 32 },
@@ -112,11 +113,11 @@ export const ARSENAL = [
       { k: 'Tempo de recarga', d: '1.9 s' },
       { k: 'Carregador', d: '25' },
       { k: 'Cadência', d: '~820 disp/min' },
+      { k: 'Dano por tiro', d: '17' },
+      { k: 'Dano na cabeça', d: '29' },
       { k: 'Disparo', d: 'Automático' },
-      { k: 'Alcance efetivo', d: 'Curto' },
-      { k: 'Mobilidade', d: 'Altíssima' },
-      { k: 'Precisão parado', d: 'Média' },
-      { k: 'Precisão em mov.', d: 'Alta' }
+      { k: 'Mobilidade', d: 'Altíssima (anda mais rápido, saca mais rápido)' },
+      { k: 'Precisão parado', d: 'Média' }
     ]
   },
   {

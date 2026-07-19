@@ -22,13 +22,13 @@ window.addEventListener('error', e => { errlog.textContent += e.message + '\n'; 
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', slide: 'ShiftLeft', reload: 'KeyR', kit: 'KeyE',
-  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', w4: 'Digit4', w5: 'Digit5', lastw: 'KeyQ',
+  w1: 'Digit1', w2: 'Digit2', w3: 'Digit3', w4: 'Digit4', w5: 'Digit5', w6: 'Digit6', lastw: 'KeyQ',
   melee: 'KeyV', nade: 'KeyG', smoke: 'KeyC', board: 'Tab'
 };
 const BIND_LABELS = {
   forward: 'Andar — frente', back: 'Andar — trás', left: 'Andar — esquerda', right: 'Andar — direita',
   jump: 'Pular', slide: 'Deslizar', reload: 'Recarregar', kit: 'Usar Kit',
-  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', w4: 'Escopeta', w5: 'Fuzil Tático', lastw: 'Troca rápida',
+  w1: 'Arma 1', w2: 'Arma 2', w3: 'Faca', w4: 'Escopeta', w5: 'Fuzil Tático', w6: 'Submetralhadora', lastw: 'Troca rápida',
   melee: 'Golpe rápido', nade: 'Granada', smoke: 'Fumaça', board: 'Placar'
 };
 // Códigos de mouse no mesmo formato dos binds (Mouse0 = esq., Mouse3/4 = laterais)
@@ -812,6 +812,7 @@ const SMOKE_VM = 4;  // viewmodel da granada de fumaça
 // direto). Ver espelho server-side em server/ws.js (WEAPONS[5]).
 const BRECHA = 5;
 const SENTINELA = 6;   // mesmo esquema de índice global do BRECHA — ver comentário acima
+const VESPA = 7;
 const WEAPONS = [];
 WEAPONS[0] = {
   // rec = personalidade do recuo:
@@ -868,9 +869,22 @@ WEAPONS[SENTINELA] = {
   kick: 0.05,
   rec: { climb: 0.06, drift: 0.008, jitter: 0.006, ramp: 0, max: 0.13, recovHeld: 2.8, recov: 8, bloom: 0, bloomMax: 0, vmKick: 0.09, shake: 0.025 }
 };
-const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️', '💥', '🎯'];
+// VESPA-C1: SMG agressiva de curtíssima distância. Identidade é velocidade,
+// não potência — dano baixo (17/tiro) compensado por cadência quase 2x a do
+// FALCÃO (int 0.073 ≈ 820 disp/min); "mobilidade altíssima" é mecânica de
+// verdade, não só flavor: anda mais rápido com ela na mão (spdMult) e saca
+// mais rápido que qualquer outra arma (swapT — switchWeapon() usa esse valor
+// no lugar do 0.25 padrão quando presente).
+WEAPONS[VESPA] = {
+  name: 'VESPA-C1', dmg: 17, head: 1.7, int: 0.073, mag: 25, reload: 1.9, spread: 0.022, auto: true,
+  smg: true,               // flavor: SFX própria (zumbido/serra, mais leve que o FALCÃO)
+  spdMult: 1.12, swapT: 0.15,
+  kick: 0.02,
+  rec: { climb: 0.021, drift: 0.009, jitter: 0.004, ramp: 6, max: 0.1, recovHeld: 2.1, recov: 13, bloom: 0.0019, bloomMax: 0.022, vmKick: 0.045 }
+};
+const WEAPON_ICONS = ['⚡', '◎', '🗡', '💣', '🛢️', '💥', '🎯', '🐝'];
 const ammo = [];
-ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag;
+ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag; ammo[VESPA] = WEAPONS[VESPA].mag;
 let curW = 0, lastShot = 0, reloading = 0, zoomed = false, recoil = 0, swapT = 0, camShake = 0;
 let recoilY = 0;   // componente lateral do recuo (yaw)
 let sprayN = 0;    // tiros consecutivos na rajada atual (padrão de recuo + bloom)
@@ -884,6 +898,7 @@ function shotKind(wi) {
   if (ww.sniper) return 'sniper';
   if (ww.pellets) return 'shotgun';
   if (ww.dmr) return 'dmr';
+  if (ww.smg) return 'smg';
   return 'ar';
 }
 
@@ -894,22 +909,24 @@ const vmNade = makeViewmodel('nade');
 const vmSmoke = makeViewmodel('smoke');
 const vmBrecha = makeViewmodel('brecha');
 const vmSentinela = makeViewmodel('sentinela');
+const vmVespa = makeViewmodel('vespa');
 const vmRoot = new THREE.Group();
 vmRoot.position.set(0.26, -0.24, -0.5);
-vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group, vmSmoke.group, vmBrecha.group, vmSentinela.group);
+vmRoot.add(vmAR.group, vmSR.group, vmKnife.group, vmNade.group, vmSmoke.group, vmBrecha.group, vmSentinela.group, vmVespa.group);
 vmSR.group.visible = false;
 vmKnife.group.visible = false;
 vmNade.group.visible = false;
 vmSmoke.group.visible = false;
 vmBrecha.group.visible = false;
 vmSentinela.group.visible = false;
+vmVespa.group.visible = false;
 vmRoot.visible = false; // oculto até entrar na partida
 camera.add(vmRoot);
 scene.add(camera);
 const viewmodels = [];
 viewmodels[0] = vmAR; viewmodels[1] = vmSR; viewmodels[KNIFE] = vmKnife;
 viewmodels[GRENADE] = vmNade; viewmodels[SMOKE_VM] = vmSmoke; viewmodels[BRECHA] = vmBrecha;
-viewmodels[SENTINELA] = vmSentinela;
+viewmodels[SENTINELA] = vmSentinela; viewmodels[VESPA] = vmVespa;
 
 // mostra só a viewmodel do índice `i` (guns e faca)
 function showViewmodel(i) {
@@ -1208,7 +1225,7 @@ const keys = {};
 let mouseDown = false, wantJump = false;
 let lastW = 1; // arma anterior (troca rápida / Q)
 const canvas = renderer.domElement;
-const WEAPON_ORDER = [0, 1, BRECHA, SENTINELA, KNIFE]; // ciclo do scroll
+const WEAPON_ORDER = [0, 1, BRECHA, SENTINELA, VESPA, KNIFE]; // ciclo do scroll
 
 // Zera TODO o input preso. Sem isto, perder o foco (alt-tab, notificação,
 // clicar fora) com uma tecla apertada nunca dispara o keyup → a tecla fica
@@ -1243,6 +1260,7 @@ function onBindPress(code) {
   if (code === binds.w3) switchWeapon(KNIFE);
   if (code === binds.w4) switchWeapon(BRECHA);
   if (code === binds.w5) switchWeapon(SENTINELA);
+  if (code === binds.w6) switchWeapon(VESPA);
   if (code === binds.lastw) quickSwitchWeapon();
   if (code === binds.melee) quickMelee();
   if (code === binds.nade) startNadeCook('frag');
@@ -1348,7 +1366,7 @@ function switchWeapon(i) {
   if (!WEAPON_ORDER.includes(i)) return;   // só os slots reais (guns + faca)
   lastW = curW;
   curW = i;
-  swapT = 0.25;
+  swapT = WEAPONS[i].swapT || 0.25;   // VESPA-C1 saca mais rápido (mobilidade)
   setZoom(false);
   cancelMelee();
   showViewmodel(i);
@@ -1417,7 +1435,9 @@ function moveHoriz(axis, delta) {
 }
 
 function updateMovement(dt) {
-  const spd = 8.2, accG = 60, accA = 16, fric = me.sliding ? 1.6 : 10;
+  // mobilidade por arma: hoje só a VESPA-C1 tem bônus real (spdMult) — "sacar,
+  // mirar e correr com a VESPA é mais rápido que com qualquer outra arma"
+  const spd = 8.2 * (WEAPONS[curW].spdMult || 1), accG = 60, accA = 16, fric = me.sliding ? 1.6 : 10;
   // direção desejada
   let fx = 0, fz = 0;
   if (keys[binds.forward]) fz += 1;
@@ -3110,7 +3130,7 @@ net.on('spawn', msg => {
     me.hp = 100;
     me.dead = false;
     faceCenter();
-    ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag;
+    ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag; ammo[VESPA] = WEAPONS[VESPA].mag;
     reloading = 0;
     me.nades = msg.nades ?? NADE.COUNT_START;
     me.smokes = msg.smokes ?? SMOKE.COUNT_START;
@@ -3244,7 +3264,7 @@ net.on('restart', msg => {
       me.vel.set(0, 0, 0);
       me.hp = 100; me.dead = false;
       faceCenter();
-      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag;
+      ammo[0] = WEAPONS[0].mag; ammo[1] = WEAPONS[1].mag; ammo[BRECHA] = WEAPONS[BRECHA].mag; ammo[SENTINELA] = WEAPONS[SENTINELA].mag; ammo[VESPA] = WEAPONS[VESPA].mag;
       reloading = 0;
       me.nades = p.nades ?? NADE.COUNT_START;
       me.smokes = p.smokes ?? SMOKE.COUNT_START;
