@@ -1,0 +1,43 @@
+{
+  "id": "v2.4.1",
+  "version": "2.4.1",
+  "build": 29,
+  "title": "O canal com a equipe está oficialmente aberto",
+  "subtitle": "Sugestões e reportes agora chegam à equipe em tempo real",
+  "date": "2026-07-20",
+  "time": "16:55",
+  "author": "Equipe Sunfall",
+  "type": "tech",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "Bastidores: o canal interno da equipe foi conectado. Toda sugestão e todo reporte de bug enviados pela Central da Comunidade agora chegam à nossa mesa no mesmo segundo — em formato limpo e direto ao ponto.",
+  "body": [
+    "Atualização rápida de bastidores para fechar o ciclo da v2.4.0: o canal que recebe as mensagens de vocês foi ligado oficialmente. A partir de agora, quando você envia uma sugestão ou reporta um bug, a notificação cai em tempo real no espaço de trabalho da equipe.",
+    "Aproveitamos para redesenhar o formato dessas notificações internas: gravidade com código de cores, contexto em uma linha e só os detalhes que realmente existem — o objetivo é a equipe entender cada mensagem num relance e agir mais rápido em cima dela."
+  ],
+  "motivation": "Comunicação só funciona se alguém está ouvindo do outro lado — e agora está, em tempo real.",
+  "impact": "Suas mensagens não caem numa caixa que alguém abre depois: elas chegam na hora, organizadas para gerar ação rápida.",
+  "notes": "",
+  "techNotes": "Webhook configurado via variável de ambiente (secret), sem URL no código. Embeds compactos: cor por gravidade, campos condicionais e menções sempre desativadas para conteúdo de jogador.",
+  "footer": "Fala com a gente — agora é linha direta. — Equipe Sunfall",
+  "media": [],
+  "commits": [],
+  "cards": [
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Canal da equipe conectado",
+      "desc": "Sugestões e reportes de bug passam a notificar a equipe em tempo real, no momento exato do envio.",
+      "impact": "Menos tempo entre o seu relato e a nossa ação.",
+      "tags": ["comunidade", "discord"]
+    },
+    {
+      "category": "tech",
+      "state": "improved",
+      "title": "Notificações internas repaginadas",
+      "desc": "Formato compacto e escaneável: gravidade com cor, contexto em uma linha e detalhes apenas quando existem.",
+      "impact": "A equipe entende cada mensagem num relance.",
+      "tags": ["embeds", "bastidores"]
+    }
+  ]
+}

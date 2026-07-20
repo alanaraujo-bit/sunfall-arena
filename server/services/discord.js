@@ -1,8 +1,13 @@
 // ============================================================
 // SUNFALL ARENA — integração com Discord (webhook)
 // Encaminha sugestões e reportes de bug para o canal interno da
-// equipe em embeds organizados. Configuração 100% por variável
-// de ambiente (DISCORD_WEBHOOK_URL) — sem URL no código.
+// equipe. Configuração 100% por variável de ambiente
+// (DISCORD_WEBHOOK_URL) — sem URL no código.
+//
+// Filosofia do formato: bater o olho e entender. Título direto,
+// uma linha de contexto, corpo, e só depois os detalhes — campos
+// vazios simplesmente não aparecem.
+//
 // Falha de envio nunca derruba a requisição: o registro no banco
 // é a fonte da verdade; o Discord é notificação.
 // ============================================================
@@ -16,8 +21,10 @@ const COLORS = {
   high: 0xf08060,       // laranja
   critical: 0xe0554e    // vermelho
 };
+const SEV_EMOJI = { low: '🟢', medium: '🟡', high: '🟠', critical: '🔴' };
 
-const cut = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + '…' : s || '—');
+const cut = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + '…' : s || '');
+const line = parts => parts.filter(Boolean).join('  ·  ');
 
 export async function sendToDiscord(embed) {
   if (!WEBHOOK_URL) {
@@ -43,43 +50,46 @@ export async function sendToDiscord(embed) {
   }
 }
 
-export function suggestionEmbed({ category, title, message, username, version, id }) {
+// 💡 Sugestão: título + mensagem + UMA linha de contexto. Nada mais.
+export function suggestionEmbed({ categoryLabel, title, message, username, version, id }) {
   return {
-    title: `💡 Sugestão — ${cut(title, 200)}`,
-    description: cut(message, 3500),
+    title: `💡 ${cut(title, 230)}`,
+    description: `${cut(message, 3200)}\n\n${line([categoryLabel, `🎮 ${cut(username, 40)}`, version && `🏷️ ${version}`])}`,
     color: COLORS.suggestion,
-    fields: [
-      { name: '📂 Categoria', value: cut(category, 100), inline: true },
-      { name: '🎮 Jogador', value: cut(username, 100), inline: true },
-      { name: '🏷️ Versão', value: cut(version, 20), inline: true }
-    ],
-    footer: { text: `Sunfall Arena · Sugestão #${id}` },
+    footer: { text: `Sugestão #${id} · Sunfall Arena` },
     timestamp: new Date().toISOString()
   };
 }
 
+// 🐛 Bug: gravidade no topo (cor + emoji), descrição, e detalhes
+// apenas quando existem — passos, esperado/obtido, sistema, logs.
 export function bugEmbed(b) {
-  const fields = [
-    { name: '📂 Categoria', value: cut(b.category, 100), inline: true },
-    { name: '💥 Gravidade', value: cut(b.severityLabel, 40), inline: true },
-    { name: '⏫ Prioridade', value: cut(b.priorityLabel, 40), inline: true },
-    { name: '🎮 Jogador', value: cut(b.username, 100), inline: true },
-    { name: '🏷️ Versão', value: cut(b.version, 20), inline: true },
-    { name: '🖥️ Plataforma', value: cut(b.platform, 120), inline: true },
-    { name: '📐 Resolução / Monitor', value: cut(`${b.resolution || '—'} · ${b.monitor || '—'}`, 120), inline: true },
-    { name: '📊 FPS', value: cut(b.fps, 30), inline: true },
-    { name: '🧰 Hardware', value: cut(b.hardware, 200), inline: true },
-    { name: '👣 Passos para reproduzir', value: cut(b.steps, 1000), inline: false },
-    { name: '✅ Resultado esperado', value: cut(b.expected, 500), inline: false },
-    { name: '❌ Resultado obtido', value: cut(b.actual, 500), inline: false }
-  ];
-  if (b.logs) fields.push({ name: '📜 Logs', value: cut('```' + b.logs + '```', 1000), inline: false });
+  const head = line([
+    `${SEV_EMOJI[b.severity] || '🟡'} **${b.severityLabel.toUpperCase()}**`,
+    b.categoryLabel,
+    `prioridade ${b.priorityLabel.toLowerCase()}`
+  ]);
+
+  const fields = [];
+  if (b.steps) fields.push({ name: '👣 Passos para reproduzir', value: cut(b.steps, 1000), inline: false });
+  if (b.expected || b.actual) fields.push({
+    name: '✅ Esperado → ❌ Obtido',
+    value: cut([b.expected && `**Esperado:** ${b.expected}`, b.actual && `**Obtido:** ${b.actual}`].filter(Boolean).join('\n'), 1000),
+    inline: false
+  });
+  if (b.platform) fields.push({
+    name: '🖥️ Sistema',
+    value: cut(`${line([b.platform, b.resolution && `📐 ${b.resolution}`, b.fps && `📊 ${b.fps}`])}\n${b.hardware || ''}`.trim(), 1000),
+    inline: false
+  });
+  if (b.logs) fields.push({ name: '📜 Logs', value: cut('```' + b.logs.slice(-900) + '```', 1000), inline: false });
+
   return {
-    title: `🐛 Bug — ${cut(b.title, 200)}`,
-    description: cut(b.description, 2000),
+    title: `🐛 ${cut(b.title, 230)}`,
+    description: `${head}\n\n${cut(b.description, 2500)}`,
     color: COLORS[b.severity] || COLORS.medium,
     fields,
-    footer: { text: `Sunfall Arena · Bug #${b.id}` },
+    footer: { text: line([`Bug #${b.id}`, `🎮 ${cut(b.username, 40)}`, b.version && `🏷️ ${b.version}`, 'Sunfall Arena']) },
     timestamp: new Date().toISOString()
   };
 }

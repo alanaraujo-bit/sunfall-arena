@@ -119,7 +119,10 @@ router.post('/patchnotes/:id/favorite', optionalAuth, socialLimit, async (req, r
 
 // ---------------- sugestões ----------------
 
-const SUGGESTION_CATEGORIES = ['ideia', 'melhoria', 'elogio', 'opiniao', 'experiencia', 'outro'];
+const SUGGESTION_CATEGORIES = {
+  ideia: '💡 Ideia', melhoria: '📈 Melhoria', elogio: '❤️ Elogio',
+  opiniao: '💬 Opinião', experiencia: '🎮 Experiência', outro: '📦 Outro'
+};
 const submitLimit = rateLimit('submit', 5, 10 * 60 * 1000, clientIp);
 
 router.post('/community/suggestion', optionalAuth, submitLimit, async (req, res) => {
@@ -128,7 +131,7 @@ router.post('/community/suggestion', optionalAuth, submitLimit, async (req, res)
   const message = clean(req.body?.message, 2000);
   const version = clean(req.body?.version, 20);
 
-  if (!SUGGESTION_CATEGORIES.includes(category)) return bad(res, 'invalid_category');
+  if (!SUGGESTION_CATEGORIES[category]) return bad(res, 'invalid_category');
   if (title.length < 4) return bad(res, 'title_too_short');
   if (message.length < 10) return bad(res, 'message_too_short');
   if (version && !PATCH_ID_RE.test(version)) return bad(res, 'invalid_version');
@@ -142,13 +145,19 @@ router.post('/community/suggestion', optionalAuth, submitLimit, async (req, res)
     [req.user?.sub || null, username, JSON.stringify(payload), version || null, ipHash(clientIp(req))]
   );
 
-  const delivered = await sendToDiscord(suggestionEmbed({ category, title, message, username, version, id: rows[0].id }));
+  const delivered = await sendToDiscord(suggestionEmbed({
+    categoryLabel: SUGGESTION_CATEGORIES[category],
+    title, message, username, version, id: rows[0].id
+  }));
   res.json({ ok: true, id: rows[0].id, delivered });
 });
 
 // ---------------- reporte de bugs ----------------
 
-const BUG_CATEGORIES = ['gameplay', 'interface', 'rede', 'audio', 'grafico', 'conta', 'outro'];
+const BUG_CATEGORIES = {
+  gameplay: '🎮 Gameplay', interface: '🎨 Interface', rede: '📡 Rede',
+  audio: '🔊 Áudio', grafico: '🖼️ Gráficos', conta: '👤 Conta', outro: '📦 Outro'
+};
 const SEVERITIES = { low: 'Baixa', medium: 'Média', high: 'Alta', critical: 'Crítica' };
 const PRIORITIES = { low: 'Baixa', medium: 'Média', high: 'Alta' };
 
@@ -172,7 +181,7 @@ router.post('/community/bug', optionalAuth, submitLimit, async (req, res) => {
     logs: clean(b.logs, 3000)
   };
 
-  if (!BUG_CATEGORIES.includes(bug.category)) return bad(res, 'invalid_category');
+  if (!BUG_CATEGORIES[bug.category]) return bad(res, 'invalid_category');
   if (bug.title.length < 4) return bad(res, 'title_too_short');
   if (bug.description.length < 10) return bad(res, 'description_too_short');
   if (!SEVERITIES[bug.severity]) return bad(res, 'invalid_severity');
@@ -191,8 +200,9 @@ router.post('/community/bug', optionalAuth, submitLimit, async (req, res) => {
     ...bug,
     id: rows[0].id,
     username,
-    severityLabel: `${SEVERITIES[bug.severity]}`,
-    priorityLabel: `${PRIORITIES[bug.priority]}`
+    categoryLabel: BUG_CATEGORIES[bug.category],
+    severityLabel: SEVERITIES[bug.severity],
+    priorityLabel: PRIORITIES[bug.priority]
   }));
   res.json({ ok: true, id: rows[0].id, delivered });
 });
