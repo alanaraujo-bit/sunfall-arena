@@ -1,0 +1,61 @@
+{
+  "id": "v2.3.0",
+  "version": "2.3.0",
+  "build": 27,
+  "title": "Seu perfil, sua história completa",
+  "subtitle": "Estatísticas por modo e por mapa, tempo de jogo exato e curtidas entre jogadores",
+  "date": "2026-07-20",
+  "time": "15:11",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "O perfil ganhou profundidade: abas GERAL, MODOS e MAPAS com estatísticas detalhadas, contagem exata de tempo jogado — e agora dá para CURTIR o perfil dos outros jogadores.",
+  "body": [
+    "Números genéricos contam meia história. A partir de hoje, seu perfil conta a história inteira: além do resumo geral, as novas abas MODOS e MAPAS detalham seu desempenho em cada modo de jogo e em cada arena — eliminações, mortes, headshots, vitórias e partidas, tudo separado.",
+    "Descubra de uma vez por todas: você é melhor no Todos contra Todos ou no Mata-mata em Equipe? Seu território é o Cânion ou o Ocaso? Os números respondem.",
+    "O tempo de jogo também ficou honesto: o perfil agora registra exatamente quanto tempo você passou em combate — no total, por modo e por mapa.",
+    "E chegou a primeira moeda social da arena: a CURTIDA. Visitou um perfil e respeitou o que viu? Deixe um ♥. O contador de curtidas aparece no perfil de todo jogador — e sim, nós sabemos que vocês vão competir por isso também."
+  ],
+  "motivation": "Estatísticas detalhadas transformam autoconhecimento em melhoria — e curtidas transformam respeito entre jogadores em algo visível. As duas coisas fortalecem o que a arena tem de melhor: a comunidade.",
+  "impact": "Você enxerga exatamente onde é forte e onde precisa treinar, e o reconhecimento dos outros jogadores agora fica registrado no seu perfil.",
+  "notes": "As abas novas valem tanto para o seu perfil quanto para os perfis públicos que você visita.",
+  "techNotes": "Novas tabelas de estatísticas por modo e por mapa com agregação no fim de cada partida; contagem de tempo por sessão de jogo real; curtidas com unicidade garantida por par de jogadores.",
+  "footer": "Curtiu o perfil de alguém? Deixa o coração. — Equipe Sunfall",
+  "media": [],
+  "commits": ["97a8faa", "d9d8a7c"],
+  "cards": [
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Estatísticas por modo e por mapa",
+      "desc": "Abas MODOS e MAPAS no perfil detalham eliminações, mortes, headshots, vitórias e partidas em cada contexto.",
+      "impact": "Você descobre cientificamente onde é letal.",
+      "tags": ["estatísticas", "modos", "mapas"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Tempo de jogo exato",
+      "desc": "O perfil registra o tempo real passado em partida — total, por modo e por mapa.",
+      "impact": "Suas horas de dedicação agora têm registro oficial.",
+      "tags": ["tempo", "playtime"]
+    },
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Curtidas entre jogadores",
+      "desc": "Visite qualquer perfil e deixe um ♥. O contador de curtidas fica visível para todo mundo.",
+      "impact": "Respeito entre jogadores virou estatística.",
+      "tags": ["curtidas", "social"]
+    },
+    {
+      "category": "ui",
+      "state": "improved",
+      "title": "Perfil reorganizado em abas",
+      "desc": "GERAL, MODOS e MAPAS — no seu perfil e nos perfis públicos que você visita, com o mesmo visual limpo.",
+      "impact": "Mais informação sem nenhuma poluição.",
+      "tags": ["perfil", "abas"]
+    }
+  ]
+}

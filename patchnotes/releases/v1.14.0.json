@@ -1,0 +1,60 @@
+{
+  "id": "v1.14.0",
+  "version": "1.14.0",
+  "build": 21,
+  "title": "Combate que comemora com você",
+  "subtitle": "Números de dano flutuantes, locutor de multi-kill e o barril explosivo",
+  "date": "2026-07-18",
+  "time": "14:39",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Três camadas novas de emoção no combate: números de dano flutuando a cada acerto, um locutor anunciando suas sequências de eliminação — e barris explosivos espalhados pelo mapa esperando um motivo.",
+  "body": [
+    "Acertar um tiro ficou visivelmente mais gostoso: cada bala que conecta agora solta um número de dano flutuante no ponto do impacto, no estilo consagrado pelo Free Fire. Headshots ganham destaque próprio — você vê, em tempo real, o estrago que está fazendo.",
+    "Eliminar ficou mais épico: um feedback especial de abate e headshot na tela, e um locutor que acompanha suas sequências — DOUBLE KILL, TRIPLE KILL e além. Emendar eliminações agora tem trilha sonora de glória.",
+    "E o mapa ganhou um novo personagem: o BARRIL EXPLOSIVO. Posicionado em pontos estratégicos, ele é uma armadilha à espera de um tiro certeiro — atraia inimigos para perto e transforme cenário em eliminação. (Sim, corrigimos o barril que nasceu enterrado até a metade no chão. Ele está de pé e orgulhoso agora.)"
+  ],
+  "motivation": "Feedback é a diferença entre acertar um tiro e SENTIR que acertou um tiro. Todo grande FPS celebra o desempenho do jogador em tempo real — a Sunfall Arena não podia ficar de fora.",
+  "impact": "Cada acerto informa, cada eliminação celebra e o cenário vira arma. O combate ficou mais legível e muito mais emocionante.",
+  "notes": "",
+  "techNotes": "Dano e detonação do barril são autoritativos no servidor; o cliente apenas anima números e efeitos.",
+  "footer": "TRIPLE KILL! (a gente avisa quando acontecer) — Equipe Sunfall",
+  "media": [],
+  "commits": ["e0872cb", "45eb9f2", "dda8ccd", "8270597"],
+  "cards": [
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Números de dano flutuantes",
+      "desc": "Cada acerto exibe o dano causado no ponto de impacto, com destaque especial para headshots — estilo Free Fire.",
+      "impact": "Você mede seu estrago bala a bala.",
+      "tags": ["dano", "feedback", "hud"]
+    },
+    {
+      "category": "audio",
+      "state": "new",
+      "title": "Locutor de multi-kill",
+      "desc": "Sequências de eliminação anunciadas em grande estilo, com feedback visual de kill e headshot na tela.",
+      "impact": "Suas melhores jogadas ganham narração.",
+      "tags": ["locutor", "multi-kill"]
+    },
+    {
+      "category": "world",
+      "state": "new",
+      "title": "Barril explosivo",
+      "desc": "Barris posicionados em pontos estratégicos do mapa detonam com um tiro certeiro, causando dano em área.",
+      "impact": "O cenário agora joga com você (ou contra).",
+      "tags": ["barril", "mapa", "explosivo"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Barril enterrado no chão",
+      "desc": "O barril explosivo nascia com metade do corpo abaixo do solo em alguns pontos. Reposicionado com dignidade.",
+      "impact": "Alvo visível, explosão garantida.",
+      "tags": ["correção", "barril"]
+    }
+  ]
+}

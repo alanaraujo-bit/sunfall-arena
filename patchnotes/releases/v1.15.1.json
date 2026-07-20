@@ -1,0 +1,35 @@
+{
+  "id": "v1.15.1",
+  "version": "1.15.1",
+  "build": 23,
+  "title": "Atualizações mais rápidas para vocês",
+  "subtitle": "Pipeline de publicação unificado — servidor e site atualizados num comando só",
+  "date": "2026-07-18",
+  "time": "18:15",
+  "author": "Equipe Sunfall",
+  "type": "tech",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "Bastidores: unificamos a publicação do servidor de jogo e do site num único comando. Menos fricção para a equipe significa atualizações chegando mais rápido para vocês.",
+  "body": [
+    "Atualização de bastidor, mas com efeito direto na velocidade com que novidades chegam até você: antes, publicar uma atualização exigia dois processos separados — um para o servidor de jogo, outro para o site. Qualquer descuido podia deixar os dois lados dessincronizados.",
+    "Agora é um comando só, que publica os dois lados na ordem certa, sempre juntos. Na prática: mais atualizações, menos espera e zero risco de você baixar um cliente novo falando com um servidor velho."
+  ],
+  "motivation": "Toda fricção no processo de publicação é um imposto sobre a frequência de atualizações. Removê-la beneficia diretamente o ritmo de evolução do jogo.",
+  "impact": "Novidades e correções chegando com mais frequência e confiabilidade.",
+  "notes": "",
+  "techNotes": "Comando único de deploy encadeando a publicação do backend (Fly.io) e do frontend (Vercel), garantindo consistência entre as duas pontas.",
+  "footer": "Menos burocracia, mais jogo. — Equipe Sunfall",
+  "media": [],
+  "commits": ["46611f3"],
+  "cards": [
+    {
+      "category": "tech",
+      "state": "new",
+      "title": "Publicação unificada",
+      "desc": "Servidor de jogo e site agora são publicados juntos, num único comando, sempre em sincronia.",
+      "impact": "Atualizações mais frequentes e sem dessincronia.",
+      "tags": ["deploy", "infraestrutura"]
+    }
+  ]
+}

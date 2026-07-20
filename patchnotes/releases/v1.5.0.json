@@ -1,0 +1,69 @@
+{
+  "id": "v1.5.0",
+  "version": "1.5.0",
+  "build": 6,
+  "title": "Mata-mata em Equipe + netcode de gente grande",
+  "subtitle": "Modo em times, rede a 30Hz com interpolação e monitor de FPS/ping",
+  "date": "2026-07-17",
+  "time": "16:14",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Chegou o Mata-mata em Equipe (LARANJA × AZUL) — e junto com ele uma reforma completa do netcode: atualização a 30Hz, interpolação por buffer de snapshots e um monitor de FPS e ping no HUD.",
+  "body": [
+    "Dois times, um objetivo: o Mata-mata em Equipe (TDM) estreia como segundo modo da Sunfall Arena. Escolha entre LARANJA e AZUL, some eliminações com seus aliados e leve o time à vitória. O clássico Todos contra Todos continua firme para quem prefere confiar só na própria mira.",
+    "Nos bastidores, esta é uma das atualizações mais importantes que já fizemos: o netcode foi reformado. O servidor agora envia o estado da partida 30 vezes por segundo, e o cliente reconstrói o movimento dos outros jogadores usando um buffer de snapshots com interpolação — na prática, os inimigos deslizam suavemente pela tela em vez de teleportar em passinhos robóticos.",
+    "Para você enxergar a saúde da sua conexão, o HUD ganhou um contador opcional de FPS e ping com código de cores: verde está ótimo, amarelo merece atenção, vermelho explica aquela morte injusta.",
+    "De quebra, corrigimos um erro de carregamento que podia travar o jogo na inicialização em alguns navegadores."
+  ],
+  "motivation": "Modo em equipe era o pedido mais óbvio — mas não fazia sentido lançá-lo em cima de uma rede que engasgava. Resolvemos os dois de uma vez: mais gente na partida exige movimento remoto impecável.",
+  "impact": "Partidas em equipe com inimigos que se movem de forma fluida — e ferramentas para você diagnosticar qualquer engasgo na sua conexão.",
+  "notes": "O contador de FPS/ping fica desligado por padrão. Ative em CONFIGURAÇÕES → INTERFACE.",
+  "techNotes": "Snapshots do servidor a 30Hz; cliente renderiza ~100ms no passado interpolando entre os dois snapshots mais próximos, com extrapolação limitada em caso de perda de pacote. Correção de um ReferenceError na ordem de inicialização da camada de rede.",
+  "footer": "LARANJA ou AZUL? Escolha um lado. — Equipe Sunfall",
+  "media": [],
+  "commits": ["0d78064", "fa0d57f", "f3495b9", "ea7dd40"],
+  "cards": [
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Mata-mata em Equipe (TDM)",
+      "desc": "LARANJA × AZUL: as eliminações do time somam juntas e vence quem bater a meta primeiro. Troque de time direto no menu de pausa.",
+      "impact": "A arena ganha espírito de equipe.",
+      "tags": ["tdm", "times", "modo"]
+    },
+    {
+      "category": "tech",
+      "state": "improved",
+      "title": "Netcode a 30Hz",
+      "desc": "O servidor passou a enviar o estado da partida 30 vezes por segundo, reduzindo a distância entre o que você vê e o que realmente aconteceu.",
+      "impact": "Menos surpresa, mais precisão nos duelos.",
+      "tags": ["netcode", "rede"]
+    },
+    {
+      "category": "tech",
+      "state": "improved",
+      "title": "Interpolação por buffer de snapshots",
+      "desc": "O movimento dos outros jogadores é reconstruído com interpolação entre snapshots. Fim do 'teleporte' de inimigos em conexões normais.",
+      "impact": "Alvos se movem de forma suave e previsível.",
+      "tags": ["interpolação", "suavidade"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Contador de FPS e ping",
+      "desc": "Monitor discreto no canto do HUD com código de cores para quadros por segundo e latência. Opcional, em CONFIGURAÇÕES → INTERFACE.",
+      "impact": "Você diagnostica a conexão sem sair da partida.",
+      "tags": ["fps", "ping", "hud"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Erro de carregamento corrigido",
+      "desc": "Um erro de inicialização (uso de variável antes da declaração) podia impedir o jogo de abrir em alguns navegadores. Corrigido.",
+      "impact": "O jogo abre de forma confiável para todo mundo.",
+      "tags": ["correção", "inicialização"]
+    }
+  ]
+}

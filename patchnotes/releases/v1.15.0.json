@@ -1,0 +1,44 @@
+{
+  "id": "v1.15.0",
+  "version": "1.15.0",
+  "build": 22,
+  "title": "Melhores Momentos: sua jogada, seu troféu",
+  "subtitle": "Replay 3D do maior multi-kill da partida no fim de cada jogo",
+  "date": "2026-07-18",
+  "time": "15:49",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Ao fim de cada partida, o jogo agora reexibe em replay 3D o maior multi-kill do jogo — a jogada da partida, com direito a plateia.",
+  "body": [
+    "Toda partida tem AQUELA jogada — o triple kill impossível, a limpeza de sala que ninguém acreditou. Agora ela não morre no kill feed: ao final de cada jogo, o sistema de MELHORES MOMENTOS seleciona automaticamente o maior multi-kill da partida e o reexibe em replay 3D completo para todos os jogadores.",
+    "É o seu highlight na telona: movimento, tiros e eliminações reconstruídos exatamente como aconteceram. Fazer a jogada da partida agora significa que todo mundo vai assisti-la — inclusive quem estava do lado errado dela.",
+    "Nesta mesma atualização, corrigimos dois problemas da primeira hora do sistema: o replay que podia travar durante a exibição e a última vítima da sequência que não caía na reconstituição."
+  ],
+  "motivation": "Grandes jogadas merecem palco e memória. O replay final cria um motivo a mais para buscar a jogada perfeita — e um ritual de fim de partida que celebra quem fez por merecer.",
+  "impact": "Sua melhor sequência vira o encerramento do show. Jogue para estar nele.",
+  "notes": "",
+  "techNotes": "O servidor registra janelas de eventos de eliminação e elege a sequência de maior pontuação; o cliente reconstrói a cena a partir dos snapshots do período.",
+  "footer": "Faça a jogada. A gente cuida da transmissão. — Equipe Sunfall",
+  "media": [],
+  "commits": ["7988f07", "c8c85d0"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Melhores Momentos",
+      "desc": "O maior multi-kill da partida é reexibido em replay 3D para todos os jogadores no fim do jogo.",
+      "impact": "A jogada da partida ganha o palco que merece.",
+      "tags": ["replay", "highlight", "multi-kill"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Replay travado e vítima fantasma",
+      "desc": "Corrigidos o travamento do replay do melhor momento e a última vítima da sequência que permanecia de pé na reconstituição.",
+      "impact": "O highlight roda liso do início ao fim.",
+      "tags": ["correção", "replay"]
+    }
+  ]
+}

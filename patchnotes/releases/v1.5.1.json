@@ -1,0 +1,43 @@
+{
+  "id": "v1.5.1",
+  "version": "1.5.1",
+  "build": 7,
+  "title": "Servidores no Brasil",
+  "subtitle": "Migração para São Paulo (região GRU) — ping menor para todo mundo por aqui",
+  "date": "2026-07-17",
+  "time": "16:35",
+  "author": "Equipe Sunfall",
+  "type": "tech",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "O servidor do jogo mudou de casa: agora roda em São Paulo. Se você joga do Brasil, seu ping acabou de despencar.",
+  "body": [
+    "Atualização curta e certeira: migramos o servidor de jogo para a região GRU (São Paulo). Como a maior parte da nossa comunidade joga do Brasil, isso significa menos quilômetros entre o seu clique e o servidor — e cada quilômetro a menos é latência a menos.",
+    "Combinada com o netcode novo da v1.5.0, esta mudança deixa a experiência de tiro visivelmente mais responsiva."
+  ],
+  "motivation": "Latência é o imposto invisível de todo FPS online. Trazer o servidor para perto dos jogadores era a forma mais direta de reduzi-lo.",
+  "impact": "Ping menor, tiros registrados mais rápido, duelos mais justos — sem você precisar fazer nada.",
+  "notes": "",
+  "techNotes": "Deploy containerizado no Fly.io, região GRU, com health checks e reinício automático.",
+  "footer": "Menos lag, mais headshot. — Equipe Sunfall",
+  "media": [],
+  "commits": ["d364c56"],
+  "cards": [
+    {
+      "category": "tech",
+      "state": "improved",
+      "title": "Servidor em São Paulo",
+      "desc": "Infraestrutura de jogo migrada para a região GRU (Fly.io), fisicamente próxima da maioria dos nossos jogadores.",
+      "impact": "Redução direta de latência para quem joga do Brasil.",
+      "tags": ["servidor", "infraestrutura", "brasil"]
+    },
+    {
+      "category": "performance",
+      "state": "optimized",
+      "title": "Ping menor nas partidas",
+      "desc": "Com o servidor mais perto, o tempo de ida e volta de cada ação diminui — o jogo responde mais rápido ao seu comando.",
+      "impact": "Sua bala chega antes. Literalmente.",
+      "tags": ["ping", "latência"]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "id": "v1.9.0",
+  "version": "1.9.0",
+  "build": 15,
+  "title": "O lobby ganhou trilha sonora",
+  "subtitle": "Player de música com 4 faixas, crossfade, aleatório e repetição",
+  "date": "2026-07-17",
+  "time": "23:11",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "O silêncio do lobby acabou: player de música completo com 4 faixas, transição suave entre elas, modos aleatório e repetição, volume independente — e início automático ao entrar no site.",
+  "body": [
+    "Um bom lobby tem clima — e clima pede música. A partir de agora, a Sunfall Arena te recebe com uma trilha sonora de 4 faixas selecionadas a dedo, tocando com crossfade suave entre uma e outra (nada de cortes secos).",
+    "O player completo vive em CONFIGURAÇÕES → ÁUDIO: play/pause, faixa anterior e próxima, modo aleatório, repetição e a lista completa para escolher sua favorita. O volume da música é independente do volume dos efeitos — equilibre como quiser, a preferência fica salva.",
+    "A música começa automaticamente ao entrar no site (com fallback educado para navegadores que exigem uma primeira interação) e pausa sozinha quando a partida começa — na arena, seus ouvidos pertencem aos passos do inimigo."
+  ],
+  "motivation": "O lobby é a sala de estar do jogo. Depois do redesign visual da v1.7.0, faltava a camada sonora para completar a atmosfera.",
+  "impact": "Entrar no jogo agora tem clima de jogo grande — e você controla cada detalhe da trilha.",
+  "notes": "Aproveitamos para corrigir a persistência do volume, que em algumas situações não era lembrada entre sessões.",
+  "techNotes": "",
+  "footer": "Aumenta o som e bora pro lobby. — Equipe Sunfall",
+  "media": [],
+  "commits": ["40c0122", "390e60b", "4200027"],
+  "cards": [
+    {
+      "category": "audio",
+      "state": "new",
+      "title": "Player de música do lobby",
+      "desc": "Quatro faixas com crossfade entre elas, controles completos (play, anterior, próxima), modo aleatório e repetição.",
+      "impact": "O lobby nunca mais fica em silêncio.",
+      "tags": ["música", "player"]
+    },
+    {
+      "category": "audio",
+      "state": "improved",
+      "title": "Autoplay inteligente",
+      "desc": "A música inicia automaticamente ao entrar no site; se o navegador bloquear, ela começa na primeira interação. Ao entrar em partida, pausa sozinha.",
+      "impact": "Clima instantâneo, sem apertar nada.",
+      "tags": ["autoplay", "música"]
+    },
+    {
+      "category": "ui",
+      "state": "improved",
+      "title": "Controles no painel de Áudio",
+      "desc": "O player mora em CONFIGURAÇÕES → ÁUDIO, com volume da música separado do volume dos efeitos e lista de faixas clicável.",
+      "impact": "Tudo da trilha num lugar só, do seu jeito.",
+      "tags": ["configurações", "volume"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Persistência de volume",
+      "desc": "O volume escolhido agora é lembrado corretamente entre sessões.",
+      "impact": "Ajustou uma vez, ficou ajustado.",
+      "tags": ["volume", "correção"]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "v1.6.1",
+  "version": "1.6.1",
+  "build": 9,
+  "title": "Rede que aguenta tranco",
+  "subtitle": "Reconexão automática e qualidade gráfica por nível de máquina",
+  "date": "2026-07-17",
+  "time": "19:38",
+  "author": "Equipe Sunfall",
+  "type": "patch",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "Caiu o Wi-Fi? O jogo agora reconecta sozinho. E a qualidade gráfica ganhou níveis para cada tipo de máquina.",
+  "body": [
+    "Dois reforços de qualidade de vida nesta atualização. Primeiro, robustez de rede: se a sua conexão oscilar, o jogo tenta reconectar automaticamente com intervalos progressivos, em vez de simplesmente te devolver para o lobby.",
+    "Segundo, gráficos sob medida: as configurações de qualidade agora funcionam por níveis, ajustando o conjunto certo de efeitos para cada faixa de máquina — do notebook de estudo ao PC parrudo."
+  ],
+  "motivation": "Nem toda conexão é estável e nem todo PC é uma nave — o jogo precisa ser bom nos dois cenários.",
+  "impact": "Menos partidas perdidas por oscilação de rede e um jogo que roda redondo na máquina que você tem.",
+  "notes": "",
+  "techNotes": "Reconexão com backoff exponencial (1s → 15s) e limite de tentativas antes de desistir com aviso ao jogador.",
+  "footer": "Qualidade de vida também vence partidas. — Equipe Sunfall",
+  "media": [],
+  "commits": ["56df792"],
+  "cards": [
+    {
+      "category": "system",
+      "state": "improved",
+      "title": "Reconexão automática",
+      "desc": "Oscilou a rede, o jogo tenta voltar sozinho com intervalos progressivos — você só percebe se a queda for longa de verdade.",
+      "impact": "Uma piscada do Wi-Fi não encerra mais sua partida.",
+      "tags": ["rede", "reconexão"]
+    },
+    {
+      "category": "improvements",
+      "state": "improved",
+      "title": "Qualidade gráfica por nível",
+      "desc": "Presets de qualidade que ligam e desligam o conjunto certo de efeitos para cada faixa de hardware.",
+      "impact": "Mais FPS nas máquinas modestas, mais beleza nas potentes.",
+      "tags": ["gráficos", "presets"]
+    }
+  ]
+}

@@ -4,6 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sunfall Arena</title>
+  <!-- ═══ Favicons & Metadados ═══ -->
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#FF6B00" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#FF6B00" media="(prefers-color-scheme: dark)">
+  <meta property="og:image" content="https://sunfallarena.com/og-image-1200x630.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="msapplication-TileColor" content="#1A1A1A">
   <link rel="stylesheet" href="/style.css">
   <script src="/config.js"></script>
   <script type="importmap">
@@ -128,6 +138,7 @@
     <!-- NAV LATERAL -->
     <nav id="lobby-nav">
       <button type="button" class="nav-item nav-arsenal" id="nav-arsenal"><span class="ni-ico">▤</span><span class="ni-txt">ARSENAL</span></button>
+      <button type="button" class="nav-item nav-updates" id="nav-updates"><span class="ni-ico">✦</span><span class="ni-txt">NOVIDADES</span><span class="ni-badge hidden" id="updates-badge">0</span></button>
       <button type="button" class="nav-item" id="nav-profile"><span class="ni-ico">◈</span><span class="ni-txt">PERFIL</span></button>
       <button type="button" class="nav-item" id="nav-friends"><span class="ni-ico">☍</span><span class="ni-txt">AMIGOS</span></button>
       <button type="button" class="nav-item" id="nav-rank"><span class="ni-ico">♛</span><span class="ni-txt">RANKING</span></button>
@@ -485,6 +496,30 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NOVIDADES (Central da Comunidade: patch notes, sugestões, bugs) -->
+    <section class="screen updates-screen" id="screen-updates">
+      <div class="updates">
+        <div class="up-grain"></div>
+        <header class="up-head">
+          <div class="up-brand">
+            <span class="up-kicker">SUNFALL // CENTRAL DA COMUNIDADE</span>
+            <h2 class="up-title">NOVIDADES</h2>
+          </div>
+          <nav class="up-tabs" id="up-tabs">
+            <button type="button" class="up-tab active" data-uptab="notes"><span>📜</span> PATCH NOTES</button>
+            <button type="button" class="up-tab" data-uptab="ideas"><span>💡</span> SUGESTÕES</button>
+            <button type="button" class="up-tab" data-uptab="bugs"><span>🐛</span> REPORTAR BUG</button>
+          </nav>
+          <button type="button" class="up-close screen-close" title="Fechar">✕</button>
+        </header>
+        <div class="up-pages">
+          <div class="up-page" data-uppage="notes" id="up-page-notes"></div>
+          <div class="up-page hidden" data-uppage="ideas" id="up-page-ideas"></div>
+          <div class="up-page hidden" data-uppage="bugs" id="up-page-bugs"></div>
         </div>
       </div>
     </section>

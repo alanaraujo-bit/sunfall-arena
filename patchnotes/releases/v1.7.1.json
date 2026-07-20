@@ -1,0 +1,43 @@
+{
+  "id": "v1.7.1",
+  "version": "1.7.1",
+  "build": 11,
+  "title": "Mais FPS para todo mundo",
+  "subtitle": "Otimização pesada de performance e configurações gráficas detalhadas",
+  "date": "2026-07-17",
+  "time": "20:17",
+  "author": "Equipe Sunfall",
+  "type": "patch",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "Passamos o pente fino na renderização e abrimos o capô para você: escala de resolução, sombras, anti-aliasing, partículas, texturas e campo de visão — tudo ajustável.",
+  "body": [
+    "Otimização não é glamourosa, mas é o que separa 40 de 90 FPS. Nesta rodada, cortamos custo de renderização em várias frentes do motor — menos trabalho por quadro, mais quadros por segundo, nas mesmas máquinas.",
+    "E para quem gosta de ajuste fino, as CONFIGURAÇÕES → GRÁFICOS ficaram completas: escala de resolução (o controle que mais pesa no FPS), qualidade de sombras, anti-aliasing, densidade de partículas, detalhes do cenário, qualidade de texturas e campo de visão (70–110). Quatro presets prontos — de 'batata' a alta — para quem só quer jogar."
+  ],
+  "motivation": "Cada jogador tem um hardware diferente, e ninguém merece escolher entre jogar feio ou jogar travando. Controle fino resolve os dois.",
+  "impact": "Mais FPS no mesmo PC e liberdade total para equilibrar beleza e desempenho do seu jeito.",
+  "notes": "Dica: se o FPS estiver baixo, reduza primeiro a escala de resolução — é o ajuste de maior efeito.",
+  "techNotes": "",
+  "footer": "Rodando liso até na batata. — Equipe Sunfall",
+  "media": [],
+  "commits": ["ef4509e"],
+  "cards": [
+    {
+      "category": "performance",
+      "state": "optimized",
+      "title": "Otimização pesada de renderização",
+      "desc": "Redução de custo por quadro em várias frentes do motor gráfico, elevando o FPS em todas as faixas de hardware.",
+      "impact": "Mais quadros por segundo sem trocar de PC.",
+      "tags": ["fps", "otimização"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Configurações gráficas detalhadas",
+      "desc": "Escala de resolução, sombras, anti-aliasing, partículas, detalhes do cenário, texturas e campo de visão — além de 4 presets prontos.",
+      "impact": "Você decide exatamente onde gastar cada quadro.",
+      "tags": ["gráficos", "configurações", "fov"]
+    }
+  ]
+}

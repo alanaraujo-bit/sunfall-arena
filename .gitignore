@@ -1,5 +1,6 @@
 node_modules/
 public/shared/
+public/patchnotes/
 .env
 
 .vercel

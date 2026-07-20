@@ -1,0 +1,51 @@
+{
+  "id": "v1.7.2",
+  "version": "1.7.2",
+  "build": 12,
+  "title": "Kill feed com identidade",
+  "subtitle": "Ícones de arma e headshot no feed, correção de estruturas invisíveis e GPU honesta",
+  "date": "2026-07-17",
+  "time": "21:15",
+  "author": "Equipe Sunfall",
+  "type": "patch",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "O kill feed agora conta a história de cada abate com ícone da arma e marcador de headshot — e duas correções importantes de renderização e diagnóstico.",
+  "body": [
+    "O kill feed ficou expressivo: cada eliminação agora mostra o ícone da arma usada, e headshots ganham um indicador próprio. Num relance você sabe quem caiu, para quem e como — inclusive quando o 'como' foi na cabeça.",
+    "Também corrigimos um problema sério em que partes do cenário podiam ficar invisíveis após mudanças no mapa, e o mostrador de GPU nas configurações agora informa a placa de vídeo real em uso — útil para descobrir que o notebook estava rodando o jogo na GPU integrada em vez da dedicada."
+  ],
+  "motivation": "Detalhes de leitura de jogo importam: o kill feed é o jornal da partida e precisa contar a história completa.",
+  "impact": "Mais informação de combate num relance e cenário renderizando 100% correto.",
+  "notes": "",
+  "techNotes": "",
+  "footer": "Na cabeça. Literalmente. — Equipe Sunfall",
+  "media": [],
+  "commits": ["2cb9ba1", "45998d5"],
+  "cards": [
+    {
+      "category": "ui",
+      "state": "improved",
+      "title": "Kill feed com ícones de arma e headshot",
+      "desc": "Cada linha do feed mostra a arma da eliminação; abates na cabeça ganham marcador exclusivo.",
+      "impact": "Você lê a partida inteira num relance.",
+      "tags": ["kill feed", "headshot"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Estruturas invisíveis no cenário",
+      "desc": "Um problema de integração fazia partes do mapa não renderizarem em certas condições. Tudo de volta ao lugar.",
+      "impact": "O que te dá cobertura agora sempre aparece.",
+      "tags": ["renderização", "mapa"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Mostrador de GPU honesto",
+      "desc": "As configurações agora exibem a placa de vídeo realmente utilizada pelo navegador — sem chute.",
+      "impact": "Diagnóstico certeiro de por que o FPS está baixo.",
+      "tags": ["gpu", "diagnóstico"]
+    }
+  ]
+}

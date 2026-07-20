@@ -1,0 +1,77 @@
+{
+  "id": "v1.0.0",
+  "version": "1.0.0",
+  "build": 1,
+  "title": "Bem-vindos à Sunfall Arena",
+  "subtitle": "O pôr do sol nunca foi tão perigoso — nosso FPS abre as portas no seu navegador",
+  "date": "2026-07-17",
+  "time": "03:06",
+  "author": "Equipe Sunfall",
+  "type": "major",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "A Sunfall Arena está no ar! Um FPS multiplayer completo rodando direto no navegador: mapa Cânion, duas armas, movimentação fluida com deslize e bots patrulhando para a partida nunca ficar vazia.",
+  "body": [
+    "Hoje é o dia um. Depois de muito café e muitas texturas pintadas à mão, a Sunfall Arena chega ao seu navegador — sem download, sem instalação, sem espera. Basta abrir o link e atirar.",
+    "O cenário é uma vila desértica banhada pela luz do entardecer. Toda a direção de arte foi construída em cima dessa ideia: cores quentes, silhuetas legíveis e um visual estilizado que roda bem até em máquinas modestas. Nenhum asset externo — cada textura e cada som é gerado em tempo real pelo próprio jogo.",
+    "No lançamento você já encontra o mapa Cânion, dois pilares do nosso arsenal — o rifle FALCÃO-9 e o sniper FERRÃO-SR — e uma movimentação pensada para recompensar quem flui: corrida, pulo e deslize que mantém velocidade e pode ser encadeado.",
+    "E para ninguém ficar esperando em sala vazia: três bots patrulham a arena desde o primeiro segundo. Abra várias abas para jogar com amigos na mesma rede — o multiplayer já nasce funcionando."
+  ],
+  "motivation": "Queríamos provar que um FPS competitivo, bonito e fluido cabe dentro de um navegador — e que dá para entrar numa partida em menos de dez segundos.",
+  "impact": "Você já pode jogar agora: entre, escolha seu apelido e dispute o Cânion contra bots e outros jogadores da sua rede.",
+  "notes": "Este é o começo da jornada. O plano de voo inclui contas, progressão, amigos, novos modos e muito mais — acompanhe as próximas notas de atualização.",
+  "techNotes": "Renderização via Three.js (WebGL), servidor Node.js com WebSocket para o estado da partida, texturas procedurais via canvas e SFX procedural via WebAudio.",
+  "footer": "Obrigado por estar aqui desde o primeiro tiro. Nos vemos na arena! — Equipe Sunfall",
+  "media": [],
+  "commits": ["63e6baa"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Sunfall Arena chega ao navegador",
+      "desc": "FPS multiplayer completo, sem download: abra o link e jogue. Visual hand-painted de vila desértica ao entardecer, feito para ser bonito e leve ao mesmo tempo.",
+      "impact": "Da URL para dentro da partida em segundos.",
+      "tags": ["lançamento", "navegador"]
+    },
+    {
+      "category": "world",
+      "state": "new",
+      "title": "Mapa: Cânion",
+      "desc": "Nossa primeira arena: rotas curtas para o combate frenético, linhas longas para os snipers e cobertura suficiente para quem gosta de flanquear.",
+      "impact": "O palco de estreia de todas as suas eliminações.",
+      "tags": ["cânion", "mapa"]
+    },
+    {
+      "category": "content",
+      "state": "new",
+      "title": "FALCÃO-9 e FERRÃO-SR",
+      "desc": "O rifle FALCÃO-9 é o pau para toda obra: cadência honesta e controle previsível. O FERRÃO-SR recompensa paciência e pontaria com eliminações de um tiro bem colocado, com luneta.",
+      "impact": "Dois estilos de jogo distintos desde o primeiro dia.",
+      "tags": ["armas", "falcão-9", "ferrão-sr"]
+    },
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Movimentação com deslize",
+      "desc": "Corra, pule e deslize mantendo velocidade — o deslize pode ser encadeado com pulo para atravessar o mapa com estilo. Stamina controla o ritmo para ninguém virar um foguete infinito.",
+      "impact": "Quem domina o movimento chega primeiro no duelo.",
+      "tags": ["movimento", "slide"]
+    },
+    {
+      "category": "ai",
+      "state": "new",
+      "title": "Bots de patrulha",
+      "desc": "Três bots rondam a arena para a partida nunca ficar vazia. Eles patrulham, caçam e atiram — o suficiente para você aquecer a mira a qualquer hora.",
+      "impact": "Sempre tem alguém para enfrentar, mesmo às 4h da manhã.",
+      "tags": ["bots", "ia"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "HUD completo",
+      "desc": "Mira, barra de vida, munição, placar (Tab), kill feed e tela de fim de partida com o vencedor — tudo desenhado para máxima legibilidade sob o sol do deserto.",
+      "impact": "Toda a informação que importa, sem poluir sua tela.",
+      "tags": ["hud", "interface"]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "v1.11.0",
+  "version": "1.11.0",
+  "build": 17,
+  "title": "Arsenal: sua coleção ganhou uma vitrine",
+  "subtitle": "Nova tela premium com visualizador 3D das armas, fichas técnicas e loadout",
+  "date": "2026-07-18",
+  "time": "01:12",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Estreia o ARSENAL: uma tela dedicada onde você inspeciona cada arma em 3D — gire, aproxime, estude — lê a ficha técnica completa e monta seu equipamento.",
+  "body": [
+    "Armas com personalidade merecem palco. O novo ARSENAL, acessível direto da navegação do lobby, é a vitrine oficial do nosso armamento: selecione uma arma na lista e o modelo 3D dela aparece no centro do palco — arraste para girar, role para aproximar, examine cada detalhe pintado à mão.",
+    "Ao lado, a ficha técnica completa: dano, cadência, alcance e as características que definem o estilo de cada ferramenta. Abaixo, os slots de equipamento — escolha sua primária e clique em EQUIPAR para levá-la à próxima partida.",
+    "A tela já nasce com a paleta quente do jogo e com os modelos reais do FALCÃO-9 e do FERRÃO-SR. E um truque para quem gosta de compartilhar: o endereço ?armory=<arma> abre o Arsenal direto na arma escolhida — mande o link e mostre seu brinquedo favorito."
+  ],
+  "motivation": "Conhecer o equipamento é parte do jogo. Uma vitrine 3D transforma a escolha de arma de um menu burocrático em um momento de conexão com o seu estilo.",
+  "impact": "Você estuda, compara e escolhe seu armamento numa experiência à altura de vitrine de jogo AAA.",
+  "notes": "Armas ainda sem modelo 3D exibem a ficha técnica completa com aviso de 'modelo em produção'.",
+  "techNotes": "Visualizador 3D em canvas dedicado, inicializado sob demanda ao abrir a tela (custo zero para quem não usa). Deep-link via parâmetro de URL ?armory=.",
+  "footer": "Escolha com carinho — ela vai te acompanhar em muitas eliminações. — Equipe Sunfall",
+  "media": [],
+  "commits": ["f1d21c2", "dbff681", "88d8c7c"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Tela ARSENAL com visualizador 3D",
+      "desc": "Vitrine premium das armas: modelo 3D interativo (girar e aproximar), lista de armamento e slots de equipamento com botão EQUIPAR.",
+      "impact": "Escolher arma virou um momento, não um menu.",
+      "tags": ["arsenal", "3d", "loadout"]
+    },
+    {
+      "category": "ui",
+      "state": "improved",
+      "title": "Paleta quente e fichas técnicas",
+      "desc": "O Arsenal adotou a identidade visual do jogo, e o FALCÃO-9 e o FERRÃO-SR ganharam fichas técnicas completas com seus modelos reais.",
+      "impact": "Informação de verdade com a cara da Sunfall.",
+      "tags": ["ficha técnica", "visual"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Link direto para cada arma",
+      "desc": "O endereço ?armory=<arma> abre o Arsenal já na arma escolhida — perfeito para compartilhar com amigos.",
+      "impact": "Mostrar seu setup agora é copiar e colar.",
+      "tags": ["deep-link", "compartilhar"]
+    }
+  ]
+}

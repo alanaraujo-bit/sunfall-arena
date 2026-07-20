@@ -1,0 +1,61 @@
+{
+  "id": "v2.2.0",
+  "version": "2.2.0",
+  "build": 26,
+  "title": "Crie a sua classe",
+  "subtitle": "Sistema de classes estilo Black Ops 2: monte, nomeie e troque no respawn",
+  "date": "2026-07-19",
+  "time": "02:16",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Chegou o Create-a-Class: monte suas próprias classes com as armas do Arsenal, dê nomes a elas e troque de classe a cada respawn — com o servidor garantindo que ninguém equipa o que não pode.",
+  "body": [
+    "Com o Arsenal completo em seis classes de armas, faltava a peça que transforma coleção em identidade: o sistema de classes, inspirado no lendário Create-a-Class do Black Ops 2.",
+    "Funciona como manda a tradição: monte configurações de equipamento, batize cada uma e alterne entre elas conforme o plano de jogo. O chip de classe no lobby mostra sua configuração ativa — um clique abre o Arsenal direto nela para ajustes de última hora.",
+    "E a parte mais estratégica: ao morrer, o seletor de classes aparece na tela de respawn. Caiu para um sniper de longe? Volte de SENTINELA-DR. O confronto afunilou para dentro das casas? BRECHA-12 na mão. Adaptar o equipamento à partida em andamento agora é uma habilidade — como sempre deveria ser.",
+    "Importante: o servidor é a autoridade real do equipamento. O que você tem equipado é validado e aplicado por ele — o cliente só desenha a interface."
+  ],
+  "motivation": "Armas definem estilos; classes definem jogadores. Dar nome ao próprio setup e trocá-lo no calor da partida é uma das sensações mais icônicas dos FPS — queríamos ela aqui, feita do jeito certo.",
+  "impact": "Sua identidade de combate agora é configurável, nomeável e adaptável a cada respawn.",
+  "notes": "",
+  "techNotes": "Loadout autoritativo: definição compartilhada em shared/loadout.js e validação server-side do equipamento em cada spawn — imune a adulteração no cliente.",
+  "footer": "Monte a classe. Escreva a lenda. — Equipe Sunfall",
+  "media": [],
+  "commits": ["a6ba259"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Create-a-Class",
+      "desc": "Monte classes com as armas do Arsenal, dê nome a cada configuração e alterne entre elas quando quiser — estilo Black Ops 2.",
+      "impact": "Seu estilo de jogo vira um preset com nome.",
+      "tags": ["classes", "loadout", "bo2"]
+    },
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Troca de classe no respawn",
+      "desc": "Ao morrer, o seletor de classes aparece na tela — escolha a resposta certa para o rumo da partida antes de voltar.",
+      "impact": "Adaptação tática entra no ciclo de respawn.",
+      "tags": ["respawn", "tática"]
+    },
+    {
+      "category": "security",
+      "state": "new",
+      "title": "Servidor como autoridade do equipamento",
+      "desc": "O loadout equipado é validado e aplicado pelo servidor em cada spawn — o cliente apenas exibe.",
+      "impact": "Impossível equipar por fora o que não se tem.",
+      "tags": ["anti-cheat", "loadout"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Chip de classe no lobby",
+      "desc": "Sua classe ativa (nome e arma) sempre visível no dock de jogo; um clique abre o Arsenal direto nela.",
+      "impact": "Você nunca inicia partida com a classe errada.",
+      "tags": ["lobby", "chip"]
+    }
+  ]
+}

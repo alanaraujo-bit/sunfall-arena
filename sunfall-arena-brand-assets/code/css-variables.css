@@ -1,0 +1,32 @@
+:root {
+  /* ═══ Sunfall Arena — Brand Colors ═══ */
+  --color-primary: #E65C00;
+  --color-primary-dark: #FF6B00;
+  --color-secondary: #4A5D4E;
+  --color-secondary-dark: #5E7563;
+  --color-accent: #D9C5A0;
+  --color-accent-dark: #EADCB6;
+  --color-bg: #F2EFE9;
+  --color-bg-dark: #1A1A1A;
+  --color-surface: #FFFFFF;
+  --color-surface-dark: #242424;
+  --color-text-primary: #121212;
+  --color-text-primary-dark: #F5F5F5;
+  --color-text-secondary: #4A5D4E;
+  --color-text-secondary-dark: #5E7563;
+  --color-success: #27AE60;
+  --color-warning: #F39C12;
+  --color-error: #C0392B;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: var(--color-primary-dark);
+    --color-secondary: var(--color-secondary-dark);
+    --color-accent: var(--color-accent-dark);
+    --color-bg: var(--color-bg-dark);
+    --color-surface: var(--color-surface-dark);
+    --color-text-primary: var(--color-text-primary-dark);
+    --color-text-secondary: var(--color-text-secondary-dark);
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "id": "v2.0.0",
+  "version": "2.0.0",
+  "build": 24,
+  "title": "OCASO — o novo mapa da Sunfall Arena",
+  "subtitle": "Uma vila inteira construída em sete fases, do blockout ao pôr do sol",
+  "date": "2026-07-18",
+  "time": "23:15",
+  "author": "Equipe Sunfall",
+  "type": "major",
+  "tier": "advanced",
+  "pinned": true,
+  "summary": "A maior atualização da nossa história: OCASO, o segundo mapa da Sunfall Arena, está aberto para combate — arquitetura de verdade, materiais com relevo, props, atmosfera de fim de tarde e um sol gigante no horizonte.",
+  "body": [
+    "O Cânion ganhou companhia. OCASO é o nosso segundo mapa e o maior projeto que já colocamos na arena: uma vila desértica congelada no exato momento em que o sol toca o horizonte — e o nome não é coincidência.",
+    "Construímos o Ocaso em sete fases, e cada uma deixou sua marca. Primeiro, a infraestrutura multi-mapa que permite ao jogo hospedar quantas arenas quisermos daqui em diante. Depois o blockout jogável — semanas de ajuste de rota, ângulo e timing antes de qualquer tijolo bonito. Então vieram a arquitetura de verdade (o fim das caixas cinzas), os materiais com normal maps e decalques, os props que dão vida de vila habitada, e a iluminação de entardecer que define a identidade do lugar.",
+    "Na fase final, polimento de gente grande: otimização agressiva de draw calls para o mapa rodar liso, correção de um bug real de bot preso na geometria e os retoques finais. Depois do lançamento, ainda subimos o sol no céu — literalmente: ele ficou maior, mais alto e visível de mais pontos do mapa, porque descobrimos que a janela angular original era estreita demais para apreciá-lo.",
+    "O Ocaso já está disponível em todos os modos: no multiplayer público, o novo seletor de mapa mostra a contagem real de jogadores em cada arena — escolha onde quer caçar. Nas salas personalizadas, é só selecionar no menu de criação."
+  ],
+  "motivation": "Um único mapa, por melhor que seja, define um teto para o jogo. O Ocaso quebra esse teto duas vezes: entrega variedade hoje e deixa pronta a infraestrutura para todos os mapas de amanhã.",
+  "impact": "O dobro de territórios para dominar, rotas novas para decorar, ângulos novos para abusar — e a promessa concreta de que mais arenas virão.",
+  "notes": "O rótulo '(em obras)' foi aposentado: o Ocaso é um mapa completo, de pleno direito.",
+  "techNotes": "Registry de mapas compartilhado entre cliente e servidor (cada sala roda seu próprio mapa), materiais v2 com normal maps e decalques, passe de otimização de draw calls e correção de navegação dos bots na geometria nova.",
+  "footer": "O sol se põe. A caçada começa. — Equipe Sunfall",
+  "media": [],
+  "commits": ["d95f56a", "19f01b5", "cd29a86", "ce98a62", "ef22d2f", "d3304a5", "10cb99c", "4eefbea", "5dbf26b"],
+  "cards": [
+    {
+      "category": "world",
+      "state": "new",
+      "title": "Mapa: OCASO",
+      "desc": "Vila desértica ao pôr do sol: ruas, construções, rotas de flanco e linhas de sniper — o segundo mapa completo da Sunfall Arena.",
+      "impact": "Um mundo novo inteiro para aprender e dominar.",
+      "tags": ["ocaso", "mapa", "lançamento"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Infraestrutura multi-mapa",
+      "desc": "O jogo agora suporta múltiplas arenas nativamente: cada sala roda seu próprio mapa, do público ao personalizado.",
+      "impact": "A porta ficou aberta para todos os mapas futuros.",
+      "tags": ["multi-mapa", "sistema"]
+    },
+    {
+      "category": "world",
+      "state": "improved",
+      "title": "Arquitetura e materiais de verdade",
+      "desc": "Fim das caixas de teste: construções reais, materiais com relevo (normal maps), decalques e props que fazem a vila parecer habitada.",
+      "impact": "Imersão de vila viva, não de protótipo.",
+      "tags": ["arquitetura", "materiais", "props"]
+    },
+    {
+      "category": "world",
+      "state": "improved",
+      "title": "Luz e atmosfera de entardecer",
+      "desc": "Iluminação dedicada de fim de tarde com o sol visível no céu — retrabalhado após o lançamento para ficar maior, mais alto e presente em mais ângulos do mapa.",
+      "impact": "O pôr do sol mais bonito em que você vai atirar.",
+      "tags": ["iluminação", "atmosfera", "sol"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Seletor de mapa no multiplayer público",
+      "desc": "Escolha em qual arena quer entrar, vendo a contagem real de jogadores em cada uma.",
+      "impact": "Você decide onde a ação te espera.",
+      "tags": ["seletor", "matchmaking"]
+    },
+    {
+      "category": "performance",
+      "state": "optimized",
+      "title": "Otimização de draw calls",
+      "desc": "Passe agressivo de redução de chamadas de renderização para o Ocaso rodar tão liso quanto o Cânion.",
+      "impact": "Mapa novo sem imposto de FPS.",
+      "tags": ["draw calls", "otimização"]
+    },
+    {
+      "category": "ai",
+      "state": "fixed",
+      "title": "Bot preso na geometria",
+      "desc": "Um ponto da geometria nova prendia bots em patrulha. Navegação corrigida.",
+      "impact": "Bots circulando o mapa inteiro, como devem.",
+      "tags": ["bots", "correção"]
+    }
+  ]
+}

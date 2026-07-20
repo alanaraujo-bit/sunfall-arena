@@ -1,0 +1,52 @@
+{
+  "id": "v1.8.0",
+  "version": "1.8.0",
+  "build": 14,
+  "title": "Killcam: veja como você caiu",
+  "subtitle": "Replay da sua morte pela visão do assassino, estilo Black Ops 2 — e respawn quando você quiser",
+  "date": "2026-07-17",
+  "time": "22:03",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Morreu? Agora você assiste ao replay pela visão de quem te eliminou — arma, mira e tiros reais — antes de voltar ao combate na hora que decidir.",
+  "body": [
+    "Toda morte tem uma lição, e agora você pode assisti-la: ao ser eliminado, entra em cena a killcam — um replay da jogada pela visão de quem te derrubou, no melhor estilo Black Ops 2, com barras de cinema e tudo.",
+    "E não é uma reconstituição de mentirinha: a segunda versão da killcam, incluída nesta mesma atualização, mostra o ponto de vista real do assassino — a arma dele, o movimento da mira dele e cada tiro disparado. Você vê exatamente o que ele viu, pelo dobro de tempo da primeira versão.",
+    "Sem paciência para cinema? Aperte F e pule direto. O respawn também ficou nas suas mãos: você volta à partida quando quiser, em vez de esperar um relógio arbitrário."
+  ],
+  "motivation": "A morte num FPS não pode ser só frustração — ela é a melhor professora do jogo. Ver a jogada pelo outro lado transforma raiva em aprendizado (e, às vezes, em respeito).",
+  "impact": "Você entende cada morte, aprende as linhas de tiro dos oponentes e volta ao jogo no seu próprio ritmo.",
+  "notes": "",
+  "techNotes": "O replay reexecuta o buffer de snapshots recentes do ponto de vista do atacante, incluindo pose da arma, orientação de câmera e eventos de disparo.",
+  "footer": "Aperte F para pular... ou assista e aprenda. — Equipe Sunfall",
+  "media": [],
+  "commits": ["9ecd740", "c4556d1"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Killcam estilo Black Ops 2",
+      "desc": "Ao morrer, você assiste ao replay da jogada pela visão do assassino, com barras cinematográficas e opção de pular com F.",
+      "impact": "Cada morte vira uma aula gratuita.",
+      "tags": ["killcam", "replay"]
+    },
+    {
+      "category": "improvements",
+      "state": "improved",
+      "title": "Killcam v2: ponto de vista real",
+      "desc": "O replay mostra a arma, a mira e os tiros exatamente como o assassino executou — com o dobro de duração da primeira versão.",
+      "impact": "Você vê o que ele viu, sem interpretação.",
+      "tags": ["killcam", "pov"]
+    },
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Respawn sob demanda",
+      "desc": "Você decide quando voltar à partida — assista à killcam inteira ou renasça imediatamente.",
+      "impact": "Seu ritmo, suas regras.",
+      "tags": ["respawn"]
+    }
+  ]
+}

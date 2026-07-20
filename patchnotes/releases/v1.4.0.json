@@ -1,0 +1,44 @@
+{
+  "id": "v1.4.0",
+  "version": "1.4.0",
+  "build": 5,
+  "title": "Quem é o melhor da arena?",
+  "subtitle": "Perfis públicos e ranking global",
+  "date": "2026-07-17",
+  "time": "15:20",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Agora dá para saber: o ranking global lista os melhores jogadores da Sunfall Arena, e todo jogador com conta ganhou um perfil público que qualquer um pode visitar.",
+  "body": [
+    "Competição de verdade precisa de um placar de verdade. A nova aba RANKING mostra os melhores jogadores do jogo, ordenados por desempenho — com busca por nome para você achar qualquer um (ou conferir a própria posição).",
+    "E cada nome no ranking agora é uma porta: clique em qualquer jogador para abrir o perfil público dele, com nível, XP e estatísticas de combate. Chega de se perguntar se aquele sniper que te eliminou três vezes é realmente bom — os números não mentem.",
+    "Seu perfil também está visível para os outros. Capriche nas estatísticas."
+  ],
+  "motivation": "Visibilidade cria ambição. Quando você vê o topo, quer chegar lá — e quando os outros veem o seu perfil, cada partida passa a valer mais.",
+  "impact": "Sua reputação agora é pública: suba no ranking e deixe seu perfil falar por você.",
+  "notes": "",
+  "techNotes": "",
+  "footer": "O topo do ranking está esperando. Vai deixar? — Equipe Sunfall",
+  "media": [],
+  "commits": ["96a1fd6"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Ranking global",
+      "desc": "Os melhores jogadores da arena em uma lista só, com busca por nome de usuário para encontrar qualquer perfil.",
+      "impact": "Agora existe um topo — e ele tem nome e sobrenome.",
+      "tags": ["ranking", "competitivo"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Perfis públicos",
+      "desc": "Todo jogador com conta tem um perfil visitável: nível, XP e estatísticas de combate abertos para quem quiser conferir.",
+      "impact": "Seus números viram seu cartão de visita.",
+      "tags": ["perfil", "social"]
+    }
+  ]
+}

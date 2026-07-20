@@ -1,0 +1,36 @@
+{
+  "categories": {
+    "news":         { "label": "Novidades",     "emoji": "✨", "color": "#f0c04c" },
+    "system":       { "label": "Sistema",       "emoji": "⚙️", "color": "#b8b0a0" },
+    "gameplay":     { "label": "Gameplay",      "emoji": "🎮", "color": "#6ee0c8" },
+    "balance":      { "label": "Balanceamento", "emoji": "🛡️", "color": "#e0a34e" },
+    "fixes":        { "label": "Correções",     "emoji": "🐛", "color": "#e0554e" },
+    "performance":  { "label": "Performance",   "emoji": "🚀", "color": "#8ac850" },
+    "ui":           { "label": "Interface",     "emoji": "🎨", "color": "#d98cc8" },
+    "audio":        { "label": "Áudio",         "emoji": "🔊", "color": "#8fb8e8" },
+    "world":        { "label": "Mundo",         "emoji": "🌍", "color": "#f08060" },
+    "content":      { "label": "Conteúdo",      "emoji": "📦", "color": "#c8a850" },
+    "ai":           { "label": "IA",            "emoji": "🧠", "color": "#b48ce0" },
+    "tech":         { "label": "Técnico",       "emoji": "💻", "color": "#9aa8b8" },
+    "security":     { "label": "Segurança",     "emoji": "🔐", "color": "#e07850" },
+    "experimental": { "label": "Experimental",  "emoji": "🧪", "color": "#7ee0a0" },
+    "improvements": { "label": "Melhorias",     "emoji": "📈", "color": "#6ec8e0" }
+  },
+  "states": {
+    "new":          { "label": "NOVO",         "color": "#3fc8b4" },
+    "improved":     { "label": "MELHORADO",    "color": "#f0c04c" },
+    "fixed":        { "label": "CORRIGIDO",    "color": "#8ac850" },
+    "removed":      { "label": "REMOVIDO",     "color": "#8a8478" },
+    "balanced":     { "label": "BALANCEADO",   "color": "#e0a34e" },
+    "optimized":    { "label": "OTIMIZADO",    "color": "#6ec8e0" },
+    "experimental": { "label": "EXPERIMENTAL", "color": "#b48ce0" }
+  },
+  "types": {
+    "major":   { "label": "GRANDE ATUALIZAÇÃO", "color": "#f0c04c" },
+    "feature": { "label": "ATUALIZAÇÃO",        "color": "#3fc8b4" },
+    "patch":   { "label": "AJUSTES",            "color": "#6ec8e0" },
+    "hotfix":  { "label": "CORREÇÃO",           "color": "#e0554e" },
+    "tech":    { "label": "TÉCNICA",            "color": "#9aa8b8" }
+  },
+  "reactions": ["👍", "❤️", "🔥", "🎉", "👏", "😮", "🐛", "⚡", "🚀", "😂"]
+}

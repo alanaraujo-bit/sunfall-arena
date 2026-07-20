@@ -1,0 +1,59 @@
+{
+  "id": "v1.12.1",
+  "version": "1.12.1",
+  "build": 19,
+  "title": "Vocês reportaram, nós corrigimos",
+  "subtitle": "Cinco correções vindas direto do feedback da comunidade",
+  "date": "2026-07-18",
+  "time": "10:36",
+  "author": "Equipe Sunfall",
+  "type": "hotfix",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "Rodada rápida de saúde do jogo: cinco bugs reportados pela comunidade — teclas presas, nomes de jogador, música e comportamento dos bots — todos corrigidos.",
+  "body": [
+    "Nada deixa a gente mais feliz do que bug reportado com carinho — e nada nos move mais rápido. Esta atualização resolve cinco problemas apontados por vocês nos últimos dias, das teclas que ficavam 'presas' ao trocar de janela até bots fazendo coisas que bot não deveria fazer.",
+    "Continuem reportando. Cada relato de vocês vira exatamente isto aqui: um jogo melhor para todo mundo, geralmente em questão de horas."
+  ],
+  "motivation": "Feedback da comunidade é o radar de qualidade mais preciso que existe — quem joga todo dia encontra o que nenhum teste interno encontra.",
+  "impact": "Menos fricção nos detalhes: controles, identidade e áudio se comportando exatamente como deveriam.",
+  "notes": "",
+  "techNotes": "",
+  "footer": "Achou um bug? Conta pra gente — agora tem até aba para isso chegando. — Equipe Sunfall",
+  "media": [],
+  "commits": ["cc2720a"],
+  "cards": [
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Teclas presas ao trocar de janela",
+      "desc": "Alternar de janela (Alt+Tab) no meio do movimento podia deixar a tecla 'andando sozinha' ao voltar. O estado do teclado agora é limpo corretamente.",
+      "impact": "Seu personagem só anda quando você mandar.",
+      "tags": ["controles", "teclado"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Nomes de jogador exibidos errado",
+      "desc": "Casos em que o nome mostrado na partida não correspondia ao jogador certo foram corrigidos.",
+      "impact": "O crédito da eliminação vai para quem merece.",
+      "tags": ["nomes", "identidade"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Comportamento da música",
+      "desc": "Situações em que a trilha do lobby tocava quando não devia (ou parava quando não devia) foram ajustadas.",
+      "impact": "Música no lobby, silêncio tático na arena.",
+      "tags": ["música", "áudio"]
+    },
+    {
+      "category": "ai",
+      "state": "fixed",
+      "title": "Bots mais comportados",
+      "desc": "Correções no comportamento dos bots que causavam ações erráticas em situações específicas.",
+      "impact": "Oponentes de treino mais críveis.",
+      "tags": ["bots", "ia"]
+    }
+  ]
+}

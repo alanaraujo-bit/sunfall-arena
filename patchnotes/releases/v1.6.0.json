@@ -1,0 +1,52 @@
+{
+  "id": "v1.6.0",
+  "version": "1.6.0",
+  "build": 8,
+  "title": "Justiça servida a 30Hz",
+  "subtitle": "Tiro autoritativo no servidor com compensação de lag — a base anti-cheat da arena",
+  "date": "2026-07-17",
+  "time": "16:53",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Cada tiro agora é validado pelo servidor com compensação de lag: o que você mira é o que acerta, e trapacear ficou muito mais difícil.",
+  "body": [
+    "Esta é daquelas mudanças que você não vê — mas sente em todo duelo. Até agora, quem decidia se um tiro acertou era o cliente, ou seja, o navegador de cada jogador. Isso é rápido, mas abre espaço para dois problemas sérios: trapaça e injustiça.",
+    "A partir de hoje, o servidor é o único juiz. Cada disparo é enviado com o instante exato em que aconteceu, e o servidor 'rebobina' a posição de todos os jogadores para aquele momento antes de decidir se acertou — a famosa compensação de lag (lag compensation), a mesma técnica dos grandes FPS competitivos.",
+    "Na prática: se o inimigo estava na sua mira quando você clicou, o tiro conta — mesmo que ele estivesse em movimento e a sua conexão tenha demorado alguns milissegundos para entregar o clique. E como o cliente não decide mais nada, hacks de dano ou de acerto simplesmente deixam de funcionar."
+  ],
+  "motivation": "Um jogo competitivo só se sustenta sobre confiança. Cada eliminação precisa ser inquestionável — para quem acertou e para quem caiu.",
+  "impact": "Duelos mais justos para conexões diferentes e uma barreira sólida contra trapaça. Se você venceu o duelo na tela, você venceu o duelo no servidor.",
+  "notes": "",
+  "techNotes": "O servidor mantém histórico de posições dos jogadores e reexecuta o raycast do disparo contra o estado do mundo no timestamp do clique, com limites de tolerância para evitar abuso de timestamps forjados.",
+  "footer": "Mire tranquilo: o servidor está do seu lado. — Equipe Sunfall",
+  "media": [],
+  "commits": ["dc84b91"],
+  "cards": [
+    {
+      "category": "security",
+      "state": "new",
+      "title": "Tiro autoritativo no servidor",
+      "desc": "O servidor valida cada disparo: trajetória, dano e acerto. O cliente apenas informa a intenção — quem decide é a autoridade central.",
+      "impact": "Hacks de dano e de acerto perdem o efeito.",
+      "tags": ["anti-cheat", "autoridade"]
+    },
+    {
+      "category": "security",
+      "state": "new",
+      "title": "Compensação de lag",
+      "desc": "O servidor rebobina o mundo para o instante exato do seu clique antes de julgar o tiro, dentro de limites seguros de tolerância.",
+      "impact": "O que estava na sua mira é o que você acerta.",
+      "tags": ["lag compensation", "justiça"]
+    },
+    {
+      "category": "gameplay",
+      "state": "improved",
+      "title": "Duelos consistentes entre conexões",
+      "desc": "Jogadores com pings diferentes agora disputam em condições equivalentes — a vantagem de conexão foi drasticamente reduzida.",
+      "impact": "Vence a mira, não o provedor de internet.",
+      "tags": ["competitivo", "equilíbrio"]
+    }
+  ]
+}

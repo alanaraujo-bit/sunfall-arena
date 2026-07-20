@@ -1,0 +1,44 @@
+{
+  "id": "v1.2.0",
+  "version": "1.2.0",
+  "build": 3,
+  "title": "Ninguém vence sozinho",
+  "subtitle": "Sistema de amigos: pedidos, aceites e status online em tempo real",
+  "date": "2026-07-17",
+  "time": "11:57",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Chegou o sistema de amigos: envie pedidos por nome de usuário, aceite convites, veja quem está online e monte sua tropa para dominar a arena.",
+  "body": [
+    "A Sunfall Arena acaba de ficar mais social. A nova aba AMIGOS no lobby permite adicionar qualquer jogador pelo nome de usuário — a pessoa recebe o pedido, aceita, e pronto: vocês estão conectados.",
+    "Na sua lista você vê em tempo real quem está online e quem está fora, com indicador visual direto no lobby. É o primeiro passo para jogar junto de verdade — e as salas privadas com convite já estão no nosso radar.",
+    "Mudou de ideia sobre alguém? Remover um amigo é igualmente simples. Sem burocracia, sem drama."
+  ],
+  "motivation": "FPS é melhor com amigos — essa é uma verdade universal. Antes de construir salas privadas e convites, precisávamos do alicerce: saber quem são os seus aliados.",
+  "impact": "Adicione seus amigos hoje e veja quem está online. Em breve, um clique será o suficiente para caírem juntos na mesma partida.",
+  "notes": "O sistema de amigos requer conta — convidados não podem enviar nem receber pedidos.",
+  "techNotes": "",
+  "footer": "Marque aquele amigo que sempre rouba a sua kill. — Equipe Sunfall",
+  "media": [],
+  "commits": ["a486d10"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Sistema de amigos",
+      "desc": "Envie pedidos de amizade pelo nome de usuário, aceite ou recuse convites recebidos e gerencie sua lista direto no lobby.",
+      "impact": "Sua tropa começa a se formar.",
+      "tags": ["amigos", "social"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Status online em tempo real",
+      "desc": "Um indicador ao lado de cada amigo mostra quem está conectado agora — verde para online, apagado para ausente.",
+      "impact": "Você sabe na hora quem está disponível para jogar.",
+      "tags": ["online", "presença"]
+    }
+  ]
+}

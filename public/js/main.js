@@ -13,6 +13,7 @@ import { Net, api, apiAuth, apiPublicGet } from './net.js';
 import { SFX, getAudioContext } from './audio.js';
 import * as Music from './music.js';
 import { initArmory } from './armory.js';
+import { initUpdatesHub, unreadCount } from './updates/index.js';
 import { PRIMARY_WEAPONS, resolvePrimary } from '/shared/loadout.js';
 import { getActiveClass, loadClasses, getActiveIndex, setActiveIndex } from './classes.js';
 import { byId as weaponById } from './arsenal-data.js';
@@ -558,12 +559,15 @@ function updatePerf(dt) {
 const screens = {
   account: $('screen-account'), profile: $('screen-profile'), friends: $('screen-friends'),
   rank: $('screen-rank'), config: $('screen-config'), modes: $('screen-modes'),
-  armory: $('screen-armory'), mapSelect: $('screen-map-select')
+  armory: $('screen-armory'), mapSelect: $('screen-map-select'), updates: $('screen-updates')
 };
 let currentScreen = null;
 
 // Arsenal: inicializado sob demanda (o visualizador 3D só é criado ao abrir)
 let armory = null;
+
+// Central da Comunidade (NOVIDADES): também inicializada sob demanda
+let updatesHub = null;
 
 function showScreen(name) {
   if (armory && currentScreen === 'armory' && name !== 'armory') armory.close();
@@ -573,6 +577,10 @@ function showScreen(name) {
   if (name === 'rank') loadLeaderboard();
   if (name === 'friends') { renderFriendsScreen(); refreshFriends(); }
   if (name === 'armory') { if (!armory) armory = initArmory(); armory.open(); }
+  if (name === 'updates') {
+    if (!updatesHub) updatesHub = initUpdatesHub({ getAuth: () => auth, onUnreadChange: refreshUpdatesBadge });
+    updatesHub.open();
+  }
 }
 function closeScreen() {
   if (armory && currentScreen === 'armory') armory.close();
@@ -603,6 +611,16 @@ hud.navConfig.onclick = () => showScreen('config');
 hud.modeChip.onclick = () => showScreen('modes');
 $('nav-arsenal').onclick = () => showScreen('armory');
 hud.classChip.onclick = () => showScreen('armory');
+$('nav-updates').onclick = () => showScreen('updates');
+
+// selo "NOVO" na nav: quantas notas de atualização ainda não foram lidas
+function refreshUpdatesBadge() {
+  const badge = $('updates-badge');
+  const n = updatesHub ? updatesHub.unread() : unreadCount();
+  badge.textContent = n > 9 ? '9+' : String(n);
+  badge.classList.toggle('hidden', n === 0);
+}
+refreshUpdatesBadge();
 
 // fechar telas: botão ✕, clicar fora do painel, ou Esc
 for (const el of Object.values(screens)) {
@@ -3957,6 +3975,17 @@ if (TESTMODE && !SMOKEDEMO) {
 // atalho: ?armory abre direto o Arsenal (útil pra demonstrar/testar a tela)
 if (new URLSearchParams(location.search).has('armory')) {
   addEventListener('load', () => showScreen('armory'));
+}
+
+// deep-link: ?patch=v2.0.0 abre NOVIDADES direto na nota da versão
+// (?patch sem valor abre a lista) — é o link do botão COPIAR LINK.
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('patch')) addEventListener('load', () => {
+    showScreen('updates');
+    const id = q.get('patch');
+    if (id) updatesHub?.openArticle(id);
+  });
 }
 
 // atalho de demonstração: ?smokedemo entra numa sala limpa (sem bots) e lança

@@ -1,0 +1,61 @@
+{
+  "id": "v1.13.0",
+  "version": "1.13.0",
+  "build": 20,
+  "title": "Cada arma com sua alma",
+  "subtitle": "Recuo com personalidade, áudio de tiro repaginado e controles com botões laterais do mouse",
+  "date": "2026-07-18",
+  "time": "13:57",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "O gunplay deu um salto: cada arma ganhou padrão de recuo próprio, os sons de tiro e acerto foram refeitos, e os controles agora aceitam botões laterais do mouse — incluindo troca rápida de arma no Q.",
+  "body": [
+    "Armas que atiram igual são armas sem alma. Nesta atualização, cada ferramenta do arsenal ganhou o seu recuo característico: o FALCÃO-9 sobe num padrão que se aprende e se domina, o FERRÃO-SR chuta como um sniper deve chutar. Dominar o recuo agora é uma habilidade — e habilidade separa os bons dos lendários.",
+    "Depois do primeiro ajuste, subimos a magnitude do recuo e adotamos recuperação em duas velocidades (rápida no início, suave no fim): a versão inicial estava tímida demais e quase imperceptível em combate real.",
+    "Os ouvidos também foram premiados: sons de disparo e de acerto repaginados, com mais corpo e resposta imediata — o 'tec' de acertar um inimigo agora é inconfundível.",
+    "E nos controles, liberdade total: qualquer atalho pode ser mapeado para os botões laterais do mouse (M4/M5), e a nova troca rápida no Q alterna instantaneamente para a última arma usada — reflexo puro para os duelos apertados."
+  ],
+  "motivation": "Gunplay é o coração de um FPS. Recuo com identidade, som com impacto e controles ágeis são o tripé da sensação de tiro — e nenhum dos três estava no nível que queríamos.",
+  "impact": "Atirar ficou mais gostoso, mais expressivo e mais habilidoso. Quem treinar o recuo de cada arma vai sentir a diferença no placar.",
+  "notes": "Para remapear os controles: CONFIGURAÇÕES → CONTROLES, clique no atalho e pressione a tecla ou botão do mouse desejado.",
+  "techNotes": "",
+  "footer": "Segura o coice. — Equipe Sunfall",
+  "media": [],
+  "commits": ["4d7b127", "b7fed8d", "4f72176"],
+  "cards": [
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Recuo com personalidade por arma",
+      "desc": "Cada arma tem seu padrão de subida e recuperação característicos. Aprender o recuo da sua favorita agora é parte do domínio dela.",
+      "impact": "Skill de controle de spray passa a existir — e a pagar.",
+      "tags": ["recuo", "gunplay"]
+    },
+    {
+      "category": "balance",
+      "state": "balanced",
+      "title": "Recuo recalibrado",
+      "desc": "A primeira versão estava sutil demais. Aumentamos a magnitude e adotamos recuperação em duas velocidades para um coice perceptível mas domável.",
+      "impact": "O recuo agora se sente — e se domina.",
+      "tags": ["balanceamento", "recuo"]
+    },
+    {
+      "category": "audio",
+      "state": "improved",
+      "title": "Sons de tiro e acerto repaginados",
+      "desc": "Disparos com mais corpo e um som de acerto inconfundível — feedback sonoro instantâneo a cada bala que conecta.",
+      "impact": "Você ouve o dano acontecendo.",
+      "tags": ["áudio", "sfx"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Botões laterais do mouse + troca rápida (Q)",
+      "desc": "Mapeie qualquer ação nos botões M4/M5 e alterne instantaneamente para a última arma com Q.",
+      "impact": "Suas mãos ganham dois dedos extras.",
+      "tags": ["controles", "binds", "mouse"]
+    }
+  ]
+}

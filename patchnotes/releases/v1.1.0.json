@@ -1,0 +1,61 @@
+{
+  "id": "v1.1.0",
+  "version": "1.1.0",
+  "build": 2,
+  "title": "Sua jornada agora fica salva",
+  "subtitle": "Contas de jogador, XP, níveis e estatísticas persistentes",
+  "date": "2026-07-17",
+  "time": "10:13",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Chegaram as contas de jogador! Crie a sua, ganhe XP a cada partida, suba de nível e acompanhe suas estatísticas — tudo salvo com segurança na nuvem.",
+  "body": [
+    "Até ontem, cada partida era uma memória que se perdia ao fechar a aba. A partir de hoje, a Sunfall Arena lembra de você: crie sua conta com usuário e senha e todo o seu progresso passa a ser salvo automaticamente.",
+    "O sistema de progressão nasce junto: cada eliminação, cada vitória e cada partida completada rende XP. A cada 500 XP você sobe de nível — e o seu nível aparece para todo mundo ver.",
+    "Suas estatísticas também entram na memória permanente: eliminações, mortes, headshots e partidas jogadas ficam registradas na sua conta e vão crescer com você a cada sessão.",
+    "Quem preferir continuar como convidado, sem cadastro, pode: o modo rápido continua existindo. A diferença é que o progresso do convidado não é salvo."
+  ],
+  "motivation": "Um FPS competitivo precisa de identidade e progressão. Sem conta, não há história; sem história, cada vitória vale menos. Este é o alicerce de tudo que vem pela frente: amigos, ranking e perfis.",
+  "impact": "Crie sua conta uma vez e nunca mais perca o progresso: XP, nível e estatísticas te acompanham em qualquer navegador.",
+  "notes": "",
+  "techNotes": "Persistência em Postgres gerenciado (Railway). Senhas protegidas com hash bcrypt — nunca armazenamos sua senha em texto. Sessões via token JWT com validade de 15 dias.",
+  "footer": "Seu nome no placar agora tem peso. Bom jogo! — Equipe Sunfall",
+  "media": [],
+  "commits": ["9e23f09"],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Contas de jogador",
+      "desc": "Cadastro simples com usuário e senha, direto no lobby. Entre de qualquer navegador e continue exatamente de onde parou.",
+      "impact": "Seu progresso deixa de morrer quando a aba fecha.",
+      "tags": ["conta", "cadastro"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "XP e níveis",
+      "desc": "Eliminações, vitórias e partidas rendem XP. A cada 500 XP, um nível novo — simples de entender, difícil de largar.",
+      "impact": "Toda partida contribui para a sua evolução.",
+      "tags": ["xp", "nível", "progressão"]
+    },
+    {
+      "category": "system",
+      "state": "new",
+      "title": "Estatísticas persistentes",
+      "desc": "Eliminações, mortes, headshots e partidas jogadas ficam salvos na sua conta e se acumulam para sempre.",
+      "impact": "Seus números contam a sua história na arena.",
+      "tags": ["estatísticas"]
+    },
+    {
+      "category": "security",
+      "state": "new",
+      "title": "Proteção de senha de verdade",
+      "desc": "Senhas guardadas com hash bcrypt e login via token seguro (JWT). Sua senha nunca é armazenada em texto puro.",
+      "impact": "Sua conta nasce protegida por padrão.",
+      "tags": ["segurança", "senha"]
+    }
+  ]
+}

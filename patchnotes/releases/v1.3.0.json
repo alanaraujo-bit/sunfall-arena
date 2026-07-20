@@ -1,0 +1,53 @@
+{
+  "id": "v1.3.0",
+  "version": "1.3.0",
+  "build": 4,
+  "title": "Jogue do seu jeito",
+  "subtitle": "Multiplayer público, salas personalizadas com código e um menu totalmente novo",
+  "date": "2026-07-17",
+  "time": "15:11",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "A arena ganhou estrutura de verdade: fila pública para jogar na hora, salas privadas configuráveis com código de 4 letras para chamar os amigos, e um menu reorganizado em abas.",
+  "body": [
+    "Até agora, existia uma única arena para todo mundo. Esta atualização muda isso de vez com dois caminhos claros para jogar:",
+    "MULTIPLAYER PÚBLICO — para quem quer ação imediata. Você entra na fila e cai na hora numa partida com bots e outros jogadores. Zero espera, zero configuração.",
+    "PERSONALIZADO — para quem quer as próprias regras. Crie uma sala privada escolhendo quantidade de bots, limite de eliminações e tempo de partida. A sala gera um código de 4 letras: compartilhe com os amigos e eles entram direto.",
+    "Para acomodar tudo isso, o menu foi reorganizado em abas — JOGAR, PERFIL e CONFIGURAÇÕES — deixando cada coisa no seu lugar e abrindo espaço para tudo que ainda vem por aí."
+  ],
+  "motivation": "Cada jogador tem um ritmo: tem noite de ranquear no público e noite de zoar com os amigos em sala fechada. O jogo precisava atender os dois sem fricção.",
+  "impact": "Quer jogar agora? Um clique. Quer uma sala só sua com as suas regras? Três cliques e um código para compartilhar.",
+  "notes": "",
+  "techNotes": "Cada sala roda sua própria instância de simulação no servidor, com ciclo de vida independente (criação, partida, encerramento e reciclagem).",
+  "footer": "Crie sua sala, chame a tropa e mostre quem manda. — Equipe Sunfall",
+  "media": [],
+  "commits": ["5dfd75b", "0d72c97"],
+  "cards": [
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Multiplayer público",
+      "desc": "Fila rápida que te coloca numa partida em andamento com bots e outros jogadores. Entrou, jogou.",
+      "impact": "Ação imediata sem nenhuma configuração.",
+      "tags": ["matchmaking", "público"]
+    },
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Salas personalizadas com código",
+      "desc": "Crie uma sala privada com suas regras: bots (0 a 6), limite de eliminações e duração. O código de 4 letras deixa qualquer amigo entrar na hora.",
+      "impact": "Sua sala, suas regras, sua turma.",
+      "tags": ["sala", "privado", "código"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Menu reorganizado em abas",
+      "desc": "JOGAR, PERFIL e CONFIGURAÇÕES agora vivem em abas separadas. Navegação mais limpa e espaço de sobra para os sistemas que estão chegando.",
+      "impact": "Você encontra tudo mais rápido.",
+      "tags": ["menu", "lobby"]
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "id": "v1.12.0",
+  "version": "1.12.0",
+  "build": 18,
+  "title": "Puxe o pino",
+  "subtitle": "Granadas de fragmentação e de fumaça entram em campo",
+  "date": "2026-07-18",
+  "time": "10:19",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "Os Módulos 02 e 03 do arsenal chegaram juntos: granada de fragmentação para abrir espaço na base do dano, e granada de fumaça para fechar linhas de visão. O jogo tático começa agora.",
+  "body": [
+    "Até hoje, todo confronto na Sunfall Arena se resolvia com mira. A partir de agora, resolve-se também com utilidade — e as duas primeiras chegaram com personalidades opostas.",
+    "A GRANADA DE FRAGMENTAÇÃO é a resposta para inimigos entrincheirados: arremesso com física real (quica, rola e escorrega pelo cenário), pavio calibrado e uma explosão que pune quem confiou demais na cobertura. Depois dos testes iniciais, encurtamos o tempo de detonação — a versão original dava tempo demais para alvos em movimento escaparem da área.",
+    "A GRANADA DE FUMAÇA é a ferramenta dos estrategistas: uma nuvem densa que fecha linhas de visão por vários segundos. Use para atravessar o aberto sob a mira de um sniper, reviver com segurança um confronto perdido ou simplesmente semear o caos.",
+    "As duas utilidades têm espaço próprio no HUD, com contador e recarga visual — e a física do arremesso é idêntica no seu navegador e no servidor, então a granada cai exatamente onde você viu que ia cair."
+  ],
+  "motivation": "Profundidade tática não vem de mais dano, vem de mais decisões. Granadas criam perguntas novas a cada round: gastar agora ou segurar? Abrir com frag ou cegar com fumaça?",
+  "impact": "Posições entrincheiradas deixam de ser absolutas e o aberto deixa de ser suicídio — o mapa inteiro fica mais interessante.",
+  "notes": "Corrigimos também o HUD da granada, que sobrepunha o número de vida em algumas resoluções.",
+  "techNotes": "Física de projétil compartilhada entre cliente e servidor (mesmo código nos dois lados) para trajetória idêntica. Dano da fragmentação e área da fumaça validados exclusivamente no servidor. Para revisão visual da nuvem, criamos uma sala de demonstração determinística interna.",
+  "footer": "Fogo no buraco! — Equipe Sunfall",
+  "media": [],
+  "commits": ["fd9943c", "bd22656", "6fb5bd0", "de4d44c", "c5bad23", "09a8cd8", "ea9d546", "2feb75a"],
+  "cards": [
+    {
+      "category": "content",
+      "state": "new",
+      "title": "Granada de fragmentação",
+      "desc": "Explosivo de arremesso com física real e dano em área. Perfeita para desalojar inimigos entrincheirados atrás de cobertura.",
+      "impact": "Nenhum canto do mapa é 100% seguro.",
+      "tags": ["granada", "frag", "utilidade"]
+    },
+    {
+      "category": "content",
+      "state": "new",
+      "title": "Granada de fumaça",
+      "desc": "Nuvem densa que bloqueia linhas de visão por vários segundos. Cruze o aberto, corte o ângulo do sniper, crie o caos.",
+      "impact": "Controle de visão entra no seu repertório tático.",
+      "tags": ["granada", "fumaça", "tático"]
+    },
+    {
+      "category": "balance",
+      "state": "balanced",
+      "title": "Pavio da fragmentação encurtado",
+      "desc": "O tempo de detonação original permitia que alvos em movimento saíssem da área com folga — parecia que a granada 'não dava dano'. Pavio recalibrado.",
+      "impact": "A frag agora cumpre a ameaça que promete.",
+      "tags": ["balanceamento", "frag"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "HUD da granada sobrepondo a vida",
+      "desc": "O contador de granadas invadia o número de vida em algumas resoluções. Cada um no seu quadrado.",
+      "impact": "HUD limpo em qualquer tela.",
+      "tags": ["hud", "correção"]
+    },
+    {
+      "category": "tech",
+      "state": "new",
+      "title": "Física compartilhada cliente/servidor",
+      "desc": "A trajetória da granada é calculada pelo mesmo código no navegador e no servidor — o arco que você vê é o arco que vale.",
+      "impact": "Arremessos 100% previsíveis e justos.",
+      "tags": ["física", "netcode"]
+    }
+  ]
+}

@@ -5,8 +5,12 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "build": "node scripts/copy-shared.js",
-    "deploy": "flyctl deploy -a sunfall-arena --remote-only && vercel deploy --prod"
+    "build": "node scripts/copy-shared.js && node scripts/patchnotes/build.js",
+    "predeploy": "node scripts/patchnotes/verify.js && npm run build",
+    "deploy": "flyctl deploy -a sunfall-arena --remote-only && vercel deploy --prod",
+    "notes:new": "node scripts/patchnotes/new.js",
+    "notes:verify": "node scripts/patchnotes/verify.js",
+    "notes:build": "node scripts/patchnotes/build.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

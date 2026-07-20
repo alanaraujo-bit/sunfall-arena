@@ -1,0 +1,71 @@
+{
+  "id": "v2.1.0",
+  "version": "2.1.0",
+  "build": 25,
+  "title": "O Arsenal está completo",
+  "subtitle": "Quatro armas novas de uma vez: BRECHA-12, SENTINELA-DR, VESPA-C1 e MURALHA-M",
+  "date": "2026-07-19",
+  "time": "01:38",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "A maior expansão de armamento da nossa história: escopeta, DMR, submetralhadora e metralhadora leve chegam juntas — fechando as seis classes de armas do Arsenal.",
+  "body": [
+    "Quando o Arsenal estreou, prometemos que cada estilo de jogo teria sua ferramenta. Hoje pagamos a promessa inteira, com juros: QUATRO armas novas entram em rotação de uma só vez, completando as seis classes de armamento da Sunfall Arena.",
+    "BRECHA-12 — a escopeta. Nossa primeira arma de devastação à queima-roupa: em corredores e cômodos apertados, ela transforma qualquer esquina numa sentença. Alcance curto, impacto brutal.",
+    "SENTINELA-DR — o DMR. O meio-termo cirúrgico entre o rifle e o sniper: tiros únicos precisos em cadência controlada, para quem segura ângulos médios e pune cabeças desatentas.",
+    "VESPA-C1 — a submetralhadora. Cadência furiosa e mobilidade total, feita para quem joga colado no chão deslizando entre coberturas. Enxame de balas, alvo no centro.",
+    "MURALHA-M — a metralhadora leve. Volume de fogo que nega áreas inteiras do mapa: plante-se num ângulo e ninguém passa. Pente gigante, presença gigante. (O modelo 3D dela precisou de um retoque de emergência no Arsenal — a alça e a caixa de munição insistiam em flutuar soltas. Já está tudo no lugar.)",
+    "Todas as quatro chegam com ficha técnica completa e modelo 3D inspecionável no Arsenal. Seis classes, seis personalidades, zero desculpas."
+  ],
+  "motivation": "Variedade de armamento é variedade de identidade: cada classe nova multiplica os estilos de jogo possíveis e os confrontos que a arena pode gerar.",
+  "impact": "Seja qual for o seu jeito de jogar — agressivo, cirúrgico, móvel ou territorial — agora existe uma arma construída exatamente para ele.",
+  "notes": "",
+  "techNotes": "",
+  "footer": "Seis classes. Escolha sua personalidade. — Equipe Sunfall",
+  "media": [],
+  "commits": ["85aaba9", "d823e45", "f6003f5", "382a63c", "571a9a8"],
+  "cards": [
+    {
+      "category": "content",
+      "state": "new",
+      "title": "BRECHA-12 — escopeta",
+      "desc": "Devastação à queima-roupa: a rainha dos corredores e das esquinas fechadas. Primeira escopeta jogável do arsenal.",
+      "impact": "Combate próximo ganhou uma nova palavra final.",
+      "tags": ["brecha-12", "escopeta", "arma"]
+    },
+    {
+      "category": "content",
+      "state": "new",
+      "title": "SENTINELA-DR — rifle de precisão (DMR)",
+      "desc": "Tiros únicos certeiros em cadência controlada — o elo perdido entre o FALCÃO-9 e o FERRÃO-SR.",
+      "impact": "Distâncias médias ganharam seu especialista.",
+      "tags": ["sentinela-dr", "dmr", "arma"]
+    },
+    {
+      "category": "content",
+      "state": "new",
+      "title": "VESPA-C1 — submetralhadora (SMG)",
+      "desc": "Cadência altíssima e mobilidade máxima para quem luta em movimento e cola no inimigo.",
+      "impact": "O estilo agressivo achou sua arma-assinatura.",
+      "tags": ["vespa-c1", "smg", "arma"]
+    },
+    {
+      "category": "content",
+      "state": "new",
+      "title": "MURALHA-M — metralhadora leve (LMG)",
+      "desc": "Pente gigante e volume de fogo para negar áreas inteiras. Plante-se e vire paisagem hostil.",
+      "impact": "Controle de área agora é uma profissão.",
+      "tags": ["muralha-m", "lmg", "arma"]
+    },
+    {
+      "category": "fixes",
+      "state": "fixed",
+      "title": "Modelo 3D da MURALHA-M",
+      "desc": "A alça de transporte e a caixa de munição apareciam flutuando soltas no visualizador do Arsenal. Soldadas no lugar.",
+      "impact": "A vitrine faz justiça à muralha.",
+      "tags": ["arsenal", "3d", "correção"]
+    }
+  ]
+}

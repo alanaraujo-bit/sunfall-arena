@@ -1,0 +1,53 @@
+{
+  "id": "v1.7.0",
+  "version": "1.7.0",
+  "build": 10,
+  "title": "Um lobby à altura da arena",
+  "subtitle": "Interface do lobby refeita do zero: tela cheia, navegação lateral e cara de jogo grande",
+  "date": "2026-07-17",
+  "time": "19:58",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "O lobby foi reconstruído por completo: agora é uma experiência em tela cheia com navegação lateral, chip de identidade com XP, dock de jogo e visual premium — inspirado nos menus dos grandes FPS.",
+  "body": [
+    "Se o jogo dentro da partida já tinha personalidade, o menu ainda parecia um site. Isso acabou hoje: o lobby foi redesenhado do zero como uma experiência de tela cheia, com o seu personagem em cena, luz de entardecer e hierarquia visual de jogo AAA.",
+    "A navegação mudou para uma barra lateral clara — ARSENAL, PERFIL, AMIGOS e RANKING — enquanto o topo concentra sua identidade: avatar, nome, nível e a barra de XP sempre visíveis. No canto, os acessos rápidos de tela cheia e configurações.",
+    "Na parte de baixo, o novo dock de jogo: o modo selecionado e o botão INICIAR sempre à mão. Cada tela (perfil, amigos, ranking, configurações) agora abre como um painel sobreposto elegante, com fundo escurecido e fechamento por Esc ou clique fora.",
+    "É o mesmo jogo — mas agora ele te recebe do jeito certo."
+  ],
+  "motivation": "O lobby é a primeira impressão e o lugar onde você passa o tempo entre partidas. Ele precisava transmitir o mesmo capricho da arena — e abrir espaço estrutural para tudo que planejamos colocar nele.",
+  "impact": "Navegação mais rápida, informação do seu progresso sempre visível e uma experiência de menu que respeita o seu tempo.",
+  "notes": "",
+  "techNotes": "",
+  "footer": "Entre, se ajeite — a casa é sua. — Equipe Sunfall",
+  "media": [],
+  "commits": ["1a080c1"],
+  "cards": [
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Lobby em tela cheia",
+      "desc": "Menu reconstruído como experiência imersiva: personagem em cena, luz de entardecer e telas sobrepostas com transições suaves.",
+      "impact": "A primeira impressão agora está à altura do jogo.",
+      "tags": ["lobby", "redesign"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Navegação lateral",
+      "desc": "ARSENAL, PERFIL, AMIGOS e RANKING organizados numa barra lateral limpa, com ícones e estados de foco bem definidos.",
+      "impact": "Qualquer área do jogo a um clique de distância.",
+      "tags": ["navegação", "menu"]
+    },
+    {
+      "category": "ui",
+      "state": "improved",
+      "title": "Identidade sempre visível",
+      "desc": "Avatar, nome, nível e barra de XP fixos no topo do lobby — seu progresso te acompanha em todas as telas.",
+      "impact": "Você nunca perde de vista o quanto falta para o próximo nível.",
+      "tags": ["xp", "identidade"]
+    }
+  ]
+}

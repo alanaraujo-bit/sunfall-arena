@@ -1,0 +1,102 @@
+{
+  "id": "v2.4.0",
+  "version": "2.4.0",
+  "build": 28,
+  "title": "NOVIDADES: a voz do jogo, a voz de vocês",
+  "subtitle": "Central completa de Patch Notes, Sugestões e Reporte de Bugs — direto no lobby",
+  "date": "2026-07-20",
+  "time": "16:34",
+  "author": "Equipe Sunfall",
+  "type": "major",
+  "tier": "advanced",
+  "pinned": true,
+  "summary": "A comunicação entre a equipe e vocês agora tem casa própria: a aba NOVIDADES traz o histórico completo de atualizações do jogo com reações, favoritos, busca e linha do tempo — mais canais oficiais de sugestões e reporte de bugs.",
+  "body": [
+    "Desde o primeiro dia, a Sunfall Arena evolui em ritmo acelerado — mas essa evolução acontecia em silêncio. Isso acaba hoje: a nova aba NOVIDADES, na navegação principal do lobby, é o registro vivo e permanente de tudo que muda no jogo.",
+    "Dentro dela, o histórico completo: TODAS as atualizações desde o lançamento, reconstruídas e reescritas — cada uma explicando o que mudou, por que mudou, como mudou e qual o impacto para você. Grandes updates viram artigos completos; ajustes menores, notas compactas. Navegue pela linha do tempo de versões, busque por qualquer palavra, filtre por categoria ou tipo, favorite as que quiser guardar e reaja com emojis às que amar (ou às que consertaram aquele bug que te tirava do sério).",
+    "Cada atualização tem link próprio para compartilhar, as mais importantes ficam fixadas no topo, e um selo NOVO na navegação avisa quando houver nota que você ainda não leu.",
+    "E a conversa agora é de mão dupla: a aba SUGESTÕES recebe suas ideias, elogios e opiniões direto no lobby; a aba REPORTAR BUG oferece um formulário profissional que coleta automaticamente os dados técnicos da sua máquina (versão, plataforma, resolução, FPS, placa de vídeo) para nos ajudar a reproduzir o problema. Tudo que vocês enviarem chega organizado, na hora, para a equipe.",
+    "Uma promessa de arquitetura acompanha esta atualização: a partir de agora, NENHUMA mudança entra no jogo sem patch note correspondente. Isso não é uma intenção — é uma regra automática do nosso processo de publicação, que bloqueia qualquer atualização não documentada."
+  ],
+  "motivation": "Um jogo vivo merece uma comunicação viva. Vocês merecem saber o que muda e por quê — e nós precisamos ouvir o que vocês têm a dizer. Esta central resolve os dois lados da conversa de uma vez, com a qualidade dos grandes jogos que nos inspiram.",
+  "impact": "Você nunca mais vai se perguntar 'o que mudou?'. E quando encontrar um bug ou tiver uma ideia, o caminho até a equipe é de dois cliques.",
+  "notes": "Reações e favoritos funcionam para todos — com conta ou como convidado. Sugestões e reportes de bug também aceitam envio anônimo.",
+  "techNotes": "Patch notes versionados como dados estruturados no repositório, com geração automática de rascunhos a partir do histórico do Git e verificação de consistência que bloqueia deploys não documentados. Reações e favoritos persistidos no banco com deduplicação por jogador. Sugestões e reportes com validação, sanitização e limite de envio por jogador, encaminhados em tempo real para o canal interno da equipe via webhook.",
+  "footer": "Esta página que você está lendo é a prova de que ela funciona. Bem-vindos à conversa! — Equipe Sunfall",
+  "media": [],
+  "commits": [],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Aba NOVIDADES no lobby",
+      "desc": "Central de comunicação na navegação principal: Patch Notes, Sugestões e Reportar Bug em um hub só, com selo NOVO quando houver nota não lida.",
+      "impact": "A evolução do jogo agora tem endereço fixo.",
+      "tags": ["novidades", "lobby", "hub"]
+    },
+    {
+      "category": "content",
+      "state": "new",
+      "title": "Histórico completo de atualizações",
+      "desc": "Todas as versões desde o lançamento, reescritas para jogadores: o que mudou, por que, como e com qual impacto — com linha do tempo navegável.",
+      "impact": "A história inteira do jogo ao seu alcance.",
+      "tags": ["patch notes", "timeline", "histórico"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Busca, filtros, favoritos e fixados",
+      "desc": "Busque por palavra, versão ou categoria; filtre por tipo de atualização; favorite notas para reler depois; as importantes ficam fixadas no topo.",
+      "impact": "Você encontra qualquer mudança em segundos.",
+      "tags": ["busca", "filtros", "favoritos"]
+    },
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Reações com emoji",
+      "desc": "Reaja a qualquer atualização com 👍 ❤️ 🔥 🎉 e mais — com contadores públicos que mostram o sentimento da comunidade.",
+      "impact": "Sua opinião sobre cada update vira sinal visível.",
+      "tags": ["reações", "emoji", "comunidade"]
+    },
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Aba SUGESTÕES",
+      "desc": "Canal oficial para ideias, melhorias, elogios e opiniões — direto do lobby para a mesa da equipe.",
+      "impact": "Sua ideia pode virar a próxima atualização.",
+      "tags": ["sugestões", "feedback"]
+    },
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Aba REPORTAR BUG",
+      "desc": "Formulário profissional com categoria, gravidade, passos para reproduzir — e coleta automática de versão, plataforma, resolução, FPS e GPU.",
+      "impact": "Reportar um bug ficou fácil; consertar, mais rápido ainda.",
+      "tags": ["bugs", "reporte", "qualidade"]
+    },
+    {
+      "category": "tech",
+      "state": "new",
+      "title": "Patch notes automáticos e obrigatórios",
+      "desc": "Geração de rascunhos a partir do histórico do Git e trava de publicação: nenhuma mudança entra no jogo sem nota correspondente.",
+      "impact": "Transparência garantida por arquitetura, não por promessa.",
+      "tags": ["automação", "git", "consistência"]
+    },
+    {
+      "category": "security",
+      "state": "new",
+      "title": "Proteção contra spam e abuso",
+      "desc": "Validação completa, sanitização de conteúdo e limites de envio em todos os canais de comunicação.",
+      "impact": "Canais abertos para todos, inutilizáveis para abusadores.",
+      "tags": ["segurança", "rate limit"]
+    },
+    {
+      "category": "ui",
+      "state": "new",
+      "title": "Identidade visual no navegador",
+      "desc": "O jogo ganhou ícone próprio na aba do navegador, ícones de instalação e cartão de compartilhamento — a Sunfall Arena agora se apresenta como deve em favoritos, atalhos e links.",
+      "impact": "Achar a aba do jogo no meio de vinte outras ficou instantâneo.",
+      "tags": ["favicon", "marca"]
+    }
+  ]
+}

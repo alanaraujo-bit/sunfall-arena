@@ -1,0 +1,44 @@
+{
+  "id": "v1.10.0",
+  "version": "1.10.0",
+  "build": 16,
+  "title": "PRESA-7: silêncio que corta",
+  "subtitle": "Chega o combate corpo a corpo — a primeira faca da Sunfall Arena",
+  "date": "2026-07-18",
+  "time": "00:31",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "advanced",
+  "pinned": false,
+  "summary": "O Módulo 01 do arsenal expandido está no ar: a faca PRESA-7 inaugura o combate corpo a corpo. Aproximou, cortou, sumiu.",
+  "body": [
+    "Nem todo duelo precisa de pólvora. A PRESA-7 é a nova opção para quem prefere resolver de perto: uma lâmina rápida, letal à queima-roupa e absolutamente humilhante para quem for eliminado por ela.",
+    "O sistema de combate corpo a corpo nasce completo: animação de golpe, alcance curto e honesto, dano alto que recompensa a aproximação bem executada — e todo o registro de acerto validado pelo servidor, como manda a nossa filosofia anti-cheat.",
+    "Este é o primeiro módulo do plano de expansão do arsenal. A meta é clara: cada estilo de jogo merece uma ferramenta com personalidade."
+  ],
+  "motivation": "Um FPS sem faca é um FPS sem histórias para contar. O corpo a corpo cria os momentos de maior tensão — e as eliminações mais comemoradas.",
+  "impact": "Uma nova camada de decisão em cada duelo próximo: sacar a lâmina ou confiar na bala?",
+  "notes": "",
+  "techNotes": "Detecção de acerto do golpe validada no servidor, com alcance e ângulo verificados contra a posição real dos jogadores.",
+  "footer": "De perto, ninguém erra. — Equipe Sunfall",
+  "media": [],
+  "commits": ["8588ba5"],
+  "cards": [
+    {
+      "category": "content",
+      "state": "new",
+      "title": "PRESA-7 — faca de combate",
+      "desc": "Lâmina rápida de alcance curto e dano devastador. Feita para flanqueadores, economizadores de munição e humilhadores profissionais.",
+      "impact": "A eliminação mais desmoralizante do jogo chegou.",
+      "tags": ["presa-7", "faca", "arma"]
+    },
+    {
+      "category": "gameplay",
+      "state": "new",
+      "title": "Sistema de combate corpo a corpo",
+      "desc": "Golpe com animação própria, alcance e ângulo honestos e validação de acerto no servidor.",
+      "impact": "Duelos à queima-roupa ganham uma nova resposta.",
+      "tags": ["corpo a corpo", "melee"]
+    }
+  ]
+}

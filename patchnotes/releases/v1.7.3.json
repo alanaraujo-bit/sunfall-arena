@@ -1,0 +1,35 @@
+{
+  "id": "v1.7.3",
+  "version": "1.7.3",
+  "build": 13,
+  "title": "Cura sob nova direção",
+  "subtitle": "O kit de cura por sequência de abates agora é controlado pelo servidor",
+  "date": "2026-07-17",
+  "time": "21:18",
+  "author": "Equipe Sunfall",
+  "type": "patch",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "O kit de cura — aquele que você ganha ao emendar abates — passou para o controle total do servidor, na mesma linha anti-cheat do tiro autoritativo.",
+  "body": [
+    "Seguindo a filosofia iniciada na v1.6.0, mais um sistema saiu das mãos do cliente: o kit de cura por sequência de abates agora é concedido, contado e consumido exclusivamente pelo servidor.",
+    "Para você, nada muda no ritmo de jogo — emendou abates, ganhou kit, usou, curou. A diferença é invisível e importante: ninguém pode mais forjar curas que não conquistou."
+  ],
+  "motivation": "Todo recurso que afeta o combate precisa de um único juiz. Vida é o recurso mais valioso do jogo — era a próxima fronteira óbvia da autoridade do servidor.",
+  "impact": "O kit funciona exatamente como antes para quem joga limpo — e deixa de funcionar para quem tentar burlar.",
+  "notes": "",
+  "techNotes": "Concessão por streak, contagem e consumo do kit validados server-side; o cliente apenas exibe o estado.",
+  "footer": "Ganhou, curou. Simples e justo. — Equipe Sunfall",
+  "media": [],
+  "commits": ["08bdd1e"],
+  "cards": [
+    {
+      "category": "security",
+      "state": "improved",
+      "title": "Kit de cura autoritativo",
+      "desc": "Concessão, contagem e uso do kit de cura por sequência de abates agora são decididos pelo servidor, não pelo navegador.",
+      "impact": "Cura forjada por trapaça deixa de existir.",
+      "tags": ["anti-cheat", "kit", "cura"]
+    }
+  ]
+}

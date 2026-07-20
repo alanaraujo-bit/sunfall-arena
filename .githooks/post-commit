@@ -1,0 +1,6 @@
+#!/bin/sh
+# SUNFALL ARENA — memória permanente do projeto:
+# todo commit precisa de patch note. Este hook nunca bloqueia o
+# commit; ele só avisa (o bloqueio real acontece no deploy).
+node scripts/patchnotes/verify.js --hook
+exit 0

@@ -40,8 +40,17 @@ public/js/world.js   construção visual do Cânion, personagens, armas
 public/js/world-ocaso.js construção visual do Ocaso (blockout em progresso)
 public/js/textures.js texturas hand-painted geradas via canvas
 public/js/audio.js   SFX procedural via WebAudio
+public/js/updates/   Central da Comunidade (patch notes, sugestões, bugs)
+patchnotes/          releases versionadas + registry (fonte da verdade das notas)
+scripts/patchnotes/  gerador/verificador/build dos patch notes
 design/              documentos de level design (mapa-02-ocaso.md)
 ```
+
+## Patch Notes (regra permanente)
+
+Nenhuma mudança entra no jogo sem patch note: o deploy é bloqueado se houver
+commit não documentado. Fluxo completo em **docs/PATCH-NOTES-SYSTEM.md**.
+Após clonar, ative o aviso pós-commit: `git config core.hooksPath .githooks`.
 
 Cada sala roda um mapa (`room.map`); salas personalizadas escolhem o mapa no lobby.
 
