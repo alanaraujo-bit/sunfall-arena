@@ -160,6 +160,15 @@ Todo o CSS vive em `public/style.css`, seção **"NOVIDADES — Central da Comun
 
 Sem a variável, o jogo funciona normalmente — envios ficam **apenas no banco** (`community_submissions`) e o servidor loga um aviso único. As mensagens usam embeds com cor por gravidade, campos organizados e `allowed_mentions` vazio (conteúdo de jogador nunca pinga @everyone).
 
+### Anúncios automáticos de patch notes (segundo webhook)
+
+`DISCORD_PATCHNOTES_WEBHOOK_URL` aponta para o canal de **anúncios**. A cada boot do servidor (todo deploy reinicia a máquina), `server/services/announcer.js` compara as releases de `patchnotes/` com a tabela `patch_announcements` e anuncia o que for novo — resumo, até 3 destaques e link `?patch=` para ler a nota completa no jogo (`GAME_URL`, padrão vercel.app).
+
+- **Dedupe no banco**: cada versão anuncia UMA vez, mesmo com N reinícios.
+- **Primeiro uso**: o histórico é selado sem postar (sem flood); só a versão mais recente é anunciada.
+- **Falha do Discord**: a reserva é desfeita e o próximo boot tenta de novo.
+- Fluxo normal: escreveu a release → `npm run deploy` → anúncio sai sozinho. Nada manual.
+
 ---
 
 ## 9. Segurança e antispam

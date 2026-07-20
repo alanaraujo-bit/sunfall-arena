@@ -11,7 +11,9 @@
 // Falha de envio nunca derruba a requisição: o registro no banco
 // é a fonte da verdade; o Discord é notificação.
 // ============================================================
-const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;                       // sugestões + bugs
+const PATCHNOTES_WEBHOOK_URL = process.env.DISCORD_PATCHNOTES_WEBHOOK_URL; // anúncios de patch notes
+const GAME_URL = process.env.GAME_URL || 'https://sunfall-arena.vercel.app';
 let warnedOnce = false;
 
 const COLORS = {
@@ -26,15 +28,11 @@ const SEV_EMOJI = { low: '🟢', medium: '🟡', high: '🟠', critical: '🔴' 
 const cut = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + '…' : s || '');
 const line = parts => parts.filter(Boolean).join('  ·  ');
 
-export async function sendToDiscord(embed) {
-  if (!WEBHOOK_URL) {
-    if (!warnedOnce) { warnedOnce = true; console.warn('[discord] DISCORD_WEBHOOK_URL não configurado — envios serão apenas registrados no banco.'); }
-    return false;
-  }
+async function postWebhook(url, embed) {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 6000);
-    const res = await fetch(WEBHOOK_URL, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // allowed_mentions vazio: conteúdo de jogador nunca pinga @everyone/@cargo
@@ -48,6 +46,49 @@ export async function sendToDiscord(embed) {
     console.error('[discord] falha no envio:', err.message);
     return false;
   }
+}
+
+export async function sendToDiscord(embed) {
+  if (!WEBHOOK_URL) {
+    if (!warnedOnce) { warnedOnce = true; console.warn('[discord] DISCORD_WEBHOOK_URL não configurado — envios serão apenas registrados no banco.'); }
+    return false;
+  }
+  return postWebhook(WEBHOOK_URL, embed);
+}
+
+export function hasPatchWebhook() { return !!PATCHNOTES_WEBHOOK_URL; }
+
+export async function sendPatchAnnouncement(embed) {
+  if (!PATCHNOTES_WEBHOOK_URL) return false;
+  return postWebhook(PATCHNOTES_WEBHOOK_URL, embed);
+}
+
+// 📜 Anúncio de patch note: versão resumida para o Discord — resumo,
+// até 3 destaques e o convite para ler a nota completa dentro do jogo.
+export function patchAnnounceEmbed(release, registry) {
+  const type = registry?.types?.[release.type] || { label: 'ATUALIZAÇÃO', color: '#3fc8b4' };
+  const color = parseInt(String(type.color).replace('#', ''), 16) || 0x3fc8b4;
+  const cards = release.cards || [];
+  const highlights = cards.slice(0, 3).map(c => {
+    const cat = registry?.categories?.[c.category];
+    return `${c.icon || cat?.emoji || '•'} ${c.title}`;
+  });
+  const extra = cards.length - highlights.length;
+  const url = `${GAME_URL}/?patch=${encodeURIComponent(release.id)}`;
+
+  const parts = [
+    cut(release.summary, 350),
+    highlights.length ? `**Destaques**\n${highlights.map(h => `• ${cut(h, 90)}`).join('\n')}${extra > 0 ? `\n_…e mais ${extra} mudança${extra === 1 ? '' : 's'}._` : ''}` : '',
+    `🎮 **Nota completa dentro do jogo** — aba **NOVIDADES** no lobby\n🔗 [Abrir direto nesta nota](${url})`
+  ];
+
+  return {
+    title: `📜 ${release.id} · ${cut(release.title, 200)}`,
+    description: parts.filter(Boolean).join('\n\n'),
+    color,
+    footer: { text: line([`Sunfall Arena`, `build ${release.build}`, type.label, `${release.readMinutes || ''} min de leitura`.trim()]) },
+    timestamp: new Date(`${release.date}T${release.time || '12:00'}:00-03:00`).toISOString()
+  };
 }
 
 // 💡 Sugestão: título + mensagem + UMA linha de contexto. Nada mais.

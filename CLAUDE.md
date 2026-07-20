@@ -18,4 +18,5 @@ FPS multiplayer de navegador. Backend: Express + WebSocket no Fly.io (GRU) + Pos
 - Textos voltados ao jogador em PT-BR; nomes de armas/mapas em caixa alta (FALCÃO-9, Ocaso).
 - Servidor é autoridade em tudo que afeta gameplay; validação e rate limit em toda rota pública.
 - `shared/` é copiado para `public/shared/` no build; `public/patchnotes/data.js` é gerado no build (ambos fora do git).
-- Segredos só via env (Fly secrets): `DATABASE_URL`, `JWT_SECRET`, `DISCORD_WEBHOOK_URL` (ver `.env.example`).
+- Segredos só via env (Fly secrets): `DATABASE_URL`, `JWT_SECRET`, `DISCORD_WEBHOOK_URL` (sugestões/bugs), `DISCORD_PATCHNOTES_WEBHOOK_URL` (anúncios de release) — ver `.env.example`.
+- Anúncio no Discord é automático: o boot pós-deploy anuncia releases novas (announcer.js + tabela `patch_announcements`). Não anunciar manualmente.

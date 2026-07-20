@@ -14,6 +14,7 @@ import playersRoutes from './routes/players.routes.js';
 import roomsRoutes from './routes/rooms.routes.js';
 import communityRoutes from './routes/community.routes.js';
 import { loadPatchMeta } from './services/patchmeta.js';
+import { announceNewPatchNotes } from './services/announcer.js';
 import { attachWs, startGameLoop } from './ws.js';
 import { staticMiddleware } from './static.js';
 
@@ -47,6 +48,8 @@ startGameLoop();
 
 await migrate();
 await loadPatchMeta();
+// anuncia patch notes novos no Discord (não bloqueia o boot se falhar)
+announceNewPatchNotes().catch(err => console.error('[announcer]', err.message));
 
 server.listen(PORT, () => {
   console.log('==========================================');

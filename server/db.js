@@ -131,6 +131,12 @@ export async function migrate() {
     );
   `);
   await query(`
+    CREATE TABLE IF NOT EXISTS patch_announcements (
+      patch_id     VARCHAR(20) PRIMARY KEY,
+      announced_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`
     CREATE TABLE IF NOT EXISTS community_submissions (
       id             BIGSERIAL PRIMARY KEY,
       kind           VARCHAR(10) NOT NULL,

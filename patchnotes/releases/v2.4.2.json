@@ -1,0 +1,43 @@
+{
+  "id": "v2.4.2",
+  "version": "2.4.2",
+  "build": 30,
+  "title": "As novidades agora vão até você",
+  "subtitle": "Toda atualização do jogo é anunciada automaticamente no Discord",
+  "date": "2026-07-20",
+  "time": "17:20",
+  "author": "Equipe Sunfall",
+  "type": "feature",
+  "tier": "basic",
+  "pinned": false,
+  "summary": "O canal de novidades no Discord entrou no ar: cada nova atualização do jogo é anunciada lá automaticamente, em resumo — e a nota completa continua te esperando na aba NOVIDADES, dentro do jogo.",
+  "body": [
+    "Se a v2.4.0 trouxe as notas de atualização para dentro do jogo, esta leva o aviso delas até onde você conversa: a partir de agora, toda release publicada é anunciada automaticamente no canal de novidades do Discord — com resumo, destaques e link direto para a nota completa.",
+    "E o melhor: isso não depende de ninguém lembrar de postar. O anúncio faz parte do processo de publicação do jogo — se a atualização saiu, o aviso sai junto. Se você está lendo esta nota pelo Discord, o sistema acabou de se apresentar sozinho."
+  ],
+  "motivation": "Vocês não deveriam precisar abrir o jogo para descobrir que ele mudou — a notícia tem que chegar onde vocês estão.",
+  "impact": "Atualizou, você fica sabendo na hora — no Discord o resumo, no jogo a história completa com reações, favoritos e timeline.",
+  "notes": "",
+  "techNotes": "Anúncio disparado no boot pós-deploy com deduplicação por versão no banco (cada release anuncia exatamente uma vez). Webhook e URL do jogo configuráveis por variável de ambiente.",
+  "footer": "Nos vemos no canal — e na arena. — Equipe Sunfall",
+  "media": [],
+  "commits": [],
+  "cards": [
+    {
+      "category": "news",
+      "state": "new",
+      "title": "Anúncios automáticos no Discord",
+      "desc": "Cada release nova é anunciada no canal de novidades com resumo, destaques e link direto para a nota completa no jogo.",
+      "impact": "Você fica sabendo de cada mudança sem precisar procurar.",
+      "tags": ["discord", "anúncios", "comunidade"]
+    },
+    {
+      "category": "tech",
+      "state": "new",
+      "title": "Anúncio como parte da publicação",
+      "desc": "O aviso sai junto do deploy, com trava que impede anúncio duplicado — não depende de ninguém lembrar de postar.",
+      "impact": "Comunicação garantida por arquitetura, igual aos patch notes.",
+      "tags": ["automação", "bastidores"]
+    }
+  ]
+}
