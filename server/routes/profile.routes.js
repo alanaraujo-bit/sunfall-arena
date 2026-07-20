@@ -15,7 +15,12 @@ router.get('/profile/me', requireAuth, async (req, res) => {
     [req.user.sub]
   );
   if (!rows.length) return res.status(404).json({ error: 'not_found' });
-  res.json(rows[0]);
+
+  const { rows: likeRows } = await query(
+    'SELECT COUNT(*) AS n FROM player_likes WHERE target_id = $1',
+    [req.user.sub]
+  );
+  res.json({ ...rows[0], likesCount: Number(likeRows[0].n) });
 });
 
 router.get('/stats/me', requireAuth, async (req, res) => {

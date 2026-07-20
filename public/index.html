@@ -289,14 +289,29 @@
             </div>
             <div id="pf-xpbar"><div id="pf-xpfill"></div></div>
             <div id="pf-xptext">0 / 500 XP</div>
-            <div id="pf-stats">
-              <div class="pf-tile"><b id="st-wins">0</b><span>Vitórias</span></div>
-              <div class="pf-tile"><b id="st-matches">0</b><span>Partidas</span></div>
-              <div class="pf-tile"><b id="st-kills">0</b><span>Eliminações</span></div>
-              <div class="pf-tile"><b id="st-deaths">0</b><span>Mortes</span></div>
-              <div class="pf-tile"><b id="st-kd">0.00</b><span>K/D</span></div>
-              <div class="pf-tile"><b id="st-hs">0</b><span>Headshots</span></div>
+            <div id="pf-meta">
+              <span id="pf-playtime">🕐 —</span>
+              <span id="pf-likes">♥ 0</span>
             </div>
+            <div class="pf-tabs">
+              <button type="button" class="pf-tab active" data-pftab="geral">GERAL</button>
+              <button type="button" class="pf-tab" data-pftab="modos">MODOS</button>
+              <button type="button" class="pf-tab" data-pftab="mapas">MAPAS</button>
+            </div>
+            <div class="pf-tabpage" data-pftabpage="geral">
+              <div id="pf-stats">
+                <div class="pf-tile"><b id="st-wins">0</b><span>Vitórias</span></div>
+                <div class="pf-tile"><b id="st-matches">0</b><span>Partidas</span></div>
+                <div class="pf-tile"><b id="st-winrate">0%</b><span>Vitórias %</span></div>
+                <div class="pf-tile"><b id="st-kills">0</b><span>Eliminações</span></div>
+                <div class="pf-tile"><b id="st-deaths">0</b><span>Mortes</span></div>
+                <div class="pf-tile"><b id="st-kd">0.00</b><span>K/D</span></div>
+                <div class="pf-tile"><b id="st-hs">0</b><span>Headshots</span></div>
+                <div class="pf-tile"><b id="st-hsrate">0%</b><span>HS %</span></div>
+              </div>
+            </div>
+            <div class="pf-tabpage hidden" data-pftabpage="modos" id="pf-modos"></div>
+            <div class="pf-tabpage hidden" data-pftabpage="mapas" id="pf-mapas"></div>
           </div>
         </div>
       </div>
@@ -532,16 +547,30 @@
         <div id="pm-since">—</div>
         <div id="pm-xpbar"><div id="pm-xpfill"></div></div>
         <div id="pm-xptext">—</div>
-        <div id="pm-stats">
-          <div class="pf-tile"><b id="pm-wins">0</b><span>Vitórias</span></div>
-          <div class="pf-tile"><b id="pm-matches">0</b><span>Partidas</span></div>
-          <div class="pf-tile"><b id="pm-winrate">0%</b><span>Vitórias %</span></div>
-          <div class="pf-tile"><b id="pm-kills">0</b><span>Eliminações</span></div>
-          <div class="pf-tile"><b id="pm-deaths">0</b><span>Mortes</span></div>
-          <div class="pf-tile"><b id="pm-kd">0.00</b><span>K/D</span></div>
-          <div class="pf-tile"><b id="pm-hs">0</b><span>Headshots</span></div>
-          <div class="pf-tile"><b id="pm-hsrate">0%</b><span>HS %</span></div>
+        <div id="pm-meta">
+          <span id="pm-playtime">🕐 —</span>
+          <span id="pm-likes-count">♥ 0</span>
+          <button type="button" id="pm-like" class="hidden">CURTIR</button>
         </div>
+        <div class="pf-tabs">
+          <button type="button" class="pf-tab active" data-pftab="geral">GERAL</button>
+          <button type="button" class="pf-tab" data-pftab="modos">MODOS</button>
+          <button type="button" class="pf-tab" data-pftab="mapas">MAPAS</button>
+        </div>
+        <div class="pf-tabpage" data-pftabpage="geral">
+          <div id="pm-stats">
+            <div class="pf-tile"><b id="pm-wins">0</b><span>Vitórias</span></div>
+            <div class="pf-tile"><b id="pm-matches">0</b><span>Partidas</span></div>
+            <div class="pf-tile"><b id="pm-winrate">0%</b><span>Vitórias %</span></div>
+            <div class="pf-tile"><b id="pm-kills">0</b><span>Eliminações</span></div>
+            <div class="pf-tile"><b id="pm-deaths">0</b><span>Mortes</span></div>
+            <div class="pf-tile"><b id="pm-kd">0.00</b><span>K/D</span></div>
+            <div class="pf-tile"><b id="pm-hs">0</b><span>Headshots</span></div>
+            <div class="pf-tile"><b id="pm-hsrate">0%</b><span>HS %</span></div>
+          </div>
+        </div>
+        <div class="pf-tabpage hidden" data-pftabpage="modos" id="pm-modos"></div>
+        <div class="pf-tabpage hidden" data-pftabpage="mapas" id="pm-mapas"></div>
         <button type="button" id="pm-addfriend" class="hidden">ADICIONAR AMIGO</button>
         <div id="pm-status"></div>
       </div>

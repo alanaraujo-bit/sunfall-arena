@@ -204,8 +204,11 @@ const hud = {
   navProfile: $('nav-profile'), navConfig: $('nav-config'),
   profileHint: $('profile-hint'), profileContent: $('profile-content'),
   pfName: $('pf-name'), pfLevel: $('pf-level'), pfXpFill: $('pf-xpfill'), pfXpText: $('pf-xptext'),
-  stWins: $('st-wins'), stMatches: $('st-matches'), stKills: $('st-kills'),
-  stDeaths: $('st-deaths'), stKd: $('st-kd'), stHs: $('st-hs'),
+  pfPlaytime: $('pf-playtime'), pfLikes: $('pf-likes'),
+  pfModos: $('pf-modos'), pfMapas: $('pf-mapas'),
+  stWins: $('st-wins'), stMatches: $('st-matches'), stWinrate: $('st-winrate'),
+  stKills: $('st-kills'), stDeaths: $('st-deaths'), stKd: $('st-kd'),
+  stHs: $('st-hs'), stHsrate: $('st-hsrate'),
   setQuality: $('set-quality'), setFov: $('set-fov'), setFovVal: $('set-fov-val'),
   setScale: $('set-scale'), setScaleVal: $('set-scale-val'),
   setShadows: $('set-shadows'), setAa: $('set-aa'), aaNote: $('aa-note'), aaReload: $('aa-reload'),
@@ -217,9 +220,11 @@ const hud = {
   navRank: $('nav-rank'),
   rankSearch: $('rank-search'), rankSearchBtn: $('rank-search-btn'),
   rankStatus: $('rank-status'), rankList: $('rank-list'),
-  playerModal: $('player-modal'), pmClose: $('pm-close'), pmDot: $('pm-dot'),
+  playerModal: $('player-modal'), pmCard: $('pm-card'), pmClose: $('pm-close'), pmDot: $('pm-dot'),
   pmName: $('pm-name'), pmLevel: $('pm-level'), pmSince: $('pm-since'),
   pmXpFill: $('pm-xpfill'), pmXpText: $('pm-xptext'),
+  pmPlaytime: $('pm-playtime'), pmLikesCount: $('pm-likes-count'), pmLike: $('pm-like'),
+  pmModos: $('pm-modos'), pmMapas: $('pm-mapas'),
   pmWins: $('pm-wins'), pmMatches: $('pm-matches'), pmWinrate: $('pm-winrate'),
   pmKills: $('pm-kills'), pmDeaths: $('pm-deaths'), pmKd: $('pm-kd'),
   pmHs: $('pm-hs'), pmHsrate: $('pm-hsrate'),
@@ -646,6 +651,71 @@ function updateIdChip() {
   }
 }
 
+// ---------------- Perfil: abas GERAL/MODOS/MAPAS ----------------
+const MODE_LIST = [
+  { key: 'ffa', name: 'Todos contra Todos' },
+  { key: 'tdm', name: 'Mata-mata em Equipe' }
+];
+
+function formatPlaytime(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds || 0));
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h${String(minutes).padStart(2, '0')}min`;
+  if (hours > 0) return `${hours}h${String(minutes).padStart(2, '0')}min`;
+  return `${minutes}min`;
+}
+
+// escopado por raiz: perfil próprio e perfil público podem coexistir no DOM,
+// então a troca de aba de um não pode afetar o outro.
+function initProfileTabs(root) {
+  root.querySelectorAll('.pf-tab').forEach(tab => {
+    tab.onclick = () => {
+      root.querySelectorAll('.pf-tab').forEach(t => t.classList.toggle('active', t === tab));
+      root.querySelectorAll('.pf-tabpage').forEach(p => p.classList.toggle('hidden', p.dataset.pftabpage !== tab.dataset.pftab));
+    };
+  });
+}
+initProfileTabs(hud.profileContent);
+initProfileTabs(hud.pmCard);
+
+// popula a aba MODOS ou MAPAS de um perfil (próprio ou público) a partir da
+// lista conhecida de modos/mapas — zero-preenche o que o jogador nunca jogou.
+function renderModeMapStats(container, list, byData, keyField) {
+  container.textContent = '';
+  for (const item of list) {
+    const row = (byData || []).find(d => d[keyField] === item.key) ||
+      { kills: 0, deaths: 0, headshots: 0, wins: 0, matchesPlayed: 0, playtimeSeconds: 0 };
+
+    const block = document.createElement('div');
+    block.className = 'pf-block';
+
+    const head = document.createElement('div');
+    head.className = 'pf-block-head';
+    head.textContent = item.name;
+
+    const tiles = document.createElement('div');
+    tiles.className = 'pf-stats-compact';
+    const kd = (row.kills / Math.max(1, row.deaths)).toFixed(2);
+    const entries = [
+      ['Vitórias', row.wins], ['Partidas', row.matchesPlayed],
+      ['K/D', kd], ['Tempo', formatPlaytime(row.playtimeSeconds)]
+    ];
+    for (const [label, val] of entries) {
+      const tile = document.createElement('div');
+      tile.className = 'pf-tile';
+      const b = document.createElement('b'); b.textContent = val;
+      const span = document.createElement('span'); span.textContent = label;
+      tile.append(b, span);
+      tiles.appendChild(tile);
+    }
+
+    block.append(head, tiles);
+    container.appendChild(block);
+  }
+}
+
 async function loadProfile() {
   const logged = !!auth;
   hud.profileHint.classList.toggle('hidden', logged);
@@ -661,12 +731,18 @@ async function loadProfile() {
     const inLevel = prof.xp - (prof.level - 1) * 500;
     hud.pfXpFill.style.width = `${Math.min(100, (inLevel / 500) * 100)}%`;
     hud.pfXpText.textContent = `${inLevel} / 500 XP · total ${prof.xp}`;
+    hud.pfPlaytime.textContent = `🕐 ${formatPlaytime(stats.playtimeSeconds)} jogados`;
+    hud.pfLikes.textContent = `♥ ${prof.likesCount ?? 0} curtidas`;
     hud.stWins.textContent = stats.wins ?? 0;
     hud.stMatches.textContent = stats.matchesPlayed;
+    hud.stWinrate.textContent = `${Math.round((stats.wins / Math.max(1, stats.matchesPlayed)) * 100)}%`;
     hud.stKills.textContent = stats.kills;
     hud.stDeaths.textContent = stats.deaths;
     hud.stKd.textContent = (stats.kills / Math.max(1, stats.deaths)).toFixed(2);
     hud.stHs.textContent = stats.headshots;
+    hud.stHsrate.textContent = `${Math.round((stats.headshots / Math.max(1, stats.kills)) * 100)}%`;
+    renderModeMapStats(hud.pfModos, MODE_LIST, stats.byMode, 'mode');
+    renderModeMapStats(hud.pfMapas, MAP_LIST, stats.byMap, 'mapKey');
   } catch { /* mantém últimos valores */ }
 }
 
@@ -721,7 +797,9 @@ async function loadLeaderboard() {
 async function openPlayerProfile(username) {
   hud.pmStatus.textContent = '';
   try {
-    const p = await apiPublicGet(`/players/${encodeURIComponent(username)}`);
+    const p = auth
+      ? await apiAuth('GET', `/players/${encodeURIComponent(username)}`, auth.token)
+      : await apiPublicGet(`/players/${encodeURIComponent(username)}`);
     hud.pmDot.className = p.online ? 'on' : '';
     hud.pmName.textContent = p.username;
     hud.pmLevel.textContent = p.level;
@@ -731,6 +809,7 @@ async function openPlayerProfile(username) {
     hud.pmXpFill.style.width = `${Math.min(100, (inLevel / 500) * 100)}%`;
     hud.pmXpText.textContent = `${inLevel} / 500 XP · total ${p.xp}`;
     const s = p.stats;
+    hud.pmPlaytime.textContent = `🕐 ${formatPlaytime(s.playtimeSeconds)} jogados`;
     hud.pmWins.textContent = s.wins;
     hud.pmMatches.textContent = s.matchesPlayed;
     hud.pmWinrate.textContent = `${Math.round((s.wins / Math.max(1, s.matchesPlayed)) * 100)}%`;
@@ -739,8 +818,33 @@ async function openPlayerProfile(username) {
     hud.pmKd.textContent = (s.kills / Math.max(1, s.deaths)).toFixed(2);
     hud.pmHs.textContent = s.headshots;
     hud.pmHsrate.textContent = `${Math.round((s.headshots / Math.max(1, s.kills)) * 100)}%`;
+    renderModeMapStats(hud.pmModos, MODE_LIST, p.byMode, 'mode');
+    renderModeMapStats(hud.pmMapas, MAP_LIST, p.byMap, 'mapKey');
 
     const isSelf = auth && auth.username.toLowerCase() === p.username.toLowerCase();
+
+    let pmLiked = !!p.likedByMe;
+    hud.pmLikesCount.textContent = `♥ ${p.likesCount ?? 0}`;
+    hud.pmLike.classList.toggle('hidden', !auth || isSelf);
+    hud.pmLike.classList.toggle('liked', pmLiked);
+    hud.pmLike.textContent = pmLiked ? 'CURTIDO' : 'CURTIR';
+    hud.pmLike.onclick = async () => {
+      hud.pmLike.disabled = true;
+      try {
+        const method = pmLiked ? 'DELETE' : 'POST';
+        const r = await apiAuth(method, `/players/${encodeURIComponent(p.username)}/like`, auth.token);
+        pmLiked = r.liked;
+        hud.pmLikesCount.textContent = `♥ ${r.likesCount}`;
+        hud.pmLike.classList.toggle('liked', pmLiked);
+        hud.pmLike.textContent = pmLiked ? 'CURTIDO' : 'CURTIR';
+      } catch {
+        hud.pmStatus.style.color = '#f0806a';
+        hud.pmStatus.textContent = 'Falha ao curtir.';
+      } finally {
+        hud.pmLike.disabled = false;
+      }
+    };
+
     hud.pmAddFriend.classList.toggle('hidden', !auth || isSelf);
     hud.pmAddFriend.onclick = async () => {
       hud.pmStatus.style.color = '';

@@ -856,15 +856,43 @@ body {
   background: linear-gradient(90deg, #f0c04c, #f0844c);
   transition: width .5s ease-out;
 }
-#pf-xptext { font-size: 11px; letter-spacing: 1px; opacity: .6; margin: 6px 0 16px; text-align: right; }
-#pf-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#pf-xptext { font-size: 11px; letter-spacing: 1px; opacity: .6; margin: 6px 0 10px; text-align: right; }
+#pf-meta, #pm-meta {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  font-size: 12px; opacity: .75; letter-spacing: .5px; margin-bottom: 14px;
+}
+#pm-meta { justify-content: center; }
+#pf-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
 .pf-tile {
   background: rgba(14,10,6,.55); border: 1px solid rgba(242,227,200,.12);
   border-radius: 11px; padding: 12px 6px;
   display: flex; flex-direction: column; gap: 3px;
 }
-.pf-tile b { font-size: 20px; color: #6ee0c8; }
+.pf-tile b { font-size: 17px; color: #6ee0c8; }
 .pf-tile span { font-size: 10px; letter-spacing: 1px; opacity: .6; text-transform: uppercase; }
+
+/* abas GERAL/MODOS/MAPAS — variante horizontal de .cfg-tab, escopada por
+   card (perfil próprio e perfil público podem coexistir na página) */
+.pf-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.pf-tab {
+  flex: 1; padding: 9px 4px; text-align: center; cursor: pointer; font-family: inherit;
+  font-size: 11px; font-weight: bold; letter-spacing: 1.5px; color: #f2e3c8; opacity: .55;
+  background: transparent; border: none; border-bottom: 2px solid transparent; border-radius: 8px 8px 0 0;
+  transition: opacity .15s, background .15s;
+}
+.pf-tab:hover { opacity: .85; }
+.pf-tab.active { opacity: 1; background: rgba(63,200,180,.12); border-bottom-color: #3fc8b4; color: #6ee0c8; }
+
+/* blocos de estatística por modo/mapa */
+.pf-block {
+  background: rgba(14,10,6,.55); border: 1px solid rgba(242,227,200,.16);
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; text-align: left;
+}
+.pf-block:last-child { margin-bottom: 0; }
+.pf-block-head { font-size: 13px; letter-spacing: 2px; color: #f0c04c; font-weight: bold; margin-bottom: 10px; }
+.pf-stats-compact { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pf-stats-compact .pf-tile { padding: 9px 4px; }
+.pf-stats-compact .pf-tile b { font-size: 15px; }
 
 /* ---------- Ranking ---------- */
 #rank-search-row { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -936,9 +964,17 @@ body {
   background: linear-gradient(90deg, #f0c04c, #f0844c);
   transition: width .5s ease-out;
 }
-#pm-xptext { font-size: 11px; opacity: .6; margin: 6px 0 14px; text-align: right; }
+#pm-xptext { font-size: 11px; opacity: .6; margin: 6px 0 10px; text-align: right; }
 #pm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-#pm-stats .pf-tile b { font-size: 17px; }
+#pm-like {
+  padding: 6px 14px; font-family: inherit; font-size: 11px; font-weight: bold; letter-spacing: 1.5px;
+  cursor: pointer; color: #e86a9c;
+  background: rgba(232,106,156,.12); border: 1px solid rgba(232,106,156,.4); border-radius: 20px;
+  transition: filter .1s, background .15s, border-color .15s;
+}
+#pm-like:hover { filter: brightness(1.15); }
+#pm-like:disabled { opacity: .6; cursor: default; }
+#pm-like.liked { background: rgba(232,106,156,.85); border-color: #e86a9c; color: #241408; }
 #pm-addfriend {
   width: 100%; margin-top: 16px; padding: 12px;
   font-family: inherit; font-size: 13px; font-weight: bold; letter-spacing: 3px;
