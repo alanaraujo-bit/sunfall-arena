@@ -30,3 +30,12 @@ export function requireAuth(req, res, next) {
   req.user = claims;
   next();
 }
+
+// Nunca bloqueia — só popula req.user quando há um token válido. Usado em
+// rotas públicas que precisam saber "quem está perguntando" sem deixar de
+// responder a visitantes anônimos.
+export function optionalAuth(req, res, next) {
+  const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+  req.user = token ? verifyToken(token) : null;
+  next();
+}

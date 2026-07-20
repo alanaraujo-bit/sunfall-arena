@@ -18,7 +18,7 @@ import {
 } from './game/grenades.js';
 import { barrelBounds, damageBarrel } from './game/barrels.js';
 import { recordFrame, recordFire, registerKill } from './game/highlights.js';
-import { awardXpAndPersist, persistDeath, loadProfileForJoin } from './game/stats.js';
+import { awardXpAndPersist, persistDeath, persistPlaytime, loadProfileForJoin } from './game/stats.js';
 import { verifyToken } from './auth.js';
 import { setPresence, clearPresence, getPresence } from './presence.js';
 import { query } from './db.js';
@@ -148,11 +148,11 @@ function damage(room, attacker, victim, dmg, head = false, wi = 0, bs = false, r
   broadcastRoom(room, { t: 'die', id: victim.id, by: attacker.id, kk: attacker.kills, vd: victim.deaths, h: head, w: wi, bs });
 
   if (attacker !== victim && attacker.accountId) {
-    awardXpAndPersist(attacker.accountId, { headshot: head })
+    awardXpAndPersist(attacker.accountId, room.settings.gm, room.mapKey, { headshot: head })
       .catch(err => console.error('[xp] award failed for', attacker.accountId, err));
   }
   if (victim.accountId) {
-    persistDeath(victim.accountId)
+    persistDeath(victim.accountId, room.settings.gm, room.mapKey)
       .catch(err => console.error('[stats] death persist failed for', victim.accountId, err));
   }
 
@@ -217,6 +217,13 @@ export function attachWs(server) {
 
     function leaveRoom() {
       if (!room || !self) return;
+      if (self.accountId) {
+        const elapsedSec = Math.min(Math.round((Date.now() - self.joinedAt) / 1000), 12 * 3600);
+        if (elapsedSec > 0) {
+          persistPlaytime(self.accountId, room.settings.gm, room.mapKey, elapsedSec)
+            .catch(err => console.error('[stats] playtime persist failed for', self.accountId, err));
+        }
+      }
       removePlayer(room, self);
       console.log(`- ${self.name} saiu da sala ${room.code}`);
       self = null;
@@ -234,7 +241,8 @@ export function attachWs(server) {
         hp: 100, kills: 0, deaths: 0, streak: 0, kits: 0, healingKit: false,
         nades: NADE_COUNT_START, smokes: SMOKE_COUNT_START,
         primary: resolvePrimary(primaryId),   // arma da classe escolhida — única fonte de dano real
-        alive: true, bot: false, ws
+        alive: true, bot: false, ws,
+        joinedAt: Date.now()
       };
       room = target;
       room.players.set(self.id, self);

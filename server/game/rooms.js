@@ -5,7 +5,7 @@
 // ============================================================
 import { getMap, DEFAULT_MAP, MAPS } from '../../shared/maps/index.js';
 import { makeBot } from './bots.js';
-import { awardWin, persistMatchPlayed } from './stats.js';
+import { recordMatchResult } from './stats.js';
 import { NADE_COUNT_START, SMOKE_COUNT_START } from './grenades.js';
 import { initBarrels } from './barrels.js';
 import { initHighlights } from './highlights.js';
@@ -220,9 +220,9 @@ export function endMatch(room, winner = null, winTeam = null) {
 
   for (const p of room.players.values()) {
     if (!p.accountId) continue;
-    persistMatchPlayed(p.accountId).catch(err => console.error('[stats] match persist failed', err));
     const won = tdm ? (winTeam !== null && p.team === winTeam) : (winner && p.id === winner.id);
-    if (won) awardWin(p.accountId).catch(err => console.error('[stats] win persist failed', err));
+    recordMatchResult(p.accountId, room.settings.gm, room.mapKey, won)
+      .catch(err => console.error('[stats] match result persist failed', err));
   }
 
   room.resetTimer = setTimeout(() => {

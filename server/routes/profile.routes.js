@@ -20,12 +20,29 @@ router.get('/profile/me', requireAuth, async (req, res) => {
 
 router.get('/stats/me', requireAuth, async (req, res) => {
   const { rows } = await query(
-    `SELECT kills, deaths, headshots, wins, matches_played AS "matchesPlayed"
+    `SELECT kills, deaths, headshots, wins, matches_played AS "matchesPlayed",
+            playtime_seconds AS "playtimeSeconds"
      FROM player_stats WHERE user_id = $1`,
     [req.user.sub]
   );
   if (!rows.length) return res.status(404).json({ error: 'not_found' });
-  res.json(rows[0]);
+
+  const [byMode, byMap] = await Promise.all([
+    query(
+      `SELECT mode, kills, deaths, headshots, wins, matches_played AS "matchesPlayed",
+              playtime_seconds AS "playtimeSeconds"
+       FROM player_mode_stats WHERE user_id = $1`,
+      [req.user.sub]
+    ),
+    query(
+      `SELECT map_key AS "mapKey", kills, deaths, headshots, wins, matches_played AS "matchesPlayed",
+              playtime_seconds AS "playtimeSeconds"
+       FROM player_map_stats WHERE user_id = $1`,
+      [req.user.sub]
+    )
+  ]);
+
+  res.json({ ...rows[0], byMode: byMode.rows, byMap: byMap.rows });
 });
 
 export default router;
